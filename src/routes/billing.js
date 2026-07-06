@@ -1,3 +1,8 @@
-const express = require('express'); const router = express.Router();
-router.get('/settings', (req, res) => res.render('layout', { title: 'Settings & Billing', body: '<%- include("billing/settings") %>' }));
+const express = require('express');
+const router = express.Router();
+
+router.get('/settings', (req, res) => {
+  res.render('billing/settings', { title: 'Settings & Billing' });
+});
+
 module.exports = router;
