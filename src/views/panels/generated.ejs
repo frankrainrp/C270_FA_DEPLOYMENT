@@ -1,0 +1,21 @@
+<div class="panels-view">
+  <h3>📊 AI Generated Connectors</h3>
+  <div class="chart-container" style="width:100%; max-width:600px;">
+      <canvas id="printingMetricsChart"></canvas>
+  </div>
+  <script>
+      // Tableau-style visualization data for logistics
+      const ctx = document.getElementById('printingMetricsChart').getContext('2d');
+      new Chart(ctx, {
+          type: 'bar',
+          data: {
+              labels: ['Library', 'Admin Bldg', 'Science Lab', 'Dorms'],
+              datasets: [
+                  { label: 'PricePerPrint ($)', data: [0.10, 0.05, 0.15, 0.08], backgroundColor: '#3498db' },
+                  { label: 'CostPerPrint ($)', data: [0.07, 0.03, 0.12, 0.05], backgroundColor: '#e74c3c' }
+              ]
+          },
+          options: { responsive: true, plugins: { title: { display: true, text: 'Logistics Financial Metrics' } } }
+      });
+  </script>
+</div>

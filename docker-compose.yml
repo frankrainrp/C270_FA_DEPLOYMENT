@@ -1,0 +1,16 @@
+version: '3.8'
+services:
+  butler-app:
+    build: .
+    ports: ["3000:3000"]
+    environment:
+      - MONGO_URI=mongodb://mongo:27017/butlerdb
+      - JWT_SECRET=supersecret_butler_key
+    depends_on:
+      - mongo
+  mongo:
+    image: mongo:latest
+    ports: ["27017:27017"]
+    volumes: ["butler_data:/data/db"]
+volumes:
+  butler_data:

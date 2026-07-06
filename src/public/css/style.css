@@ -1,0 +1,20 @@
+:root { --bg: #f4f7f6; --text: #2c3e50; --primary: #2980b9; --surface: #ffffff; }
+body { font-family: 'Segoe UI', system-ui; margin: 0; background: var(--bg); color: var(--text); }
+.topbar { background: var(--surface); padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+.topbar a { text-decoration: none; color: var(--text); margin-left: 1.5rem; font-weight: 500; }
+.topbar a:hover { color: var(--primary); }
+.topbar .logout { color: #e74c3c; }
+.container { padding: 2rem; max-width: 1200px; margin: auto; }
+.auth-page { display: flex; justify-content: center; align-items: center; height: 100vh; }
+.auth-card { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 100%; max-width: 400px; }
+.auth-card input { width: 100%; padding: 10px; margin-bottom: 1rem; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+.auth-card button { width: 100%; padding: 10px; background: var(--primary); color: white; border: none; border-radius: 4px; cursor: pointer; }
+.study-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; }
+.tasks-panel, .calendar-panel, .panels-view, .billing-panel { background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+ul { list-style: none; padding: 0; }
+li { padding: 0.5rem 0; border-bottom: 1px solid #eee; }
+.chat-canvas { background: white; height: 60vh; display: flex; flex-direction: column; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.05);}
+.chat-history { flex: 1; padding: 1rem; }
+.input-pod { display: flex; padding: 1rem; border-top: 1px solid #eee; background: #fafafa; }
+.input-pod input { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 4px; margin-right: 1rem; }
+.input-pod button { padding: 10px 20px; background: var(--primary); color: white; border: none; border-radius: 4px; }
