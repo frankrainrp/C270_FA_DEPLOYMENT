@@ -4,9 +4,11 @@ const router = express.Router();
 // TEMPORARY placeholder user data.
 // LATER: replace with real data from the User database (Member 2's model).
 const demoUser = {
-  name: "Student",
-  plan: "Free",
-  credits: 1450,
+    name: "Student",
+    email: "student@butler.local",
+    plan: "Free",
+    credits: 1450,
+    memberSince: "January 2026",
 };
 
 // The membership plans on offer
@@ -42,4 +44,8 @@ router.post('/checkout', (req, res) => {
   res.redirect('/billing/settings');
 });
 
+// Profile page
+router.get('/profile', (req, res) => {
+  res.render('billing/profile', { title: 'My Profile', user: demoUser });
+});
 module.exports = router;
