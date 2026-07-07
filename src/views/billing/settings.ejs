@@ -27,11 +27,85 @@
       </form>
     </div>
 
+    <!-- AI Usage & Safety -->
+    <div class="card">
+      <h3>AI Usage &amp; Safety</h3>
+      <p class="sub">Keep track of your AI usage and stay in control.</p>
+
+      <div class="usage-row">
+        <div class="usage-stat">
+          <span class="usage-num"><%= usage.messagesThisMonth %></span>
+          <span class="usage-label">messages this month</span>
+        </div>
+        <div class="usage-stat">
+          <span class="usage-num"><%= usage.creditsUsedThisMonth %></span>
+          <span class="usage-label">credits used this month</span>
+        </div>
+      </div>
+
+      <div class="toggle-row">
+        <div>
+          <strong>Content safety filter</strong>
+          <p class="sub" style="margin:0;">Blocks unsafe or inappropriate AI responses.</p>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="safetyFilter" checked>
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="toggle-row">
+        <div>
+          <strong>Daily usage reminder</strong>
+          <p class="sub" style="margin:0;">Reminds you after heavy AI use to take a break.</p>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="usageReminder">
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="toggle-row">
+        <div>
+          <strong>Use my chats to improve AI</strong>
+          <p class="sub" style="margin:0;">Turn off to keep your conversations private.</p>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="improveAI" checked>
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <p class="sub" id="safetySaved" style="margin-top:0.5rem; color: green; display:none;">Saved ✓</p>
+    </div>
+
     <!-- Membership -->
     <div class="card">
       <h3>Membership</h3>
       <p class="sub">Upgrade for more credits and faster AI.</p>
       <a href="/billing/plans" class="btn btn-primary">View plans & upgrade</a>
+    </div>
+
+    <!-- Account -->
+    <div class="card">
+      <h3>Account</h3>
+      <p class="sub">Update your account details.</p>
+      <form action="/billing/account" method="POST">
+        <div class="field">
+          <label for="accName">Name</label>
+          <input type="text" id="accName" name="name" value="<%= user.name %>">
+        </div>
+        <div class="field">
+          <label for="accEmail">Email</label>
+          <input type="email" id="accEmail" name="email" value="<%= user.email %>">
+        </div>
+        <div class="field">
+          <label for="accPassword">New password</label>
+          <input type="password" id="accPassword" name="password" placeholder="••••••••">
+          <p class="sub" style="margin:0.25rem 0 0;">Password change is simulated for now.</p>
+        </div>
+        <button type="submit" class="btn btn-primary">Save changes</button>
+      </form>
     </div>
 
     <!-- Preferences -->
@@ -63,7 +137,6 @@
       var languageSelect = document.getElementById('languageSelect');
       var savedMsg = document.getElementById('prefSaved');
 
-      // Load saved choices into the dropdowns
       themeSelect.value = localStorage.getItem('butler-theme') || 'light';
       languageSelect.value = localStorage.getItem('butler-language') || 'en';
 
@@ -72,7 +145,6 @@
         setTimeout(function () { savedMsg.style.display = 'none'; }, 1500);
       }
 
-      // Theme: change instantly + remember it
       themeSelect.addEventListener('change', function () {
         var choice = themeSelect.value;
         document.documentElement.setAttribute('data-theme', choice);
@@ -80,10 +152,35 @@
         showSaved();
       });
 
-      // Language: remember it (full translation is future work)
       languageSelect.addEventListener('change', function () {
         localStorage.setItem('butler-language', languageSelect.value);
         showSaved();
+      });
+    })();
+  </script>
+
+  <!-- AI safety toggles: remember choices in the browser -->
+  <script>
+    (function () {
+      var toggles = ['safetyFilter', 'usageReminder', 'improveAI'];
+      var savedMsg = document.getElementById('safetySaved');
+
+      // Load saved states
+      toggles.forEach(function (id) {
+        var saved = localStorage.getItem('butler-' + id);
+        if (saved !== null) document.getElementById(id).checked = (saved === 'true');
+      });
+
+      function showSaved() {
+        savedMsg.style.display = 'block';
+        setTimeout(function () { savedMsg.style.display = 'none'; }, 1500);
+      }
+
+      toggles.forEach(function (id) {
+        document.getElementById(id).addEventListener('change', function () {
+          localStorage.setItem('butler-' + id, this.checked);
+          showSaved();
+        });
       });
     })();
   </script>

@@ -11,6 +11,12 @@ const demoUser = {
     memberSince: "January 2026",
 };
 
+// Simulated AI usage stats (LATER: pull from real usage logs)
+const usageStats = {
+    messagesThisMonth: 128,
+    creditsUsedThisMonth: 640,
+};
+
 // The membership plans on offer
 const plans = [
   { name: "Free",    price: "$0",     credits: 1500,  perks: ["1,500 AI credits/month", "Basic study tools"] },
@@ -20,12 +26,20 @@ const plans = [
 
 // Settings & Billing page
 router.get('/settings', (req, res) => {
-  res.render('billing/settings', { title: 'Settings & Billing', user: demoUser });
+  res.render('billing/settings', { title: 'Settings & Billing', user: demoUser, usage: usageStats });
 });
 
 // Test: spend 10 credits
 router.post('/use-credit', (req, res) => {
   if (demoUser.credits >= 10) demoUser.credits -= 10;
+  res.redirect('/billing/settings');
+});
+
+// Save account edits (name / email) — simulated, updates the placeholder user
+router.post('/account', (req, res) => {
+  if (req.body.name && req.body.name.trim())  demoUser.name  = req.body.name.trim();
+  if (req.body.email && req.body.email.trim()) demoUser.email = req.body.email.trim();
+  // NOTE: password is simulated only — nothing is stored (no User model yet).
   res.redirect('/billing/settings');
 });
 
