@@ -8,17 +8,51 @@
 <body class="theme-light">
   <%- include('../partials/topbar') %>
   <main class="container">
-    <div class="billing-panel">
-      <h3>💳 Subscription & Preferences</h3>
-      <div class="credits">Available AI Credits: <strong>1,450</strong></div>
-      <button class="upgrade-btn">Simulate Checkout / Upgrade</button>
-      <hr>
-      <h4>Theme & Language</h4>
-      <select>
-        <option>English</option>
-        <option>中文 (Chinese)</option>
-      </select>
+
+    <div class="page-head">
+      <h1>Settings & Billing</h1>
+      <p>Manage your plan, credits, and preferences.</p>
     </div>
+
+    <!-- Credits -->
+    <div class="card">
+      <h3>AI Credits</h3>
+      <div class="credit-display">
+        <span class="num"><%= user.credits %></span>
+        <span class="label">credits remaining</span>
+      </div>
+      <p class="sub" style="margin-top:0.75rem;">Plan: <span class="plan-badge"><%= user.plan %></span></p>
+      <form action="/billing/use-credit" method="POST" style="margin-top:0.5rem;">
+        <button type="submit" class="btn btn-ghost">Use 10 credits (test)</button>
+      </form>
+    </div>
+
+    <!-- Membership -->
+    <div class="card">
+      <h3>Membership</h3>
+      <p class="sub">Upgrade for more credits and faster AI.</p>
+      <a href="/billing/plans" class="btn btn-primary">View plans & upgrade</a>
+    </div>
+
+    <!-- Preferences -->
+    <div class="card">
+      <h3>Preferences</h3>
+      <div class="field">
+        <label>Language</label>
+        <select>
+          <option>English</option>
+          <option>中文 (Chinese)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Theme</label>
+        <select>
+          <option>Light</option>
+          <option>Dark</option>
+        </select>
+      </div>
+    </div>
+
   </main>
 </body>
 </html>

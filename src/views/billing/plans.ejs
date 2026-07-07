@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title><%= title %></title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="theme-light">
+  <%- include('../partials/topbar') %>
+  <main class="container">
+
+    <div class="page-head">
+      <h1>Choose your plan</h1>
+      <p>You are currently on the <strong><%= user.plan %></strong> plan.</p>
+    </div>
+
+    <div class="plans-row">
+      <% plans.forEach(function(plan) { %>
+        <div class="plan-card <%= user.plan === plan.name ? 'is-current' : '' %>">
+          <h3><%= plan.name %></h3>
+          <p class="price"><%= plan.price %> <span>/month</span></p>
+          <ul>
+            <% plan.perks.forEach(function(perk) { %>
+              <li><%= perk %></li>
+            <% }); %>
+          </ul>
+          <% if (user.plan === plan.name) { %>
+            <button class="btn btn-ghost btn-block" disabled>Current plan</button>
+          <% } else { %>
+            <form action="/billing/checkout" method="POST">
+              <input type="hidden" name="plan" value="<%= plan.name %>">
+              <button type="submit" class="btn btn-primary btn-block">Choose <%= plan.name %></button>
+            </form>
+          <% } %>
+        </div>
+      <% }); %>
+    </div>
+
+    <p class="sub" style="margin-top:1rem;">Note: payment is simulated for this project — no real charges.</p>
+  </main>
+</body>
+</html>

@@ -18,3 +18,60 @@ li { padding: 0.5rem 0; border-bottom: 1px solid #eee; }
 .input-pod { display: flex; padding: 1rem; border-top: 1px solid #eee; background: #fafafa; }
 .input-pod input { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 4px; margin-right: 1rem; }
 .input-pod button { padding: 10px 20px; background: var(--primary); color: white; border: none; border-radius: 4px; }
+
+/* ===== Settings / Billing / Plans (modern card style) ===== */
+.page-head { margin-bottom: 1.5rem; }
+.page-head h1 { margin: 0 0 4px; font-size: 1.6rem; }
+.page-head p { margin: 0; color: #7f8c8d; font-size: 0.95rem; }
+
+.card {
+  background: var(--surface);
+  border: 1px solid #eef1f0;
+  border-radius: 14px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.04);
+  margin-bottom: 1.25rem;
+}
+.card h3 { margin: 0 0 1rem; font-size: 1.1rem; }
+.card .sub { color: #7f8c8d; font-size: 0.85rem; margin-top: -0.5rem; margin-bottom: 1rem; }
+
+.credit-display { display: flex; align-items: baseline; gap: 0.5rem; }
+.credit-display .num { font-size: 2rem; font-weight: 700; color: var(--primary); }
+.credit-display .label { color: #7f8c8d; }
+
+.plan-badge {
+  display: inline-block; padding: 4px 12px; border-radius: 999px;
+  background: #eaf3f8; color: var(--primary); font-size: 0.8rem; font-weight: 600;
+}
+
+.field { margin-bottom: 1rem; }
+.field label { display: block; font-size: 0.85rem; color: #7f8c8d; margin-bottom: 0.35rem; }
+.field select, .field input {
+  width: 100%; padding: 10px 12px; border: 1px solid #dce3e2;
+  border-radius: 8px; box-sizing: border-box; font-size: 0.95rem; background: #fff;
+}
+
+.btn {
+  display: inline-block; padding: 10px 18px; border-radius: 8px; border: none;
+  font-size: 0.9rem; font-weight: 600; cursor: pointer; text-decoration: none; text-align: center;
+}
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-primary:hover { background: #216a9c; }
+.btn-ghost { background: #f0f4f3; color: var(--text); }
+.btn-ghost:hover { background: #e6ebea; }
+.btn-block { width: 100%; }
+
+/* Plans */
+.plans-row { display: flex; gap: 1.25rem; flex-wrap: wrap; }
+.plan-card {
+  flex: 1; min-width: 220px; background: var(--surface);
+  border: 1px solid #eef1f0; border-radius: 14px; padding: 1.5rem;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.04); display: flex; flex-direction: column;
+}
+.plan-card.is-current { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(41,128,185,0.15); }
+.plan-card h3 { margin: 0 0 0.25rem; }
+.plan-card .price { font-size: 1.8rem; font-weight: 700; margin: 0.25rem 0 1rem; }
+.plan-card .price span { font-size: 0.85rem; color: #7f8c8d; font-weight: 400; }
+.plan-card ul { flex: 1; margin: 0 0 1.25rem; }
+.plan-card li { border: none; padding: 0.35rem 0; color: #555; padding-left: 1.25rem; position: relative; }
+.plan-card li::before { content: "✓"; color: var(--primary); position: absolute; left: 0; }
