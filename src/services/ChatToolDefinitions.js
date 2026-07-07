@@ -3,28 +3,34 @@
 // OpenAI-style tool schemas sent to the chat model.
 //
 // The model can request any of these tools; the actual execution
-// happens in the browser (public/js/tool-executor.js), which then
-// posts results back on the next round.  This keeps business
-// state fully on the client during the chat loop.
+// happens in the browser (public/js/tool-executor.js), which calls
+// the REST API under /api/tasks, /api/notes, /api/calendar.  The
+// REST layer talks to MongoDB via Mongoose services.
 //
-// The set here is a minimal subset of the C270_FA tool list, enough
-// to drive tasks and notes.  More tools (panels, recurring, …) can
-// be added in later phases.
+// Naming convention:
+//   task_*  -> Task CRUD
+//   note_*  -> Note CRUD
+//   event_* -> CalendarEvent CRUD
+//
+// Every id field is the MongoDB _id string.  The context summary
+// injected into the system prompt lists current ids so the model
+// can update / delete existing records.
 // ============================================================
 
 const CHAT_TOOLS = [
+  // ---------- TASKS ----------
   {
     type: "function",
     function: {
-      name: "create_item",
-      description: "Create a new task or deadline for the user.",
+      name: "task_create",
+      description: "Create a new task in MongoDB. Use when the user asks to add a task, todo, deadline, or reminder.",
       parameters: {
         type: "object",
         properties: {
-          title:       { type: "string",  description: "Short human-readable task title." },
-          dueDate:     { type: "string",  description: "ISO date (YYYY-MM-DD) when the task is due." },
+          title:       { type: "string",  description: "Short task title." },
+          dueDate:     { type: "string",  description: "ISO date or datetime (YYYY-MM-DD or full ISO)." },
           priority:    { type: "string",  enum: ["low", "medium", "high"], description: "Task priority." },
-          description: { type: "string",  description: "Optional longer description or notes." },
+          description: { type: "string",  description: "Optional longer description." },
         },
         required: ["title"],
       },
@@ -33,8 +39,8 @@ const CHAT_TOOLS = [
   {
     type: "function",
     function: {
-      name: "update_item",
-      description: "Update an existing task's fields.",
+      name: "task_update",
+      description: "Update fields of an existing task. Requires the MongoDB _id from the context snapshot.",
       parameters: {
         type: "object",
         properties: {
@@ -43,6 +49,7 @@ const CHAT_TOOLS = [
           dueDate:     { type: "string" },
           priority:    { type: "string", enum: ["low", "medium", "high"] },
           description: { type: "string" },
+          completed:   { type: "boolean" },
         },
         required: ["id"],
       },
@@ -51,8 +58,8 @@ const CHAT_TOOLS = [
   {
     type: "function",
     function: {
-      name: "delete_item",
-      description: "Delete a task by id.",
+      name: "task_delete",
+      description: "Delete a task by MongoDB _id.",
       parameters: {
         type: "object",
         properties: { id: { type: "string" } },
@@ -63,8 +70,8 @@ const CHAT_TOOLS = [
   {
     type: "function",
     function: {
-      name: "toggle_complete",
-      description: "Toggle a task's completed state.",
+      name: "task_toggle",
+      description: "Toggle a task's completed flag by MongoDB _id.",
       parameters: {
         type: "object",
         properties: { id: { type: "string" } },
@@ -75,8 +82,8 @@ const CHAT_TOOLS = [
   {
     type: "function",
     function: {
-      name: "list_items",
-      description: "List current tasks. Read-only.",
+      name: "task_list",
+      description: "List tasks. Read-only.",
       parameters: {
         type: "object",
         properties: {
@@ -85,16 +92,20 @@ const CHAT_TOOLS = [
       },
     },
   },
+
+  // ---------- NOTES ----------
   {
     type: "function",
     function: {
-      name: "create_note",
-      description: "Create a markdown note.",
+      name: "note_create",
+      description: "Create a markdown note in MongoDB.",
       parameters: {
         type: "object",
         properties: {
           title:   { type: "string" },
-          content: { type: "string" },
+          content: { type: "string", description: "Markdown body." },
+          tags:    { type: "array",  items: { type: "string" } },
+          pinned:  { type: "boolean" },
         },
         required: ["title"],
       },
@@ -103,9 +114,122 @@ const CHAT_TOOLS = [
   {
     type: "function",
     function: {
-      name: "list_notes",
-      description: "List all notes. Read-only.",
-      parameters: { type: "object", properties: {} },
+      name: "note_update",
+      description: "Update fields of an existing note.",
+      parameters: {
+        type: "object",
+        properties: {
+          id:      { type: "string" },
+          title:   { type: "string" },
+          content: { type: "string" },
+          tags:    { type: "array", items: { type: "string" } },
+          pinned:  { type: "boolean" },
+        },
+        required: ["id"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "note_delete",
+      description: "Delete a note by MongoDB _id.",
+      parameters: {
+        type: "object",
+        properties: { id: { type: "string" } },
+        required: ["id"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "note_toggle_pin",
+      description: "Toggle a note's pinned flag by MongoDB _id.",
+      parameters: {
+        type: "object",
+        properties: { id: { type: "string" } },
+        required: ["id"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "note_list",
+      description: "List notes. Read-only.",
+      parameters: {
+        type: "object",
+        properties: {
+          filter: { type: "string", enum: ["all", "pinned"] },
+        },
+      },
+    },
+  },
+
+  // ---------- CALENDAR ----------
+  {
+    type: "function",
+    function: {
+      name: "event_create",
+      description: "Create a calendar event in MongoDB. Use for meetings, exams, or dated reminders.",
+      parameters: {
+        type: "object",
+        properties: {
+          title:       { type: "string" },
+          date:        { type: "string", description: "ISO date or datetime." },
+          description: { type: "string" },
+          color:       { type: "string", enum: ["red", "orange", "yellow", "green", "blue", "purple", "gray"] },
+          tag:         { type: "string" },
+          allDay:      { type: "boolean" },
+        },
+        required: ["title", "date"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "event_update",
+      description: "Update a calendar event by MongoDB _id.",
+      parameters: {
+        type: "object",
+        properties: {
+          id:          { type: "string" },
+          title:       { type: "string" },
+          date:        { type: "string" },
+          description: { type: "string" },
+          color:       { type: "string", enum: ["red", "orange", "yellow", "green", "blue", "purple", "gray"] },
+          tag:         { type: "string" },
+          allDay:      { type: "boolean" },
+        },
+        required: ["id"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "event_delete",
+      description: "Delete a calendar event by MongoDB _id.",
+      parameters: {
+        type: "object",
+        properties: { id: { type: "string" } },
+        required: ["id"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "event_list",
+      description: "List calendar events. Read-only.",
+      parameters: {
+        type: "object",
+        properties: {
+          scope: { type: "string", enum: ["all", "upcoming"], description: "'upcoming' returns the next 7 days." },
+        },
+      },
     },
   },
 ];

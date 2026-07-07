@@ -1,19 +1,26 @@
 // ============================================================
 // public/js/chat-ui.js
-// DOM controller for the chat page.  Wires the composer form to
-// the streaming chat client, appends message bubbles, and manages
-// the "Stop" button while a response is in flight.
+// DOM controller for the chat page.
+//
+// Implements a multi-round TOOL LOOP:
+//   1. Send the current messages to /api/chat.
+//   2. If the assistant reply contains tool_calls, execute each via
+//      ButlerToolExecutor (which calls /api/tasks|notes|calendar and
+//      talks to MongoDB), append a role:"tool" message with the
+//      result, then go to step 1.
+//   3. Loop until the assistant reply has no tool_calls, or the
+//      safety cap (MAX_TOOL_ROUNDS) is hit.
 //
 // Depends on:
-//   ButlerState        (app-state.js)
-//   ButlerChatClient   (chat-client.js)
+//   ButlerState         (app-state.js)
+//   ButlerChatClient    (chat-client.js)
+//   ButlerToolExecutor  (tool-executor.js)
 // ============================================================
 
 (function initChatUi() {
-  if (!window.ButlerChatClient || !window.ButlerState) {
-    // Chat scripts are only loaded on the chat page.  Bail on other pages.
-    return;
-  }
+  if (!window.ButlerChatClient || !window.ButlerState) return;
+
+  var MAX_TOOL_ROUNDS = 6;
 
   var stream = document.querySelector("[data-message-stream]");
   var emptyBlock = document.querySelector("[data-chat-empty]");
@@ -51,6 +58,21 @@
     return bubble;
   }
 
+  function appendToolNotice(text) {
+    var row = document.createElement("div");
+    row.className = "message-row ai tool-notice";
+    row.style.opacity = "0.7";
+    row.style.fontSize = "0.8em";
+
+    var bubble = document.createElement("div");
+    bubble.className = "chat-bubble chat-bubble-ai";
+    bubble.textContent = text;
+
+    row.appendChild(bubble);
+    stream.appendChild(row);
+    scrollToEnd();
+  }
+
   function setStreamingState(streaming) {
     ButlerState.set({ isStreaming: streaming });
     sendBtn.disabled = streaming;
@@ -63,62 +85,136 @@
     el.style.height = Math.min(el.scrollHeight, 160) + "px";
   }
 
-  // ---------- Send flow ----------
+  // ---------- Message conversion ----------
+  // Convert ButlerState messages -> OpenAI-compatible wire format.
+  // MUST preserve tool_calls (on assistant messages) and tool_call_id
+  // (on tool messages) so the tool loop actually works.
+  function toWireMessages(list) {
+    return list.map(function (m) {
+      var out = { role: m.role, content: m.content == null ? "" : m.content };
+      if (Array.isArray(m.tool_calls) && m.tool_calls.length > 0) {
+        out.tool_calls = m.tool_calls;
+        // OpenAI protocol: assistant tool-call messages may have null content.
+        if (!out.content) out.content = "";
+      }
+      if (m.tool_call_id) out.tool_call_id = m.tool_call_id;
+      return out;
+    });
+  }
+
+  // Push into ButlerState so the message survives across the loop.
+  function record(msg) {
+    ButlerState.addMessage(Object.assign({ id: "m-" + Date.now() + "-" + Math.random().toString(36).slice(2, 6) }, msg));
+  }
+
+  // ---------- Single streaming round ----------
+  // Returns the assistant message from that round.
+  async function runOneRound(signal) {
+    var messages = toWireMessages(ButlerState.get().messages);
+    var localBubble = null;
+    var assistantMsg = null;
+
+    await ButlerChatClient.streamChat({
+      messages: messages,
+      model: "deepseek-v4-flash",
+      personality: "standard",
+      signal: signal,
+      callbacks: {
+        onContentDelta: function (delta) {
+          if (!localBubble) {
+            localBubble = appendMessageBubble("assistant", "");
+            pendingBubble = localBubble;
+          }
+          localBubble.textContent += delta;
+          scrollToEnd();
+        },
+        onToolCall: function (call) {
+          console.info("[chat] tool call:", call.function && call.function.name);
+        },
+        onAssistantMessage: function (msg) {
+          assistantMsg = msg;
+        },
+        onError: function (err) {
+          if (localBubble) {
+            localBubble.textContent = "Butler could not answer: " + (err && err.message ? err.message : "unknown error");
+          } else {
+            appendMessageBubble("assistant", "Butler could not answer: " + (err && err.message ? err.message : "unknown error"));
+          }
+        },
+      },
+    });
+
+    pendingBubble = null;
+    return assistantMsg || { role: "assistant", content: "" };
+  }
+
+  // ---------- Tool execution ----------
+  async function runToolCalls(toolCalls) {
+    if (!window.ButlerToolExecutor) {
+      console.warn("[chat] tool executor missing; skipping", toolCalls.length, "tool calls");
+      return toolCalls.map(function (c) {
+        return { tool_call_id: c.id, content: JSON.stringify({ ok: false, error: "Executor not loaded." }) };
+      });
+    }
+
+    var results = [];
+    for (var i = 0; i < toolCalls.length; i += 1) {
+      var call = toolCalls[i];
+      var name = call.function && call.function.name;
+      appendToolNotice("Calling " + name + "...");
+      var content = await ButlerToolExecutor.execute(call);
+      results.push({ tool_call_id: call.id, content: content });
+    }
+    return results;
+  }
+
+  // ---------- Main send flow ----------
   async function sendMessage(text) {
     var trimmed = String(text || "").trim();
     if (!trimmed) return;
 
     hideEmptyBlock();
 
-    var userMsg = { id: "m-" + Date.now(), role: "user", content: trimmed };
-    ButlerState.addMessage(userMsg);
+    record({ role: "user", content: trimmed });
     appendMessageBubble("user", trimmed);
 
     input.value = "";
     autoResize(input);
 
-    pendingBubble = appendMessageBubble("assistant", "");
     setStreamingState(true);
-
     abortController = new AbortController();
 
-    var messagesForApi = ButlerState.get().messages.map(function (m) {
-      return { role: m.role, content: m.content };
-    });
-
     try {
-      await ButlerChatClient.streamChat({
-        messages: messagesForApi,
-        model: "deepseek-v4-flash",
-        personality: "standard",
-        signal: abortController.signal,
-        callbacks: {
-          onContentDelta: function (delta) {
-            if (!pendingBubble) return;
-            pendingBubble.textContent += delta;
-            scrollToEnd();
-          },
-          onToolCall: function (call) {
-            // Tool execution is added in a later phase.
-            console.info("[chat] tool call requested:", call.function && call.function.name);
-          },
-          onAssistantMessage: function (msg) {
-            ButlerState.addMessage({
-              id: "m-" + Date.now(),
-              role: "assistant",
-              content: msg.content || "",
-            });
-          },
-          onError: function (err) {
-            if (pendingBubble) {
-              pendingBubble.textContent = "Butler could not answer: " + (err && err.message ? err.message : "unknown error");
-            }
-          },
-        },
-      });
+      var round = 0;
+      while (round < MAX_TOOL_ROUNDS) {
+        var assistantMsg = await runOneRound(abortController.signal);
+
+        // Record the assistant turn (may have content and/or tool_calls).
+        record({
+          role: "assistant",
+          content: assistantMsg.content || "",
+          tool_calls: assistantMsg.tool_calls,
+        });
+
+        if (!Array.isArray(assistantMsg.tool_calls) || assistantMsg.tool_calls.length === 0) {
+          break; // No tools -> conversation turn complete.
+        }
+
+        var results = await runToolCalls(assistantMsg.tool_calls);
+        results.forEach(function (r) {
+          record({ role: "tool", tool_call_id: r.tool_call_id, content: r.content });
+        });
+
+        round += 1;
+      }
+
+      if (round >= MAX_TOOL_ROUNDS) {
+        appendToolNotice("Reached tool-call limit (" + MAX_TOOL_ROUNDS + "). Stopping.");
+      }
     } catch (err) {
       if (!(err && (err.name === "AbortError" || err.name === "DOMException"))) {
-        console.error("[chat] streamChat failed:", err);
+        console.error("[chat] send failed:", err);
+        appendMessageBubble("assistant", "Butler could not answer: " + (err && err.message ? err.message : "unknown error"));
       }
     } finally {
       pendingBubble = null;
