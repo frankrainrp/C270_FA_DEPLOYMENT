@@ -17,6 +17,7 @@
 
 const { buildSystemPrompt } = require("./ChatPrompt");
 const { CHAT_TOOLS } = require("./ChatToolDefinitions");
+const ChatSessionService = require("./ChatSessionService");
 
 // UI model id -> upstream DeepSeek model id.
 // Kept as a whitelist so a client cannot smuggle arbitrary model names
@@ -69,6 +70,31 @@ function beginSse(res) {
 // The chunk shape mimics the OpenAI/DeepSeek delta format so chat-client.js
 // can parse both real and mock streams with the same code path.
 async function streamMock(input, res) {
+  // Get or create chat session
+  let session;
+  try {
+    session = await ChatSessionService.getLatestSession();
+  } catch (err) {
+    console.error("[ChatService] Failed to get session:", err);
+    beginSse(res);
+    writeSse(res, { error: "Failed to initialize chat session" });
+    res.write("data: [DONE]\n\n");
+    res.end();
+    return;
+  }
+
+  // Save user message to session if present
+  if (Array.isArray(input.messages) && input.messages.length > 0) {
+    const lastMsg = input.messages[input.messages.length - 1];
+    if (lastMsg.role === "user") {
+      try {
+        await ChatSessionService.addMessage(session._id, "user", lastMsg.content);
+      } catch (err) {
+        console.error("[ChatService] Failed to save user message:", err);
+      }
+    }
+  }
+
   beginSse(res);
 
   const lastUser = [...(input.messages || [])].reverse().find((m) => m.role === "user");
@@ -76,14 +102,26 @@ async function streamMock(input, res) {
   const reply = `Butler (mock mode): I received "${echo}". Configure DEEPSEEK_API_KEY in .env to enable the real model.`;
 
   const words = reply.split(/(\s+)/);
+  let fullResponse = "";
   for (const chunk of words) {
     writeSse(res, {
       choices: [{ delta: { content: chunk }, finish_reason: null }],
     });
+    fullResponse += chunk;
     // Small delay so the UI shows a streaming effect.
     await new Promise((resolve) => setTimeout(resolve, 25));
   }
   writeSse(res, { choices: [{ delta: {}, finish_reason: "stop" }] });
+
+  // Save AI response to session
+  if (fullResponse && session) {
+    try {
+      await ChatSessionService.addMessage(session._id, "assistant", fullResponse);
+    } catch (err) {
+      console.error("[ChatService] Failed to save assistant message:", err);
+    }
+  }
+
   res.write("data: [DONE]\n\n");
   res.end();
 }
@@ -101,6 +139,31 @@ async function streamReal(input, res) {
     res.write("data: [DONE]\n\n");
     res.end();
     return;
+  }
+
+  // Get or create chat session
+  let session;
+  try {
+    session = await ChatSessionService.getLatestSession();
+  } catch (err) {
+    console.error("[ChatService] Failed to get session:", err);
+    beginSse(res);
+    writeSse(res, { error: "Failed to initialize chat session" });
+    res.write("data: [DONE]\n\n");
+    res.end();
+    return;
+  }
+
+  // Save user message to session if present
+  if (Array.isArray(input.messages) && input.messages.length > 0) {
+    const lastMsg = input.messages[input.messages.length - 1];
+    if (lastMsg.role === "user") {
+      try {
+        await ChatSessionService.addMessage(session._id, "user", lastMsg.content);
+      } catch (err) {
+        console.error("[ChatService] Failed to save user message:", err);
+      }
+    }
   }
 
   const modelChoice = MODEL_MAP[input.model] || MODEL_MAP[DEFAULT_MODEL_ID];
@@ -137,16 +200,31 @@ async function streamReal(input, res) {
 
   beginSse(res);
   let hasEmitted = false;
+  let fullResponse = "";
   try {
     for await (const chunk of stream) {
       res.write(`data: ${JSON.stringify(chunk)}\n\n`);
       hasEmitted = true;
+      
+      // Collect response text for saving to session
+      if (chunk.choices && chunk.choices[0] && chunk.choices[0].delta && chunk.choices[0].delta.content) {
+        fullResponse += chunk.choices[0].delta.content;
+      }
     }
   } catch (err) {
     if (!hasEmitted) {
       writeSse(res, { error: err && err.message ? err.message : "Stream failed." });
     }
   } finally {
+    // Save AI response to session
+    if (fullResponse && session) {
+      try {
+        await ChatSessionService.addMessage(session._id, "assistant", fullResponse);
+      } catch (err) {
+        console.error("[ChatService] Failed to save assistant message:", err);
+      }
+    }
+    
     res.write("data: [DONE]\n\n");
     res.end();
   }

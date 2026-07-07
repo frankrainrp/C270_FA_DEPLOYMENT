@@ -17,6 +17,7 @@
 
 const express = require("express");
 const path = require("path");
+const mongoose = require("mongoose");
 
 // Optional .env loader.  Wrapped in try/catch so the app still boots
 // if `dotenv` is not installed yet — useful during the very first run.
@@ -75,9 +76,29 @@ app.use((err, req, res, _next) => {
 });
 
 // ------------------------------------------------------------------
+// Database connection (MongoDB via Mongoose)
+// ------------------------------------------------------------------
+const connectDB = async () => {
+  try {
+    const mongoUri = process.env.MONGO_URI || "mongodb://localhost:27017/butler";
+    await mongoose.connect(mongoUri, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    });
+    console.log("[db] Connected to MongoDB:", mongoUri);
+  } catch (err) {
+    console.error("[db] MongoDB connection failed:", err.message);
+    // Don't exit — allow app to run without DB (useful for dev/testing)
+    // In production, you'd want to exit here
+  }
+};
+
+// ------------------------------------------------------------------
 // Server bootstrap
 // ------------------------------------------------------------------
 const PORT = process.env.PORT || 3000;
+
+connectDB();
 
 app.listen(PORT, () => {
   console.log(`Butler is running at http://localhost:${PORT}`);
