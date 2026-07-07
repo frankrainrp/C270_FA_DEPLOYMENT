@@ -1,37 +1,84 @@
-const express = require('express');
-const mongoose = require('mongoose');
-const cookieParser = require('cookie-parser');
-const path = require('path');
+// ============================================================
+// src/app.js
+// Application entry point.
+//
+// Responsibilities (this file only):
+//   - Load environment variables
+//   - Create the Express app
+//   - Register global middleware (body parsers, static, cookies)
+//   - Configure EJS view engine
+//   - Mount every route through routes/index.js
+//   - Register 404 and error handlers
+//   - Start the HTTP server
+//
+// Business logic lives in services/*.js, and every URL is registered
+// in routes/index.js.  Do not add inline route handlers here.
+// ============================================================
+
+const express = require("express");
+const path = require("path");
+
+// Optional .env loader.  Wrapped in try/catch so the app still boots
+// if `dotenv` is not installed yet — useful during the very first run.
+try {
+  require("dotenv").config();
+} catch (_) { /* dotenv is optional */ }
+
+const mountRoutes = require("./routes");
+const { makeFail } = require("./lib/apiResponse");
 
 const app = express();
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(cookieParser());
 
-// Database Connection
-const mongoURI = process.env.MONGO_URI || 'mongodb://localhost:27017/butlerdb';
-mongoose.connect(mongoURI).then(() => {
-    console.log('MongoDB Connected to ButlerDB');
-    require('./services/seeder'); // Seed initial data
-}).catch(err => console.log('MongoDB connection pending...'));
+// ------------------------------------------------------------------
+// Global middleware
+// ------------------------------------------------------------------
+app.use(express.urlencoded({ extended: true, limit: "1mb" }));
+app.use(express.json({ limit: "5mb" }));
 
-// UI Shell / Theme Setup
-app.set('view engine', 'ejs');
-app.set('views', path.join(__dirname, 'views'));
-app.use(express.static(path.join(__dirname, 'public')));
+// Static assets served from src/public.
+// Requests like /css/style.css or /js/shell.js resolve to files here.
+app.use(express.static(path.join(__dirname, "public")));
 
-// Middleware (AuthGate equivalent)
-const { requireAuth } = require('./middleware/authGate');
+// ------------------------------------------------------------------
+// EJS view engine
+// ------------------------------------------------------------------
+app.set("view engine", "ejs");
+app.set("views", path.join(__dirname, "views"));
 
-// Routes mapped to Features
-app.use('/auth', require('./routes/auth'));
-app.use('/ai', requireAuth, require('./routes/ai'));
-app.use('/ocr', requireAuth, require('./routes/ocr'));
-app.use('/study', requireAuth, require('./routes/study'));
-app.use('/panels', requireAuth, require('./routes/panels'));
-app.use('/billing', requireAuth, require('./routes/billing'));
+// ------------------------------------------------------------------
+// Routes (single mount point)
+// ------------------------------------------------------------------
+mountRoutes(app);
 
-app.get('/', (req, res) => res.redirect('/auth/login'));
+// ------------------------------------------------------------------
+// 404 handler.  Responds with JSON for /api/*, HTML for everything else.
+// ------------------------------------------------------------------
+app.use((req, res) => {
+  if (req.path.startsWith("/api/")) {
+    res.status(404).json(makeFail("Not found."));
+    return;
+  }
+  res.status(404).send("404 - Page Not Found");
+});
 
+// ------------------------------------------------------------------
+// Error handler.  Must have 4 args to be treated as an error middleware.
+// ------------------------------------------------------------------
+app.use((err, req, res, _next) => {
+  console.error("[app] unhandled error:", err);
+  if (res.headersSent) return;
+  if (req.path.startsWith("/api/")) {
+    res.status(500).json(makeFail(err && err.message ? err.message : "Unknown server error."));
+    return;
+  }
+  res.status(500).send("500 - Server Error");
+});
+
+// ------------------------------------------------------------------
+// Server bootstrap
+// ------------------------------------------------------------------
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log('Butler is running on port ' + PORT));
+
+app.listen(PORT, () => {
+  console.log(`Butler is running at http://localhost:${PORT}`);
+});

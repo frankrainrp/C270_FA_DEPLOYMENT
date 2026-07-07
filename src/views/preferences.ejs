@@ -1,0 +1,262 @@
+<%
+  /*
+    preferences.ejs
+    Standalone settings page.  For now the only user preference is
+    the visual theme.  Selection is persisted to localStorage under
+    the key "butler-theme" so the choice sticks across reloads.
+
+    Themes exposed here (CSS names on the left, human labels on the right):
+      - retro : Paper  (default, cream parchment)
+      - paper : Glass  (iOS-style frosted glass)
+      - dark  : Dark   (deep neutral)
+  */
+  const pageTitle = typeof title !== "undefined" ? title : "Preferences — Butler";
+  const langCode = typeof lang !== "undefined" ? lang : "en";
+%>
+<!doctype html>
+<html lang="<%= langCode %>" data-theme="retro">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f3eee0" />
+    <title><%= pageTitle %></title>
+    <script>
+      // Preload saved theme before CSS applies to avoid FOUC.
+      (function () {
+        try {
+          var saved = localStorage.getItem("butler-theme");
+          if (saved === "paper" || saved === "retro" || saved === "dark") {
+            document.documentElement.setAttribute("data-theme", saved);
+          }
+        } catch (_) { /* ignore */ }
+      })();
+    </script>
+    <link rel="stylesheet" href="/css/style.css" />
+    <style>
+      /* Local layout for the preferences page only. */
+      .pref-shell {
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 32px 20px;
+        background: var(--color-bg);
+      }
+      .pref-card {
+        width: min(880px, 100%);
+        padding: 28px;
+        border: 1px solid var(--glass-border);
+        border-radius: var(--radius-modal);
+        background: var(--glass-bg-strong);
+        backdrop-filter: var(--glass-blur);
+        -webkit-backdrop-filter: var(--glass-blur);
+        box-shadow: var(--shadow-card-hover);
+      }
+      .pref-header {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 6px;
+      }
+      .pref-header h1 {
+        margin: 0;
+        color: var(--color-text);
+        font-family: var(--font-display);
+        font-size: 30px;
+      }
+      .pref-header a {
+        color: var(--color-primary);
+        font-weight: 700;
+        text-decoration: none;
+      }
+      .pref-header a:hover { text-decoration: underline; }
+      .pref-sub {
+        margin: 0 0 22px;
+        color: var(--color-text-muted);
+        font-size: 14px;
+      }
+      .pref-section-title {
+        margin: 6px 0 12px;
+        color: var(--color-text-faint);
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.8px;
+        text-transform: uppercase;
+      }
+      .pref-theme-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 14px;
+      }
+      .pref-theme-card {
+        display: grid;
+        gap: 12px;
+        padding: 14px;
+        border: 2px solid var(--color-border-soft);
+        border-radius: var(--radius-card);
+        background: var(--color-surface);
+        cursor: pointer;
+        text-align: left;
+        transition: transform 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+      }
+      .pref-theme-card:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-card-hover);
+      }
+      .pref-theme-card.selected {
+        border-color: var(--color-primary);
+        box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-primary) 18%, transparent);
+      }
+      .pref-preview {
+        display: grid;
+        grid-template-columns: 40% 1fr;
+        gap: 6px;
+        height: 108px;
+        padding: 8px;
+        border-radius: 12px;
+        border: 1px solid var(--color-border-soft);
+      }
+      .pref-preview-side { border-radius: 8px; padding: 6px; display: grid; align-content: start; gap: 4px; }
+      .pref-preview-main { border-radius: 8px; padding: 6px; display: grid; align-content: end; gap: 4px; }
+      .pref-swatch { height: 6px; border-radius: 3px; }
+      .pref-name {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        color: var(--color-text);
+        font-family: var(--font-display);
+        font-size: 18px;
+        font-weight: 700;
+      }
+      .pref-tag {
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: var(--color-primary-soft);
+        color: var(--color-primary);
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.4px;
+        text-transform: uppercase;
+      }
+      .pref-desc {
+        margin: 0;
+        color: var(--color-text-muted);
+        font-size: 13px;
+      }
+
+      /* Static preview colours per theme card, independent of the
+         currently applied theme, so the user can compare them
+         side by side. */
+      .pref-preview-retro { background: #f3eee0; }
+      .pref-preview-retro .pref-preview-side { background: rgba(246, 238, 220, 0.97); border: 1px solid rgba(176, 141, 87, 0.45); }
+      .pref-preview-retro .pref-preview-main { background: rgba(246, 238, 220, 0.85); border: 1px solid rgba(176, 141, 87, 0.35); }
+      .pref-preview-retro .pref-swatch.primary { background: #2d4a3e; }
+      .pref-preview-retro .pref-swatch.accent  { background: #b08d57; }
+      .pref-preview-retro .pref-swatch.muted   { background: #d8cbab; }
+
+      .pref-preview-paper { background: #dbe7e6; }
+      .pref-preview-paper .pref-preview-side { background: rgba(239, 246, 245, 0.78); border: 1px solid rgba(255, 255, 255, 0.55); }
+      .pref-preview-paper .pref-preview-main { background: rgba(242, 248, 247, 0.9); border: 1px solid rgba(255, 255, 255, 0.55); }
+      .pref-preview-paper .pref-swatch.primary { background: #4a7c99; }
+      .pref-preview-paper .pref-swatch.accent  { background: #1fa39a; }
+      .pref-preview-paper .pref-swatch.muted   { background: #cfd8d7; }
+
+      .pref-preview-dark { background: #0a0a0b; }
+      .pref-preview-dark .pref-preview-side { background: rgba(30, 43, 42, 0.62); border: 1px solid rgba(255, 255, 255, 0.1); }
+      .pref-preview-dark .pref-preview-main { background: rgba(34, 47, 46, 0.78); border: 1px solid rgba(255, 255, 255, 0.1); }
+      .pref-preview-dark .pref-swatch.primary { background: #7cc4e0; }
+      .pref-preview-dark .pref-swatch.accent  { background: #4fd3c5; }
+      .pref-preview-dark .pref-swatch.muted   { background: #3a4342; }
+    </style>
+  </head>
+  <body>
+    <main class="pref-shell">
+      <section class="pref-card">
+        <header class="pref-header">
+          <h1>Preferences</h1>
+          <a href="/chat">← Back to Butler</a>
+        </header>
+        <p class="pref-sub">Choose the visual theme that fits the mood you are working in. Your choice is saved on this device only.</p>
+
+        <h2 class="pref-section-title">Theme</h2>
+
+        <div class="pref-theme-grid" data-theme-grid>
+
+          <!-- Paper / retro: default, parchment look. -->
+          <button
+            type="button"
+            class="pref-theme-card"
+            data-theme-value="retro"
+          >
+            <div class="pref-preview pref-preview-retro">
+              <div class="pref-preview-side">
+                <span class="pref-swatch primary"></span>
+                <span class="pref-swatch muted"></span>
+                <span class="pref-swatch muted"></span>
+              </div>
+              <div class="pref-preview-main">
+                <span class="pref-swatch accent"></span>
+                <span class="pref-swatch muted"></span>
+              </div>
+            </div>
+            <div class="pref-name">
+              <span>Paper</span>
+              <span class="pref-tag">Default</span>
+            </div>
+            <p class="pref-desc">Cream parchment, handwritten headings, olive and brass accents.</p>
+          </button>
+
+          <!-- Paper (CSS name) / glass (visual): iOS-style. -->
+          <button
+            type="button"
+            class="pref-theme-card"
+            data-theme-value="paper"
+          >
+            <div class="pref-preview pref-preview-paper">
+              <div class="pref-preview-side">
+                <span class="pref-swatch primary"></span>
+                <span class="pref-swatch muted"></span>
+                <span class="pref-swatch muted"></span>
+              </div>
+              <div class="pref-preview-main">
+                <span class="pref-swatch accent"></span>
+                <span class="pref-swatch muted"></span>
+              </div>
+            </div>
+            <div class="pref-name">
+              <span>Glass</span>
+            </div>
+            <p class="pref-desc">Frosted glass panels, soft teal palette, iOS-style rounded shell.</p>
+          </button>
+
+          <!-- Dark: deep neutral. -->
+          <button
+            type="button"
+            class="pref-theme-card"
+            data-theme-value="dark"
+          >
+            <div class="pref-preview pref-preview-dark">
+              <div class="pref-preview-side">
+                <span class="pref-swatch primary"></span>
+                <span class="pref-swatch muted"></span>
+                <span class="pref-swatch muted"></span>
+              </div>
+              <div class="pref-preview-main">
+                <span class="pref-swatch accent"></span>
+                <span class="pref-swatch muted"></span>
+              </div>
+            </div>
+            <div class="pref-name">
+              <span>Dark</span>
+            </div>
+            <p class="pref-desc">Deep neutral background with cool blue-cyan highlights.</p>
+          </button>
+
+        </div>
+      </section>
+    </main>
+
+    <script src="/js/preferences.js" defer></script>
+  </body>
+</html>

@@ -1,0 +1,82 @@
+<%
+  /*
+    pages/task.ejs
+    Task list panel.  Static skeleton for the UI shell phase; a later
+    phase will replace the demo cards with data from /api/tasks.
+
+    Locals available:
+    - activeNav (always "tasks")
+    - rail      (task counts + current view)
+  */
+  const demoTasks = [
+    { id: "t1", title: "Finish DevOps CA2 report",   due: "Today",     priority: "high",   done: false },
+    { id: "t2", title: "Review React → EJS mapping", due: "Tomorrow",  priority: "medium", done: false },
+    { id: "t3", title: "Push initial commit",        due: "This week", priority: "low",    done: false },
+    { id: "t4", title: "Read Butler style.css",      due: "Done",      priority: "low",    done: true  },
+  ];
+
+  const priorityColor = {
+    high:   "var(--color-danger)",
+    medium: "var(--color-warning)",
+    low:    "var(--color-primary)",
+  };
+%>
+
+<section class="tasks-panel">
+  <header class="chat-composer" style="border-top: 0; border-bottom: 1px solid var(--color-border-soft); padding: 14px 22px;">
+    <strong style="font-family: var(--font-display); font-size: 20px;">Tasks</strong>
+    <span style="color: var(--color-text-muted); margin-left: 8px;">Demo view</span>
+  </header>
+
+  <div class="tasks-content">
+    <div class="task-group">
+      <div class="task-group-title">
+        <span>Active</span>
+        <span><%= demoTasks.filter(t => !t.done).length %></span>
+      </div>
+
+      <% demoTasks.filter(t => !t.done).forEach(function(t) { %>
+        <article
+          class="task-card"
+          data-task-id="<%= t.id %>"
+          style="--task-color: <%= priorityColor[t.priority] %>"
+        >
+          <input class="task-checkbox" type="checkbox" aria-label="Toggle complete" />
+          <div class="task-main">
+            <div class="task-title"><%= t.title %></div>
+            <div class="task-meta">
+              <span>Due <%= t.due %></span>
+              <span>Priority: <%= t.priority %></span>
+            </div>
+          </div>
+          <div class="task-actions">
+            <button class="glass-btn" type="button">Edit</button>
+          </div>
+        </article>
+      <% }) %>
+    </div>
+
+    <div class="task-group">
+      <div class="task-group-title">
+        <span>Completed</span>
+        <span><%= demoTasks.filter(t => t.done).length %></span>
+      </div>
+
+      <% demoTasks.filter(t => t.done).forEach(function(t) { %>
+        <article
+          class="task-card completed"
+          data-task-id="<%= t.id %>"
+          style="--task-color: <%= priorityColor[t.priority] %>"
+        >
+          <input class="task-checkbox" type="checkbox" checked aria-label="Toggle complete" />
+          <div class="task-main">
+            <div class="task-title"><%= t.title %></div>
+            <div class="task-meta">
+              <span><%= t.due %></span>
+            </div>
+          </div>
+        </article>
+      <% }) %>
+    </div>
+  </div>
+</section>

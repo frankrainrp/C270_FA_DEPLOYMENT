@@ -1,0 +1,49 @@
+<%
+  /*
+    pages/calendar.ejs
+    Calendar workspace skeleton.
+    Later phases will pull real events from /api/tasks (deadline items)
+    and any calendar sources; for now we render a static month grid.
+  */
+  const today = new Date();
+  const monthLabel = today.toLocaleDateString("en", { month: "long", year: "numeric" });
+
+  // Weekday header labels shown above the grid.
+  const weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+  // Build a fake 5x7 grid of day numbers for the demo view.
+  const days = [];
+  const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+  for (let i = 1; i <= 35; i += 1) {
+    if (i <= daysInMonth) {
+      days.push({ label: String(i), isToday: i === today.getDate(), muted: false });
+    } else {
+      days.push({ label: String(i - daysInMonth), isToday: false, muted: true });
+    }
+  }
+%>
+
+<section class="calendar-panel">
+  <header class="calendar-toolbar">
+    <strong style="font-family: var(--font-display); font-size: 20px;"><%= monthLabel %></strong>
+    <div style="display: flex; gap: 8px;">
+      <button class="glass-btn" type="button">Prev</button>
+      <button class="glass-btn" type="button">Today</button>
+      <button class="glass-btn" type="button">Next</button>
+    </div>
+  </header>
+
+  <div style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); padding: 0 18px; color: var(--color-text-muted); font-size: 12px; font-weight: 700;">
+    <% weekdays.forEach(function(d) { %>
+      <div style="padding: 6px 4px;"><%= d %></div>
+    <% }) %>
+  </div>
+
+  <div class="calendar-grid">
+    <% days.forEach(function(d) { %>
+      <div class="calendar-day <%= d.isToday ? 'today' : '' %> <%= d.muted ? 'muted' : '' %>">
+        <span class="calendar-day-number"><%= d.label %></span>
+      </div>
+    <% }) %>
+  </div>
+</section>

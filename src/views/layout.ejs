@@ -1,14 +1,261 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8"><title><%= title %></title>
-    <link rel="stylesheet" href="/css/style.css">
-    <script src="https://unpkg.com/dexie@latest/dist/dexie.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-</head>
-<body class="theme-light">
-    <%- include('partials/topbar') %>
-    <main class="container"><%- body %></main>
-    <script src="/js/localData.js"></script>
-</body>
+<%
+  /*
+    layout.ejs
+    Master page shell.  Mirrors the C270_FA React composition:
+    WallpaperLayer + TopBar + LeftRail + main panel + MobileTabBar.
+
+    Locals accepted (populated by lib/renderLayout.js):
+    - title               : page title
+    - theme               : paper | dark | retro
+    - activeNav           : chat | tasks | calendar | notes
+    - activeCustomPanelId : currently selected custom panel id
+    - tabsOrder           : ordered list of built-in tab ids
+    - hiddenTabs          : list of built-in tab ids to hide
+    - customPanels        : [{ id, label, emoji }]
+    - authProfile         : { name, email, imageUrl }
+    - plan                : free | pro | max
+    - planName            : display name shown in the user menu
+    - rail                : sidebar data forwarded to partials/sidebar.ejs
+    - page                : file under views/pages/ to include as main content
+    - pageLocals          : extra locals forwarded to the page partial
+    - labels              : optional string dictionary
+    - t                   : optional translation function
+  */
+  const value = (name, fallback) => (
+    typeof locals !== "undefined" && Object.prototype.hasOwnProperty.call(locals, name)
+      ? locals[name]
+      : fallback
+  );
+
+  const labels = value("labels", {});
+  const label = (key, fallback) => {
+    if (typeof t === "function") return t(key);
+    return Object.prototype.hasOwnProperty.call(labels, key) ? labels[key] : fallback;
+  };
+
+  const pageTitle = value("title", "Butler");
+  const theme = value("theme", "paper");
+  const activeNav = value("activeNav", "chat");
+  const activeCustomPanelId = value("activeCustomPanelId", null);
+  const navDefaults = ["chat", "tasks", "calendar", "notes"];
+  const tabsOrder = Array.isArray(value("tabsOrder", null)) ? value("tabsOrder") : navDefaults;
+  const hiddenTabs = new Set(value("hiddenTabs", []));
+  const visibleTabs = tabsOrder.filter((id) => !hiddenTabs.has(id));
+  const customPanels = Array.isArray(value("customPanels", [])) ? value("customPanels", []) : [];
+  const authProfile = value("authProfile", {});
+  const userName = authProfile.name || label("user.name", "Student User");
+  const userEmail = authProfile.email || label("user.email", "student@example.com");
+  const userImageUrl = authProfile.imageUrl || "";
+  const plan = value("plan", "free");
+  const planName = value("planName", plan === "max" ? "Max" : plan === "pro" ? "Pro" : "Free");
+  const isPaid = plan !== "free";
+  const rail = value("rail", {});
+  const page = value("page", null);
+  const pageLocals = value("pageLocals", {});
+%>
+<!doctype html>
+<html lang="<%= value("lang", "en") %>" data-theme="<%= theme %>">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#f3eee0" />
+    <title><%= pageTitle %></title>
+    <script>
+      // Applies the user's saved theme BEFORE stylesheet loads, so
+      // there is no flash of the wrong theme.  Must stay inline and
+      // must precede the CSS <link>.
+      (function () {
+        try {
+          var saved = localStorage.getItem("butler-theme");
+          if (saved === "paper" || saved === "retro" || saved === "dark") {
+            document.documentElement.setAttribute("data-theme", saved);
+          }
+        } catch (_) { /* localStorage unavailable */ }
+      })();
+    </script>
+    <link rel="stylesheet" href="/css/style.css" />
+  </head>
+  <body>
+    <div class="layout-shell" data-layout-shell>
+      <div class="layout-wallpaper" aria-hidden="true">
+        <div class="wallpaper-grid"></div>
+        <div class="wallpaper-glow"></div>
+        <div class="wallpaper-halftone"></div>
+      </div>
+
+      <header class="layout-topbar glass-panel" data-topbar>
+        <a class="topbar-brand" href="/" aria-label="Butler home">
+          <span class="app-logo" aria-hidden="true"></span>
+          <span class="brand-name">Butler</span>
+        </a>
+
+        <nav class="pill-nav" aria-label="<%= label("topbar.mainNavigation", "Main navigation") %>">
+          <% visibleTabs.forEach((id) => { %>
+            <a
+              class="pill-nav-item <%= !activeCustomPanelId && activeNav === id ? "active" : "" %>"
+              href="/<%= id %>"
+              data-nav-id="<%= id %>"
+              data-draggable-tab="true"
+              title="<%= label("topbar.tabReorder", "Drag to reorder") %>"
+            >
+              <span><%= label("nav." + id, id.charAt(0).toUpperCase() + id.slice(1)) %></span>
+            </a>
+          <% }) %>
+
+          <% customPanels.forEach((panel) => { %>
+            <a
+              class="pill-nav-item custom <%= activeCustomPanelId === panel.id ? "active" : "" %>"
+              href="/panel/<%= panel.id %>"
+              data-custom-panel-id="<%= panel.id %>"
+              title="<%= panel.label || label("nav.customPanel", "Custom panel") %>"
+            >
+              <span class="pill-nav-emoji" aria-hidden="true"><%= panel.emoji || "P" %></span>
+              <span class="pill-nav-label"><%= panel.label || label("nav.customPanel", "Custom panel") %></span>
+            </a>
+          <% }) %>
+
+          <button
+            class="pill-nav-item icon-only"
+            type="button"
+            data-action="create-custom-panel"
+            aria-label="<%= label("nav.newPanel", "New panel") %>"
+            title="<%= label("nav.newPanel", "New panel") %>"
+          >
+            <span aria-hidden="true">+</span>
+          </button>
+        </nav>
+
+        <div class="topbar-actions">
+          <form class="global-search" role="search" action="/search" method="get" data-global-search>
+            <label class="sr-only" for="global-search-input"><%= label("search.label", "Search") %></label>
+            <span class="search-icon" aria-hidden="true"></span>
+            <input
+              id="global-search-input"
+              name="q"
+              type="search"
+              autocomplete="off"
+              placeholder="<%= label("search.placeholder", "Search tasks, notes, chats") %>"
+              value="<%= value("searchQuery", "") %>"
+            />
+          </form>
+
+          <button
+            class="icon-button"
+            type="button"
+            data-action="toggle-mini-apps"
+            aria-pressed="<%= value("miniAppsOpen", false) ? "true" : "false" %>"
+            aria-label="<%= label("topbar.miniApps", "Mini apps") %>"
+            title="<%= label("topbar.miniApps", "Mini apps") %>"
+          >
+            <span class="icon-grid" aria-hidden="true"></span>
+          </button>
+
+          <div class="user-menu-wrap" data-user-menu>
+            <button
+              class="user-trigger"
+              type="button"
+              data-user-menu-trigger
+              aria-haspopup="menu"
+              aria-expanded="false"
+            >
+              <span class="avatar">
+                <% if (userImageUrl) { %>
+                  <img src="<%= userImageUrl %>" alt="" />
+                <% } else { %>
+                  <span class="avatar-fallback" aria-hidden="true"><%= userName.slice(0, 1).toUpperCase() %></span>
+                <% } %>
+              </span>
+              <span class="user-summary">
+                <span class="user-name"><%= userName %></span>
+                <span class="user-email"><%= userEmail %></span>
+              </span>
+              <span class="chevron" aria-hidden="true"></span>
+            </button>
+
+            <div class="user-menu glass-menu" role="menu" data-user-menu-panel hidden>
+              <div class="user-menu-header">
+                <span class="avatar large">
+                  <% if (userImageUrl) { %>
+                    <img src="<%= userImageUrl %>" alt="" />
+                  <% } else { %>
+                    <span class="avatar-fallback" aria-hidden="true"><%= userName.slice(0, 1).toUpperCase() %></span>
+                  <% } %>
+                </span>
+                <div>
+                  <strong><%= userName %></strong>
+                  <span><%= userEmail %></span>
+                  <em class="plan-badge <%= isPaid ? "paid" : "free" %>"><%= planName %></em>
+                </div>
+              </div>
+
+              <a role="menuitem" class="menu-item" href="/billing">
+                <span class="menu-icon card-icon" aria-hidden="true"></span>
+                <span><%= label("menu.billing", "Billing") %></span>
+              </a>
+              <a role="menuitem" class="menu-item" href="/preferences">
+                <span class="menu-icon settings-icon" aria-hidden="true"></span>
+                <span><%= label("menu.preferences", "Preferences") %></span>
+              </a>
+              <a role="menuitem" class="menu-item" href="/achievements">
+                <span class="menu-icon trophy-icon" aria-hidden="true"></span>
+                <span><%= label("menu.achievements", "Achievements") %></span>
+              </a>
+              <% if (!isPaid) { %>
+                <a role="menuitem" class="menu-item accent" href="/pricing">
+                  <span class="menu-icon crown-icon" aria-hidden="true"></span>
+                  <span><%= label("menu.upgrade", "Upgrade") %></span>
+                </a>
+              <% } %>
+              <form role="none" action="/logout" method="post">
+                <button role="menuitem" class="menu-item danger" type="submit">
+                  <span class="menu-icon logout-icon" aria-hidden="true"></span>
+                  <span><%= label("menu.logout", "Log out") %></span>
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <div class="layout-body">
+        <button
+          class="mobile-drawer-backdrop"
+          type="button"
+          data-mobile-drawer-backdrop
+          aria-label="<%= label("topbar.closeNav", "Close navigation") %>"
+          hidden
+        ></button>
+
+        <aside class="layout-sidebar glass-panel retro-railhost" data-mobile-drawer>
+          <%- include("./partials/sidebar", { activeNav, activeCustomPanelId, rail, label }) %>
+        </aside>
+
+        <main class="layout-main glass-panel" id="main-content" tabindex="-1">
+          <% if (page) { %>
+            <%- include("./pages/" + page, Object.assign({ activeNav, rail, label }, pageLocals || {})) %>
+          <% } %>
+        </main>
+      </div>
+
+      <nav class="mobile-tabbar glass-panel" aria-label="<%= label("topbar.mobileNavigation", "Mobile navigation") %>">
+        <button class="mobile-tabbar-menu" type="button" data-mobile-drawer-trigger aria-label="<%= label("topbar.openNav", "Open navigation") %>">
+          <span class="panel-icon" aria-hidden="true"></span>
+        </button>
+
+        <% navDefaults.forEach((id) => { %>
+          <a
+            class="mobile-tab <%= !activeCustomPanelId && activeNav === id ? "active" : "" %>"
+            href="/<%= id %>"
+            data-nav-id="<%= id %>"
+            aria-label="<%= label("nav." + id, id.charAt(0).toUpperCase() + id.slice(1)) %>"
+          >
+            <span class="mobile-tab-icon <%= "icon-" + id %>" aria-hidden="true"></span>
+            <span><%= label("nav." + id, id.charAt(0).toUpperCase() + id.slice(1)) %></span>
+          </a>
+        <% }) %>
+      </nav>
+    </div>
+
+    <script src="/js/shell.js" defer></script>
+  </body>
 </html>
