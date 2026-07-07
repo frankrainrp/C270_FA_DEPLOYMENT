@@ -1,77 +1,128 @@
-:root { --bg: #f4f7f6; --text: #2c3e50; --primary: #2980b9; --surface: #ffffff; }
-body { font-family: 'Segoe UI', system-ui; margin: 0; background: var(--bg); color: var(--text); }
-.topbar { background: var(--surface); padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-.topbar a { text-decoration: none; color: var(--text); margin-left: 1.5rem; font-weight: 500; }
-.topbar a:hover { color: var(--primary); }
-.topbar .logout { color: #e74c3c; }
-.container { padding: 2rem; max-width: 1200px; margin: auto; }
-.auth-page { display: flex; justify-content: center; align-items: center; height: 100vh; }
-.auth-card { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 100%; max-width: 400px; }
-.auth-card input { width: 100%; padding: 10px; margin-bottom: 1rem; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-.auth-card button { width: 100%; padding: 10px; background: var(--primary); color: white; border: none; border-radius: 4px; cursor: pointer; }
-.study-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; }
-.tasks-panel, .calendar-panel, .panels-view, .billing-panel { background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
-ul { list-style: none; padding: 0; }
-li { padding: 0.5rem 0; border-bottom: 1px solid #eee; }
-.chat-canvas { background: white; height: 60vh; display: flex; flex-direction: column; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.05);}
-.chat-history { flex: 1; padding: 1rem; }
-.input-pod { display: flex; padding: 1rem; border-top: 1px solid #eee; background: #fafafa; }
-.input-pod input { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 4px; margin-right: 1rem; }
-.input-pod button { padding: 10px 20px; background: var(--primary); color: white; border: none; border-radius: 4px; }
-
-/* ===== Settings / Billing / Plans (modern card style) ===== */
-.page-head { margin-bottom: 1.5rem; }
-.page-head h1 { margin: 0 0 4px; font-size: 1.6rem; }
-.page-head p { margin: 0; color: #7f8c8d; font-size: 0.95rem; }
-
-.card {
-  background: var(--surface);
-  border: 1px solid #eef1f0;
-  border-radius: 14px;
-  padding: 1.5rem;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.04);
-  margin-bottom: 1.25rem;
+/* ===== Design tokens (light theme defaults) ===== */
+:root {
+  --primary: #6c4bd6;
+  --primary-dark: #573bb0;
+  --bg: #ffffff;
+  --text: #1f2933;
+  --text-muted: #7f8c8d;
+  --card-bg: #ffffff;
+  --card-border: #eef1f0;
+  --hover: #f0f4f3;
+  --shadow: rgba(0,0,0,0.08);
 }
-.card h3 { margin: 0 0 1rem; font-size: 1.1rem; }
-.card .sub { color: #7f8c8d; font-size: 0.85rem; margin-top: -0.5rem; margin-bottom: 1rem; }
 
+/* Dark theme: re-defines the same variables */
+[data-theme="dark"] {
+  --primary: #8b6df0;
+  --primary-dark: #6c4bd6;
+  --bg: #16181d;
+  --text: #e8eaed;
+  --text-muted: #9aa0a6;
+  --card-bg: #22262e;
+  --card-border: #2f343d;
+  --hover: #2a2f38;
+  --shadow: rgba(0,0,0,0.4);
+}
+
+/* ===== Base ===== */
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+}
+a { color: var(--primary); }
+
+.container { max-width: 900px; margin: 0 auto; padding: 1.5rem; }
+
+/* ===== Topbar ===== */
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0.75rem 1.5rem; border-bottom: 1px solid var(--card-border);
+  background: var(--card-bg);
+}
+.topbar .brand { display: flex; align-items: center; gap: 0.5rem; font-weight: 700; font-size: 1.1rem; color: var(--text); }
+.topbar .nav-links a { margin-right: 1.25rem; text-decoration: none; color: var(--primary); font-weight: 500; }
+
+/* ===== Page head ===== */
+.page-head h1 { margin: 0 0 0.25rem; font-size: 1.9rem; }
+.page-head p { margin: 0 0 1.5rem; color: var(--text-muted); }
+
+/* ===== Cards ===== */
+.card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 14px;
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.25rem;
+  box-shadow: 0 2px 8px var(--shadow);
+}
+.card h3 { margin: 0 0 0.75rem; font-size: 1.05rem; }
+.sub { color: var(--text-muted); margin: 0 0 0.75rem; }
+
+/* ===== Credits ===== */
 .credit-display { display: flex; align-items: baseline; gap: 0.5rem; }
 .credit-display .num { font-size: 2rem; font-weight: 700; color: var(--primary); }
-.credit-display .label { color: #7f8c8d; }
-
+.credit-display .label { color: var(--text-muted); }
 .plan-badge {
-  display: inline-block; padding: 4px 12px; border-radius: 999px;
-  background: #eaf3f8; color: var(--primary); font-size: 0.8rem; font-weight: 600;
+  display: inline-block; padding: 2px 10px; border-radius: 999px;
+  background: var(--primary); color: #fff; font-size: 0.8rem; font-weight: 600;
 }
 
-.field { margin-bottom: 1rem; }
-.field label { display: block; font-size: 0.85rem; color: #7f8c8d; margin-bottom: 0.35rem; }
-.field select, .field input {
-  width: 100%; padding: 10px 12px; border: 1px solid #dce3e2;
-  border-radius: 8px; box-sizing: border-box; font-size: 0.95rem; background: #fff;
-}
-
+/* ===== Buttons ===== */
 .btn {
-  display: inline-block; padding: 10px 18px; border-radius: 8px; border: none;
-  font-size: 0.9rem; font-weight: 600; cursor: pointer; text-decoration: none; text-align: center;
+  display: inline-block; padding: 0.6rem 1.1rem; border-radius: 10px;
+  font-size: 0.9rem; font-weight: 600; cursor: pointer; text-decoration: none;
+  border: 1px solid transparent;
 }
 .btn-primary { background: var(--primary); color: #fff; }
-.btn-primary:hover { background: #216a9c; }
-.btn-ghost { background: #f0f4f3; color: var(--text); }
-.btn-ghost:hover { background: #e6ebea; }
-.btn-block { width: 100%; }
+.btn-primary:hover { background: var(--primary-dark); }
+.btn-ghost { background: transparent; color: var(--text); border-color: var(--card-border); }
+.btn-ghost:hover { background: var(--hover); }
 
-/* Plans */
-.plans-row { display: flex; gap: 1.25rem; flex-wrap: wrap; }
-.plan-card {
-  flex: 1; min-width: 220px; background: var(--surface);
-  border: 1px solid #eef1f0; border-radius: 14px; padding: 1.5rem;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.04); display: flex; flex-direction: column;
+/* ===== Form fields ===== */
+.field { margin-bottom: 0.9rem; }
+.field label { display: block; margin-bottom: 0.3rem; font-weight: 500; font-size: 0.9rem; }
+.field select {
+  padding: 0.4rem 0.6rem; border-radius: 8px;
+  border: 1px solid var(--card-border);
+  background: var(--card-bg); color: var(--text);
 }
-.plan-card.is-current { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(41,128,185,0.15); }
-.plan-card h3 { margin: 0 0 0.25rem; }
-.plan-card .price { font-size: 1.8rem; font-weight: 700; margin: 0.25rem 0 1rem; }
-.plan-card .price span { font-size: 0.85rem; color: #7f8c8d; font-weight: 400; }
-.plan-card ul { flex: 1; margin: 0 0 1.25rem; }
-.plan-card li { border: none; padding: 0.35rem 0; color: #555; padding-left: 1.25rem; position: relative; }
-.plan-card li::before { content: "✓"; color: var(--primary); position: absolute; left: 0; }
+
+/* ===== Plans grid ===== */
+.plans-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; }
+
+/* ===== Profile ===== */
+.avatar-circle {
+  width: 72px; height: 72px; border-radius: 50%;
+  background: var(--primary); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.8rem; font-weight: 700;
+}
+
+/* ===== Account dropdown (ChatGPT-style) ===== */
+.nav-links { display: flex; align-items: center; gap: 1.5rem; }
+.account { position: relative; display: flex; align-items: center; gap: 0.6rem; cursor: pointer; padding: 4px 8px; border-radius: 10px; }
+.account:hover { background: var(--hover); }
+.account-avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--primary); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; }
+.account-info { display: flex; flex-direction: column; line-height: 1.1; }
+.account-name { font-weight: 600; font-size: 0.9rem; color: var(--text); }
+.account-plan { font-size: 0.72rem; color: var(--text-muted); }
+.account-caret { color: var(--text-muted); font-size: 0.8rem; }
+
+.account-menu {
+  position: absolute; top: 110%; right: 0; min-width: 200px;
+  background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px;
+  box-shadow: 0 8px 24px var(--shadow); padding: 6px;
+  display: none; z-index: 100;
+}
+.account-menu.open { display: block; }
+.account-menu a {
+  display: block; padding: 10px 12px; border-radius: 8px;
+  color: var(--text); text-decoration: none; font-size: 0.9rem; margin: 0;
+}
+.account-menu a:hover { background: var(--hover); }
+.account-menu .logout { color: #e74c3c; }
+.account-menu-divider { height: 1px; background: var(--card-border); margin: 6px 4px; }

@@ -38,21 +38,54 @@
     <div class="card">
       <h3>Preferences</h3>
       <div class="field">
-        <label>Language</label>
-        <select>
-          <option>English</option>
-          <option>中文 (Chinese)</option>
+        <label for="languageSelect">Language</label>
+        <select id="languageSelect">
+          <option value="en">English</option>
+          <option value="zh">中文 (Chinese)</option>
         </select>
       </div>
       <div class="field">
-        <label>Theme</label>
-        <select>
-          <option>Light</option>
-          <option>Dark</option>
+        <label for="themeSelect">Theme</label>
+        <select id="themeSelect">
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
         </select>
       </div>
+      <p class="sub" id="prefSaved" style="margin-top:0.5rem; color: green; display:none;">Saved ✓</p>
     </div>
 
   </main>
+
+  <!-- Preferences logic: switch theme + remember choices -->
+  <script>
+    (function () {
+      var themeSelect = document.getElementById('themeSelect');
+      var languageSelect = document.getElementById('languageSelect');
+      var savedMsg = document.getElementById('prefSaved');
+
+      // Load saved choices into the dropdowns
+      themeSelect.value = localStorage.getItem('butler-theme') || 'light';
+      languageSelect.value = localStorage.getItem('butler-language') || 'en';
+
+      function showSaved() {
+        savedMsg.style.display = 'block';
+        setTimeout(function () { savedMsg.style.display = 'none'; }, 1500);
+      }
+
+      // Theme: change instantly + remember it
+      themeSelect.addEventListener('change', function () {
+        var choice = themeSelect.value;
+        document.documentElement.setAttribute('data-theme', choice);
+        localStorage.setItem('butler-theme', choice);
+        showSaved();
+      });
+
+      // Language: remember it (full translation is future work)
+      languageSelect.addEventListener('change', function () {
+        localStorage.setItem('butler-language', languageSelect.value);
+        showSaved();
+      });
+    })();
+  </script>
 </body>
 </html>
