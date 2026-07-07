@@ -1,23 +1,24 @@
 /*
   style.css
-  Butler EJS 导出版完整样式表。
+  Complete stylesheet for the Butler EJS build.
 
-  结构来源：
-  - layout.ejs：页面大框架、顶栏、主内容、移动端底栏
-  - sidebar.ejs：左侧二级导航
-  - 当前 React 项目：globals.css、TopBar、LeftRail、ChatRail、TasksRail、
-    CalendarRail、NotesRail、ChatCanvas、TasksPanel、CalendarPanel、NotesPanel
+  Structure derived from:
+  - layout.ejs        — top-level page shell, topbar, main area, mobile tab bar
+  - sidebar.ejs       — contextual left rail
+  - Original React source — globals.css, TopBar, LeftRail, ChatRail, TasksRail,
+    CalendarRail, NotesRail, ChatCanvas, TasksPanel, CalendarPanel, NotesPanel
 
-  注释规则：
-  - 每个大区块说明它负责的界面范围。
-  - 组件级注释说明该类名绑定的 UI 语义。
-  - 所有主题色通过 CSS 变量维护，便于后续 EJS 后端切换 data-theme。
+  Comment conventions:
+  - Each numbered block describes the UI area it owns.
+  - Component-level comments explain which class name maps to which UI concept.
+  - All theme colours flow through CSS variables so the server can switch
+    data-theme without shipping additional CSS.
 */
 
 @import url("https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Gaegu:wght@300;400;700&display=swap");
 
 /* ============================================================
-   1. 设计变量：全局颜色、半径、阴影、字体和背景纹理
+   1. Design tokens: global colours, radii, shadows, fonts, textures
    ============================================================ */
 :root {
   color-scheme: light;
@@ -88,7 +89,7 @@
   --bg-halftone-size: 0 0;
 }
 
-/* 暗色主题：对应当前项目里的 dark data-theme。 */
+/* Dark theme.  Applied by <html data-theme="dark">. */
 html[data-theme="dark"] {
   color-scheme: dark;
   --color-primary: #3e7591;
@@ -142,7 +143,8 @@ html[data-theme="dark"] {
     inset -1px -1px 0 rgba(0, 0, 0, 0.3);
 }
 
-/* 复古主题：保留纸张、墨绿和黄铜的视觉方向。 */
+/* Retro theme (labelled "Paper" in the Preferences UI).
+   Cream parchment background with olive and brass accents. */
 html[data-theme="retro"] {
   color-scheme: light;
   --color-primary: #2d4a3e;
@@ -191,7 +193,8 @@ html[data-theme="retro"] {
   --bg-halftone-size: 9px 9px;
 }
 
-/* 纸面主题：当前默认风格，偏清爽、低饱和。 */
+/* "Paper" CSS name (labelled "Glass" in the Preferences UI).
+   Light, low-saturation iOS-style frosted glass. */
 html[data-theme="paper"] {
   --color-bg: #dbe7e6;
   --color-surface: #eff6f5;
@@ -199,7 +202,7 @@ html[data-theme="paper"] {
 }
 
 /* ============================================================
-   2. Reset 与基础排版：保证 EJS 独立运行时和 Next 版本一致
+   2. Reset & base typography
    ============================================================ */
 *,
 *::before,
@@ -277,7 +280,7 @@ button {
 }
 
 /* ============================================================
-   3. App Layout：页面主框架，对应 layout.ejs 的顶层容器
+   3. App layout: top-level shell, mirrors layout.ejs containers
    ============================================================ */
 .layout-shell {
   position: relative;
@@ -354,7 +357,7 @@ button {
 }
 
 /* ============================================================
-   4. Top Bar：品牌、导航、搜索和用户菜单
+   4. Top bar: brand, pill nav, global search, user menu
    ============================================================ */
 .layout-topbar {
   position: relative;
@@ -756,7 +759,7 @@ html[data-theme="dark"] .pill-nav {
 }
 
 /* ============================================================
-   5. Sidebar：左侧二级导航与每个 tab 的 rail 内容
+   5. Sidebar: contextual left rail per active tab
    ============================================================ */
 .layout-sidebar {
   position: relative;
@@ -1073,7 +1076,7 @@ html[data-theme="dark"] .sidebar-item:hover {
 }
 
 /* ============================================================
-   6. 图标绘制：用 CSS 生成常见线性图标，避免依赖 React 图标库
+   6. Icon glyphs: pure-CSS line icons (no icon library required)
    ============================================================ */
 .plus-icon::before,
 .plus-icon::after {
@@ -1382,7 +1385,7 @@ html[data-theme="dark"] .sidebar-item:hover {
 }
 
 /* ============================================================
-   7. 通用控件：按钮、输入框、面板、标签和弹窗
+   7. Common controls: buttons, inputs, panels, badges, modals
    ============================================================ */
 .btn {
   min-height: 36px;
@@ -1580,7 +1583,7 @@ html[data-theme="dark"] .sidebar-item:hover {
 }
 
 /* ============================================================
-   8. Chat：对话主画布、消息流、确认卡片和输入舱
+   8. Chat: main canvas, message stream, confirm cards, composer
    ============================================================ */
 .chat-shell {
   height: 100%;
@@ -1791,7 +1794,7 @@ html[data-theme="dark"] .sidebar-item:hover {
 }
 
 /* ============================================================
-   9. Tasks：任务列表、任务卡片、优先级和详情抽屉
+   9. Tasks: list, cards, priority colours, detail drawer
    ============================================================ */
 .tasks-panel {
   height: 100%;
@@ -1927,7 +1930,7 @@ html[data-theme="dark"] .sidebar-item:hover {
 }
 
 /* ============================================================
-   10. Calendar：月视图、周视图、日视图和事件胶囊
+   10. Calendar: month, week, and day views plus event pills
    ============================================================ */
 .calendar-panel {
   height: 100%;
@@ -2056,7 +2059,7 @@ html[data-theme="dark"] .sidebar-item:hover {
 }
 
 /* ============================================================
-   11. Notes：笔记列表、编辑器、Markdown 预览和 Obsidian 风格内容
+   11. Notes: list, editor, markdown preview, Obsidian styling
    ============================================================ */
 .notes-panel {
   height: 100%;
@@ -2226,7 +2229,7 @@ html[data-theme="dark"] .sidebar-item:hover {
 }
 
 /* ============================================================
-   12. Mini Apps、偏好设置、计费和自定义面板的通用布局
+   12. Mini apps, preferences, billing, custom-panel layouts
    ============================================================ */
 .mini-apps-drawer {
   position: fixed;
@@ -2363,7 +2366,8 @@ html[data-theme="dark"] .sidebar-item:hover {
 }
 
 /* ============================================================
-   13. 动效与状态：搜索高亮、弹跳、震动、加载和可访问性降级
+   13. Motion & states: search flash, bounce, shake, loading,
+       reduced-motion fallback
    ============================================================ */
 .fx-pop {
   animation: fx-pop 180ms ease-out;
@@ -2461,7 +2465,8 @@ html[data-theme="dark"] .sidebar-item:hover {
 }
 
 /* ============================================================
-   13.5 当前项目全局类名兼容层：覆盖 React 版本里已使用的 className
+   13.5 Legacy class-name compatibility layer
+        (mirrors the class names used by the original React build)
    ============================================================ */
 .font-display {
   font-family: var(--font-display);
@@ -3013,7 +3018,7 @@ html[data-theme="retro"] main::after {
 }
 
 /* ============================================================
-   14. 移动端：抽屉式侧栏和底部 tab bar
+   14. Mobile: drawer sidebar and bottom tab bar
    ============================================================ */
 .mobile-tabbar,
 .mobile-drawer-backdrop {
