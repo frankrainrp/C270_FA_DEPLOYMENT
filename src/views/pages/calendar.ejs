@@ -1,26 +1,32 @@
 <%
   /*
     pages/calendar.ejs
-    Calendar workspace skeleton.
-    Later phases will pull real events from /api/tasks (deadline items)
-    and any calendar sources; for now we render a static month grid.
+    Calendar workspace with a month grid, event pills, and a detail panel
+    for the selected day.
   */
   const today = new Date();
   const monthLabel = today.toLocaleDateString("en", { month: "long", year: "numeric" });
-
-  // Weekday header labels shown above the grid.
   const weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const eventMap = [
+    { day: today.getDate(), title: "Deep dive", detail: "Review the report outline", color: "var(--color-primary)" },
+    { day: today.getDate() + 1, title: "Lab review", detail: "Go over the deployment checklist", color: "var(--color-accent)" },
+    { day: today.getDate() + 3, title: "Focus block", detail: "Pomodoro sprint for writing", color: "var(--color-warning)" },
+  ];
 
-  // Build a fake 5x7 grid of day numbers for the demo view.
   const days = [];
   const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
   for (let i = 1; i <= 35; i += 1) {
-    if (i <= daysInMonth) {
-      days.push({ label: String(i), isToday: i === today.getDate(), muted: false });
-    } else {
-      days.push({ label: String(i - daysInMonth), isToday: false, muted: true });
-    }
+    const dayNumber = i <= daysInMonth ? i : i - daysInMonth;
+    const events = eventMap.filter((entry) => entry.day === dayNumber);
+    days.push({
+      label: String(dayNumber),
+      isToday: dayNumber === today.getDate(),
+      muted: i > daysInMonth,
+      events,
+    });
   }
+
+  const selectedDate = eventMap[0] || { day: today.getDate(), title: "No plans", detail: "Open a day to review its plan." };
 %>
 
 <section class="calendar-panel">
@@ -33,17 +39,55 @@
     </div>
   </header>
 
+  <div class="calendar-summary">
+    <div class="hero-card hero-main">
+      <p class="hero-kicker">Study rhythm</p>
+      <h3>Plan your week around calm study blocks and a few key milestones.</h3>
+    </div>
+    <div class="hero-card">
+      <p class="hero-kicker">Today</p>
+      <div class="chip-list">
+        <span class="calendar-chip">Focus sprint</span>
+        <span class="calendar-chip">Review notes</span>
+      </div>
+    </div>
+  </div>
+
   <div style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); padding: 0 18px; color: var(--color-text-muted); font-size: 12px; font-weight: 700;">
-    <% weekdays.forEach(function(d) { %>
-      <div style="padding: 6px 4px;"><%= d %></div>
+    <% weekdays.forEach(function(day) { %>
+      <div style="padding: 6px 4px;"><%= day %></div>
     <% }) %>
   </div>
 
   <div class="calendar-grid">
-    <% days.forEach(function(d) { %>
-      <div class="calendar-day <%= d.isToday ? 'today' : '' %> <%= d.muted ? 'muted' : '' %>">
-        <span class="calendar-day-number"><%= d.label %></span>
-      </div>
+    <% days.forEach(function(day) { %>
+      <button
+        class="calendar-day <%= day.isToday ? 'today' : '' %> <%= day.muted ? 'muted' : '' %>"
+        type="button"
+        data-day="<%= day.label %>"
+        data-title="<%= day.events[0] ? day.events[0].title : 'Free day' %>"
+        data-detail="<%= day.events[0] ? day.events[0].detail : 'Open space for revision and reflection.' %>"
+      >
+        <span class="calendar-day-number"><%= day.label %></span>
+        <% if (day.events.length) { %>
+          <div class="event-list">
+            <% day.events.forEach(function(eventItem) { %>
+              <span class="event-pill" style="--event-color: <%= eventItem.color %>">
+                <span><%= eventItem.title %></span>
+              </span>
+            <% }) %>
+          </div>
+        <% } %>
+      </button>
     <% }) %>
+  </div>
+
+  <div class="calendar-detail-card" id="calendar-detail-card">
+    <div>
+      <p class="hero-kicker">Selected day</p>
+      <h3 id="calendar-detail-title">Day <%= selectedDate.day %></h3>
+      <p id="calendar-detail-detail"><%= selectedDate.detail %></p>
+    </div>
+    <div class="calendar-detail-badge" id="calendar-detail-badge"><%= selectedDate.title %></div>
   </div>
 </section>
