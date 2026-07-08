@@ -141,45 +141,6 @@
     });
   });
 
-  var noteButtons = document.querySelectorAll(".note-list-item");
-  var titleInput = document.getElementById("note-title-input");
-  var bodyInput = document.getElementById("note-body-input");
-  var updatedLabel = document.getElementById("note-updated-label");
-  var searchInput = document.getElementById("note-search");
-
-  function selectNote(button) {
-    if (!button) return;
-    noteButtons.forEach(function (item) {
-      item.classList.remove("active");
-    });
-    button.classList.add("active");
-    if (titleInput) titleInput.value = button.getAttribute("data-note-title");
-    if (bodyInput) bodyInput.value = button.getAttribute("data-note-body");
-    if (updatedLabel) updatedLabel.textContent = "Updated " + button.getAttribute("data-note-updated");
-  }
-
-  noteButtons.forEach(function (button) {
-    button.addEventListener("click", function () {
-      selectNote(button);
-    });
-  });
-
-  if (searchInput) {
-    searchInput.addEventListener("input", function () {
-      var query = searchInput.value.trim().toLowerCase();
-      noteButtons.forEach(function (button) {
-        var text = (button.getAttribute("data-note-title") + " " + button.getAttribute("data-note-preview")).toLowerCase();
-        button.style.display = text.includes(query) ? "grid" : "none";
-      });
-    });
-  }
-
-  var saveButton = document.getElementById("save-note-btn");
-  if (saveButton) {
-    saveButton.addEventListener("click", function () {
-      if (titleInput && bodyInput) {
-        updatedLabel.textContent = "Updated just now";
-      }
-    });
-  }
+  // Notes page behaviour now lives in public/js/notes.js (loaded only on
+  // the Notes page). Keeping it out of shell.js avoids double event binding.
 })();

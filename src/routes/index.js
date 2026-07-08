@@ -8,6 +8,7 @@
 const pages = require("./pages");
 const apiHealth = require("./api/health");
 const apiChat = require("./api/chat");
+const apiNotes = require("./api/notes");
 
 module.exports = function mountRoutes(app) {
   // HTML pages served with the shared layout shell.
@@ -16,4 +17,6 @@ module.exports = function mountRoutes(app) {
   // JSON / SSE API surface.
   app.use("/api/health", apiHealth);
   app.use("/api/chat", apiChat);
+  app.use("/api/notes", apiNotes);
 };
+

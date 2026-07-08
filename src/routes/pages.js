@@ -12,7 +12,7 @@ const express = require("express");
 
 const { renderLayout } = require("../lib/renderLayout");
 const { getMockRail } = require("../data/mockRail");
-
+const notesStore = require("../data/notesStore"); //for future use, not used in this snippet but may be used in the future for notes data ei
 const router = express.Router();
 
 // -----------------------------------------------------------
@@ -53,13 +53,34 @@ router.get("/calendar", (_req, res) => {
   });
 });
 
-router.get("/notes", (_req, res) => {
+// New Note (server fallback for no-JS): create, then open it.
+router.get("/notes/new", (_req, res) => {
+  const note = notesStore.createNote({ title: "Untitled note", body: "" });
+  res.redirect("/notes?note=" + encodeURIComponent(note.id));
+});
+
+router.get("/notes", (req, res) => {
+  const notes = notesStore.listNotes();
+  const activeNote =
+    (req.query.note && notesStore.getNote(req.query.note)) || notes[0] || null;
+
+  const rail = getMockRail("notes");
+  rail.noteCounts = Object.assign({}, rail.noteCounts, { all: notes.length });
+  rail.pinnedNotes = notes.slice(0, 2).map((n) => ({ id: n.id, title: n.title }));
+
   renderLayout(res, {
     title: "Notes",
     activeNav: "notes",
     page: "note",
-    rail: getMockRail("notes"),
+    rail,
+    pageLocals: { notes, activeNote },
   });
+});
+
+// Open a specific note (used by the pinned-notes sidebar links).
+router.get("/notes/:id", (req, res) => {
+  if (!notesStore.getNote(req.params.id)) return res.redirect("/notes");
+  res.redirect("/notes?note=" + encodeURIComponent(req.params.id));
 });
 
 // -----------------------------------------------------------
