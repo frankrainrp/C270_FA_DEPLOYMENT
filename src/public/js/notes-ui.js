@@ -21,6 +21,7 @@
   var saveBtn    = root.querySelector("[data-note-save]");
   var deleteBtn  = root.querySelector("[data-note-delete]");
   var newBtn     = root.querySelector("[data-new-note]");
+  var updatedLabel = document.getElementById("note-updated-label");
 
   if (!editor || !titleInput || !bodyInput) return;
 
@@ -32,6 +33,10 @@
     window.location.reload();
   }
 
+  function setUpdated(text) {
+    if (updatedLabel) updatedLabel.textContent = "Updated " + (text || "just now");
+  }
+
   async function loadNoteInto(id) {
     if (!id) return;
     try {
@@ -40,6 +45,7 @@
       editor.dataset.noteId = String(n._id);
       titleInput.value = n.title || "";
       bodyInput.value = n.content || "";
+      setUpdated("just now");
       Array.prototype.forEach.call(
         list.querySelectorAll(".note-list-item"),
         function (el) {

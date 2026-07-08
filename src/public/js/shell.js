@@ -93,9 +93,69 @@
     if (event.key === "Escape") {
       closeUserMenu();
       closeDrawer();
+      closeTaskDrawer();
     }
   });
 
   if (drawerTrigger) drawerTrigger.addEventListener("click", openDrawer);
   if (drawerBackdrop) drawerBackdrop.addEventListener("click", closeDrawer);
+
+  function closeTaskDrawer() {
+    var drawerEl = document.getElementById("task-detail-drawer");
+    if (drawerEl) drawerEl.hidden = true;
+  }
+
+  function openTaskDrawer(event) {
+    var card = event.currentTarget;
+    var drawerEl = document.getElementById("task-detail-drawer");
+
+    if (!drawerEl || !card) return;
+
+    document.getElementById("task-detail-title").textContent = card.getAttribute("data-title");
+    document.getElementById("task-detail-priority").textContent = "Priority: " + card.getAttribute("data-priority");
+    document.getElementById("task-detail-due").textContent = "Due: " + card.getAttribute("data-due");
+    document.getElementById("task-detail-description").textContent = card.getAttribute("data-description");
+    document.getElementById("task-detail-notes").textContent = card.getAttribute("data-notes");
+    drawerEl.hidden = false;
+  }
+
+  document.querySelectorAll(".task-card").forEach(function (card) {
+    var trigger = card.querySelector(".task-detail-trigger");
+    if (trigger) trigger.addEventListener("click", openTaskDrawer.bind(null, { currentTarget: card }));
+  });
+
+  var closeDrawerButton = document.querySelector("[data-close-drawer]");
+  if (closeDrawerButton) closeDrawerButton.addEventListener("click", closeTaskDrawer);
+
+  document.querySelectorAll(".calendar-day").forEach(function (button) {
+    button.addEventListener("click", function () {
+      if (button.disabled) return;
+      document.querySelectorAll(".calendar-day").forEach(function (day) {
+        day.classList.remove("is-active");
+      });
+      button.classList.add("is-active");
+      var card = document.getElementById("calendar-detail-card");
+      if (!card) return;
+      document.getElementById("calendar-detail-title").textContent = "Day " + button.getAttribute("data-day");
+      document.getElementById("calendar-detail-detail").textContent = button.getAttribute("data-detail");
+      document.getElementById("calendar-detail-badge").textContent = button.getAttribute("data-title");
+    });
+  });
+
+  // Note search only.  Open / save / delete are handled by notes-ui.js
+  // against the real MongoDB API — do not wire mock select/save here.
+  var noteButtons = document.querySelectorAll(".note-list-item");
+  var searchInput = document.getElementById("note-search");
+  if (searchInput) {
+    searchInput.addEventListener("input", function () {
+      var query = searchInput.value.trim().toLowerCase();
+      noteButtons.forEach(function (button) {
+        var text = (
+          (button.getAttribute("data-note-title") || "") + " " +
+          (button.getAttribute("data-note-preview") || "")
+        ).toLowerCase();
+        button.style.display = text.indexOf(query) >= 0 ? "" : "none";
+      });
+    });
+  }
 })();

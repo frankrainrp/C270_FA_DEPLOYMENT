@@ -1909,6 +1909,129 @@ html[data-theme="dark"] .sidebar-item:hover {
   gap: 6px;
 }
 
+.productivity-hero,
+.calendar-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(220px, 0.8fr) minmax(220px, 0.8fr);
+  gap: 12px;
+  padding: 18px 18px 0;
+}
+
+.hero-card {
+  display: grid;
+  gap: 8px;
+  padding: 14px 16px;
+  border: 1px solid var(--color-border-soft);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.42);
+}
+
+.hero-card.hero-main {
+  background: linear-gradient(135deg, rgba(74, 124, 153, 0.18), rgba(31, 163, 154, 0.14));
+}
+
+.hero-kicker {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.42em;
+  text-transform: uppercase;
+}
+
+.hero-card h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.hero-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.hero-stats div {
+  display: grid;
+  gap: 2px;
+}
+
+.hero-stats strong {
+  font-size: 15px;
+}
+
+.hero-stats span {
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.chip-list,
+.focus-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip-list li,
+.calendar-chip,
+.focus-tools span {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.task-drawer-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--color-border-soft);
+}
+
+.task-drawer-body {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+}
+
+.drawer-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.drawer-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.drawer-description,
+.drawer-section p {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.drawer-section {
+  display: grid;
+  gap: 6px;
+}
+
+.drawer-section h4 {
+  margin: 0;
+  font-size: 14px;
+}
+
 .priority-low {
   --task-color: var(--color-info);
 }
@@ -1980,9 +2103,15 @@ html[data-theme="dark"] .sidebar-item:hover {
   opacity: 0.58;
 }
 
-.calendar-day.today {
+.calendar-day.today,
+.calendar-day.is-active {
   border-color: var(--color-primary);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 12%, transparent);
+}
+
+.calendar-day:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
 }
 
 .calendar-day-number {
@@ -2066,6 +2195,27 @@ html[data-theme="dark"] .sidebar-item:hover {
   background: rgba(255, 255, 255, 0.26);
 }
 
+.calendar-detail-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 18px 18px;
+  padding: 14px 16px;
+  border: 1px solid var(--color-border-soft);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.42);
+}
+
+.calendar-detail-badge {
+  padding: 8px 10px;
+  border-radius: 999px;
+  background: var(--color-accent-soft);
+  color: var(--color-accent-hover);
+  font-size: 12px;
+  font-weight: 700;
+}
+
 /* ============================================================
    11. Notes: list, editor, markdown preview, Obsidian styling
    ============================================================ */
@@ -2096,13 +2246,23 @@ html[data-theme="dark"] .sidebar-item:hover {
   -webkit-backdrop-filter: var(--glass-blur);
 }
 
+.notes-summary p {
+  margin: 4px 0 0;
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
 .note-list-item {
+  width: 100%;
   display: grid;
   gap: 5px;
   padding: 12px 14px;
+  border: 0;
   border-bottom: 1px solid var(--color-border-soft);
+  text-align: left;
   cursor: pointer;
   transition: background 120ms ease;
+  background: transparent;
 }
 
 .note-list-item:hover,
@@ -2139,9 +2299,20 @@ html[data-theme="dark"] .sidebar-item:hover {
 .note-editor-toolbar {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
   padding: 12px 14px;
   border-bottom: 1px solid var(--color-border-soft);
+}
+
+.note-editor-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 14px 0;
+  color: var(--color-text-muted);
+  font-size: 12px;
 }
 
 .note-title-input {
