@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const CalendarService = require("../../services/CalendarService");
-const { makeSuccess, makeFail } = require("../../lib/apiResponse");
+const { makeOk, makeFail } = require("../../lib/apiResponse");
 
 /**
  * GET /api/calendar
@@ -10,7 +10,7 @@ const { makeSuccess, makeFail } = require("../../lib/apiResponse");
 router.get("/", async (req, res) => {
   try {
     const events = await CalendarService.findAll();
-    res.json(makeSuccess({ events }));
+    res.json(makeOk({ events }));
   } catch (err) {
     console.error("[api/calendar] GET error:", err);
     res.status(500).json(makeFail(err.message));
@@ -25,7 +25,7 @@ router.get("/month/:year/:month", async (req, res) => {
   try {
     const { year, month } = req.params;
     const events = await CalendarService.findByMonth(parseInt(year), parseInt(month));
-    res.json(makeSuccess({ events }));
+    res.json(makeOk({ events }));
   } catch (err) {
     console.error("[api/calendar] GET /month error:", err);
     res.status(500).json(makeFail(err.message));
@@ -39,7 +39,7 @@ router.get("/month/:year/:month", async (req, res) => {
 router.get("/upcoming", async (req, res) => {
   try {
     const events = await CalendarService.getUpcoming();
-    res.json(makeSuccess({ events }));
+    res.json(makeOk({ events }));
   } catch (err) {
     console.error("[api/calendar] GET /upcoming error:", err);
     res.status(500).json(makeFail(err.message));
@@ -53,7 +53,7 @@ router.get("/upcoming", async (req, res) => {
 router.get("/tags", async (req, res) => {
   try {
     const tags = await CalendarService.getTagsSummary();
-    res.json(makeSuccess({ tags }));
+    res.json(makeOk({ tags }));
   } catch (err) {
     console.error("[api/calendar] GET /tags error:", err);
     res.status(500).json(makeFail(err.message));
@@ -70,7 +70,7 @@ router.get("/:id", async (req, res) => {
     if (!event) {
       return res.status(404).json(makeFail("Event not found"));
     }
-    res.json(makeSuccess({ event }));
+    res.json(makeOk({ event }));
   } catch (err) {
     console.error("[api/calendar] GET /:id error:", err);
     res.status(500).json(makeFail(err.message));
@@ -101,7 +101,7 @@ router.post("/", async (req, res) => {
       allDay,
     });
 
-    res.status(201).json(makeSuccess({ event }, "Event created successfully"));
+    res.status(201).json(makeOk({ event }));
   } catch (err) {
     console.error("[api/calendar] POST error:", err);
     res.status(500).json(makeFail(err.message));
@@ -129,7 +129,7 @@ router.put("/:id", async (req, res) => {
       return res.status(404).json(makeFail("Event not found"));
     }
 
-    res.json(makeSuccess({ event }, "Event updated successfully"));
+    res.json(makeOk({ event }));
   } catch (err) {
     console.error("[api/calendar] PUT error:", err);
     res.status(500).json(makeFail(err.message));
@@ -148,7 +148,7 @@ router.delete("/:id", async (req, res) => {
       return res.status(404).json(makeFail("Event not found"));
     }
 
-    res.json(makeSuccess({}, "Event deleted successfully"));
+    res.json(makeOk({}));
   } catch (err) {
     console.error("[api/calendar] DELETE error:", err);
     res.status(500).json(makeFail(err.message));

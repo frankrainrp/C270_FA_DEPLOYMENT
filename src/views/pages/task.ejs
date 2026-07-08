@@ -1,82 +1,131 @@
 <%
   /*
     pages/task.ejs
-    Task list panel.  Static skeleton for the UI shell phase; a later
-    phase will replace the demo cards with data from /api/tasks.
+    Task list panel.  Rendered by pages.js with real tasks from MongoDB.
 
-    Locals available:
-    - activeNav (always "tasks")
-    - rail      (task counts + current view)
+    Locals available (via pageLocals):
+    - tasks : Array of Task documents (POJOs from .toObject())
   */
-  const demoTasks = [
-    { id: "t1", title: "Finish DevOps CA2 report",   due: "Today",     priority: "high",   done: false },
-    { id: "t2", title: "Review React → EJS mapping", due: "Tomorrow",  priority: "medium", done: false },
-    { id: "t3", title: "Push initial commit",        due: "This week", priority: "low",    done: false },
-    { id: "t4", title: "Read Butler style.css",      due: "Done",      priority: "low",    done: true  },
-  ];
+  const list = Array.isArray(locals.tasks) ? locals.tasks : [];
 
   const priorityColor = {
     high:   "var(--color-danger)",
     medium: "var(--color-warning)",
     low:    "var(--color-primary)",
   };
+
+  function fmtDue(d) {
+    if (!d) return "No due date";
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const dt = new Date(d);
+    if (isNaN(dt.getTime())) return "";
+    dt.setHours(0, 0, 0, 0);
+    const diff = Math.round((dt - today) / (1000 * 60 * 60 * 24));
+    if (diff === 0)  return "Today";
+    if (diff === 1)  return "Tomorrow";
+    if (diff === -1) return "Yesterday";
+    if (diff > 1 && diff <= 7) return "In " + diff + " days";
+    if (diff < 0)    return Math.abs(diff) + " days ago";
+    return dt.toISOString().slice(0, 10);
+  }
+
+  const active = list.filter((t) => !t.completed);
+  const done   = list.filter((t) =>  t.completed);
 %>
 
-<section class="tasks-panel">
-  <header class="chat-composer" style="border-top: 0; border-bottom: 1px solid var(--color-border-soft); padding: 14px 22px;">
-    <strong style="font-family: var(--font-display); font-size: 20px;">Tasks</strong>
-    <span style="color: var(--color-text-muted); margin-left: 8px;">Demo view</span>
+<section class="tasks-panel" data-tasks-root>
+  <header
+    class="chat-composer"
+    style="border-top: 0; border-bottom: 1px solid var(--color-border-soft); padding: 14px 22px; display: flex; align-items: center; justify-content: space-between;"
+  >
+    <div>
+      <strong style="font-family: var(--font-display); font-size: 20px;">Tasks</strong>
+      <span style="color: var(--color-text-muted); margin-left: 8px;">
+        <%= list.length %> total · <%= active.length %> active · <%= done.length %> done
+      </span>
+    </div>
+    <button class="glass-btn" type="button" data-refresh-tasks>Refresh</button>
   </header>
 
-  <div class="tasks-content">
-    <div class="task-group">
-      <div class="task-group-title">
-        <span>Active</span>
-        <span><%= demoTasks.filter(t => !t.done).length %></span>
+  <div class="tasks-content" data-tasks-list>
+    <% if (list.length === 0) { %>
+      <div style="padding: 40px; text-align: center; color: var(--color-text-muted);">
+        <p>No tasks yet.</p>
+        <p>Ask Butler in <a href="/chat">chat</a> to add one, e.g.
+          <em>"Add a task: finish CA2 tomorrow, high priority"</em>.</p>
       </div>
+    <% } %>
 
-      <% demoTasks.filter(t => !t.done).forEach(function(t) { %>
-        <article
-          class="task-card"
-          data-task-id="<%= t.id %>"
-          style="--task-color: <%= priorityColor[t.priority] %>"
-        >
-          <input class="task-checkbox" type="checkbox" aria-label="Toggle complete" />
-          <div class="task-main">
-            <div class="task-title"><%= t.title %></div>
-            <div class="task-meta">
-              <span>Due <%= t.due %></span>
-              <span>Priority: <%= t.priority %></span>
+    <% if (active.length > 0) { %>
+      <div class="task-group">
+        <div class="task-group-title">
+          <span>Active</span>
+          <span><%= active.length %></span>
+        </div>
+
+        <% active.forEach(function(t) { %>
+          <article
+            class="task-card"
+            data-task-id="<%= t._id %>"
+            style="--task-color: <%= priorityColor[t.priority] || priorityColor.medium %>"
+          >
+            <input
+              class="task-checkbox"
+              type="checkbox"
+              data-task-toggle
+              aria-label="Toggle complete"
+            />
+            <div class="task-main">
+              <div class="task-title"><%= t.title %></div>
+              <div class="task-meta">
+                <span>Due <%= fmtDue(t.dueDate) %></span>
+                <span>Priority: <%= t.priority %></span>
+              </div>
             </div>
-          </div>
-          <div class="task-actions">
-            <button class="glass-btn" type="button">Edit</button>
-          </div>
-        </article>
-      <% }) %>
-    </div>
-
-    <div class="task-group">
-      <div class="task-group-title">
-        <span>Completed</span>
-        <span><%= demoTasks.filter(t => t.done).length %></span>
+            <div class="task-actions">
+              <button class="glass-btn" type="button" data-task-delete>Delete</button>
+            </div>
+          </article>
+        <% }) %>
       </div>
+    <% } %>
 
-      <% demoTasks.filter(t => t.done).forEach(function(t) { %>
-        <article
-          class="task-card completed"
-          data-task-id="<%= t.id %>"
-          style="--task-color: <%= priorityColor[t.priority] %>"
-        >
-          <input class="task-checkbox" type="checkbox" checked aria-label="Toggle complete" />
-          <div class="task-main">
-            <div class="task-title"><%= t.title %></div>
-            <div class="task-meta">
-              <span><%= t.due %></span>
+    <% if (done.length > 0) { %>
+      <div class="task-group">
+        <div class="task-group-title">
+          <span>Completed</span>
+          <span><%= done.length %></span>
+        </div>
+
+        <% done.forEach(function(t) { %>
+          <article
+            class="task-card completed"
+            data-task-id="<%= t._id %>"
+            style="--task-color: <%= priorityColor[t.priority] || priorityColor.medium %>"
+          >
+            <input
+              class="task-checkbox"
+              type="checkbox"
+              checked
+              data-task-toggle
+              aria-label="Toggle complete"
+            />
+            <div class="task-main">
+              <div class="task-title"><%= t.title %></div>
+              <div class="task-meta">
+                <span><%= fmtDue(t.dueDate) %></span>
+              </div>
             </div>
-          </div>
-        </article>
-      <% }) %>
-    </div>
+            <div class="task-actions">
+              <button class="glass-btn" type="button" data-task-delete>Delete</button>
+            </div>
+          </article>
+        <% }) %>
+      </div>
+    <% } %>
   </div>
 </section>
+
+<script src="/js/api.js" defer></script>
+<script src="/js/tasks-ui.js" defer></script>

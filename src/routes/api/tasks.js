@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const TaskService = require("../../services/TaskService");
-const { makeSuccess, makeFail } = require("../../lib/apiResponse");
+const { makeOk, makeFail } = require("../../lib/apiResponse");
 
 /**
  * GET /api/tasks
@@ -11,7 +11,7 @@ router.get("/", async (req, res) => {
   try {
     const view = req.query.view || "all";
     const tasks = await TaskService.findAll(view);
-    res.json(makeSuccess({ tasks }));
+    res.json(makeOk({ tasks }));
   } catch (err) {
     console.error("[api/tasks] GET error:", err);
     res.status(500).json(makeFail(err.message));
@@ -25,7 +25,7 @@ router.get("/", async (req, res) => {
 router.get("/stats", async (req, res) => {
   try {
     const stats = await TaskService.getStats();
-    res.json(makeSuccess(stats));
+    res.json(makeOk(stats));
   } catch (err) {
     console.error("[api/tasks] GET /stats error:", err);
     res.status(500).json(makeFail(err.message));
@@ -42,7 +42,7 @@ router.get("/:id", async (req, res) => {
     if (!task) {
       return res.status(404).json(makeFail("Task not found"));
     }
-    res.json(makeSuccess({ task }));
+    res.json(makeOk({ task }));
   } catch (err) {
     console.error("[api/tasks] GET /:id error:", err);
     res.status(500).json(makeFail(err.message));
@@ -68,7 +68,7 @@ router.post("/", async (req, res) => {
       priority,
     });
 
-    res.status(201).json(makeSuccess({ task }, "Task created successfully"));
+    res.status(201).json(makeOk({ task }));
   } catch (err) {
     console.error("[api/tasks] POST error:", err);
     res.status(500).json(makeFail(err.message));
@@ -95,7 +95,7 @@ router.put("/:id", async (req, res) => {
       return res.status(404).json(makeFail("Task not found"));
     }
 
-    res.json(makeSuccess({ task }, "Task updated successfully"));
+    res.json(makeOk({ task }));
   } catch (err) {
     console.error("[api/tasks] PUT error:", err);
     res.status(500).json(makeFail(err.message));
@@ -114,7 +114,7 @@ router.delete("/:id", async (req, res) => {
       return res.status(404).json(makeFail("Task not found"));
     }
 
-    res.json(makeSuccess({}, "Task deleted successfully"));
+    res.json(makeOk({}));
   } catch (err) {
     console.error("[api/tasks] DELETE error:", err);
     res.status(500).json(makeFail(err.message));
@@ -133,7 +133,7 @@ router.patch("/:id/toggle", async (req, res) => {
       return res.status(404).json(makeFail("Task not found"));
     }
 
-    res.json(makeSuccess({ task }, "Task toggled successfully"));
+    res.json(makeOk({ task }));
   } catch (err) {
     console.error("[api/tasks] PATCH /toggle error:", err);
     res.status(500).json(makeFail(err.message));

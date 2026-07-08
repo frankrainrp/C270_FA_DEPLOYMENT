@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const NoteService = require("../../services/NoteService");
-const { makeSuccess, makeFail } = require("../../lib/apiResponse");
+const { makeOk, makeFail } = require("../../lib/apiResponse");
 
 /**
  * GET /api/notes
@@ -11,7 +11,7 @@ router.get("/", async (req, res) => {
   try {
     const filter = req.query.filter || "all";
     const notes = await NoteService.findAll(filter);
-    res.json(makeSuccess({ notes }));
+    res.json(makeOk({ notes }));
   } catch (err) {
     console.error("[api/notes] GET error:", err);
     res.status(500).json(makeFail(err.message));
@@ -25,7 +25,7 @@ router.get("/", async (req, res) => {
 router.get("/pinned", async (req, res) => {
   try {
     const notes = await NoteService.getPinned();
-    res.json(makeSuccess({ notes }));
+    res.json(makeOk({ notes }));
   } catch (err) {
     console.error("[api/notes] GET /pinned error:", err);
     res.status(500).json(makeFail(err.message));
@@ -42,7 +42,7 @@ router.get("/:id", async (req, res) => {
     if (!note) {
       return res.status(404).json(makeFail("Note not found"));
     }
-    res.json(makeSuccess({ note }));
+    res.json(makeOk({ note }));
   } catch (err) {
     console.error("[api/notes] GET /:id error:", err);
     res.status(500).json(makeFail(err.message));
@@ -68,7 +68,7 @@ router.post("/", async (req, res) => {
       pinned,
     });
 
-    res.status(201).json(makeSuccess({ note }, "Note created successfully"));
+    res.status(201).json(makeOk({ note }));
   } catch (err) {
     console.error("[api/notes] POST error:", err);
     res.status(500).json(makeFail(err.message));
@@ -94,7 +94,7 @@ router.put("/:id", async (req, res) => {
       return res.status(404).json(makeFail("Note not found"));
     }
 
-    res.json(makeSuccess({ note }, "Note updated successfully"));
+    res.json(makeOk({ note }));
   } catch (err) {
     console.error("[api/notes] PUT error:", err);
     res.status(500).json(makeFail(err.message));
@@ -113,7 +113,7 @@ router.delete("/:id", async (req, res) => {
       return res.status(404).json(makeFail("Note not found"));
     }
 
-    res.json(makeSuccess({}, "Note deleted successfully"));
+    res.json(makeOk({}));
   } catch (err) {
     console.error("[api/notes] DELETE error:", err);
     res.status(500).json(makeFail(err.message));
@@ -132,7 +132,7 @@ router.patch("/:id/toggle", async (req, res) => {
       return res.status(404).json(makeFail("Note not found"));
     }
 
-    res.json(makeSuccess({ note }, "Note toggled successfully"));
+    res.json(makeOk({ note }));
   } catch (err) {
     console.error("[api/notes] PATCH /toggle error:", err);
     res.status(500).json(makeFail(err.message));

@@ -804,6 +804,14 @@ html[data-theme="dark"] .pill-nav {
   transform: translateY(-1px);
 }
 
+.sidebar-primary-icon {
+  position: relative;
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+  display: inline-block;
+}
+
 .sidebar-section {
   min-height: 0;
   display: flex;

@@ -73,8 +73,17 @@ function beginSse(res) {
 
 // Best-effort chat session helpers.  Never throw — if MongoDB is not
 // available the chat should still work in-memory.
-async function safeGetSession() {
+//
+// If the client passes a sessionId, we save into that specific
+// conversation.  Different tabs / URLs isolate their history this way.
+// If sessionId is missing or invalid, we fall back to the latest
+// session (creating one if none exists).
+async function safeGetSession(sessionId) {
   try {
+    if (sessionId) {
+      const s = await ChatSessionService.findById(sessionId);
+      if (s) return s;
+    }
     return await ChatSessionService.getLatestSession();
   } catch (err) {
     console.warn("[ChatService] session unavailable:", err.message);
@@ -207,7 +216,7 @@ async function streamReal(input, res) {
 
     // Best-effort persistence.  Only on the first turn of a user
     // message (not on tool follow-up rounds).
-    const session = await safeGetSession();
+    const session = await safeGetSession(input.sessionId);
     if (session && !isFollowUpToolRound(input.messages)) {
       const lastUser = extractLastUserContent(input.messages);
       if (lastUser) await safeSaveMessage(session, "user", lastUser);

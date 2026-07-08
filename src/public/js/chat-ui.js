@@ -116,6 +116,7 @@
 
     await ButlerChatClient.streamChat({
       messages: messages,
+      sessionId: ButlerState.get().activeSessionId || null,
       model: "deepseek-v4-flash",
       personality: "standard",
       signal: signal,

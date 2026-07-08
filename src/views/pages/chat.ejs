@@ -84,6 +84,15 @@
   </div>
 </section>
 
+<script>
+  // Hand SSR-rendered chat history to the client so ButlerState is
+  // seeded before chat-ui.js sends its first message.  Without this,
+  // subsequent turns would forget everything before the reload.
+  window.__BUTLER_INIT__ = {
+    messages: <%- JSON.stringify(initialMessagesList) %>,
+    activeSessionId: <%- JSON.stringify((locals && locals.activeSessionId) || null) %>,
+  };
+</script>
 <script src="/js/app-state.js" defer></script>
 <script src="/js/api.js" defer></script>
 <script src="/js/chat-client.js" defer></script>
