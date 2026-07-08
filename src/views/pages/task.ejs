@@ -1,56 +1,131 @@
 <%
   /*
     pages/task.ejs
-    Task list panel.  Static skeleton for the UI shell phase; a later
-    phase will replace the demo cards with data from /api/tasks.
-
-    Locals available:
-    - activeNav (always "tasks")
-    - rail      (task counts + current view)
+    Study productivity task workspace with overview cards, task list,
+    and a detail drawer for each selected task.
   */
   const demoTasks = [
-    { id: "t1", title: "Finish DevOps CA2 report",   due: "Today",     priority: "high",   done: false },
-    { id: "t2", title: "Review React → EJS mapping", due: "Tomorrow",  priority: "medium", done: false },
-    { id: "t3", title: "Push initial commit",        due: "This week", priority: "low",    done: false },
-    { id: "t4", title: "Read Butler style.css",      due: "Done",      priority: "low",    done: true  },
+    {
+      id: "t1",
+      title: "Finish DevOps CA2 report",
+      due: "Today",
+      priority: "high",
+      done: false,
+      description: "Polish the study dashboard, finalise the report, and prepare the hand-in summary.",
+      notes: "Focus on the deployment checklist and include the validation results.",
+    },
+    {
+      id: "t2",
+      title: "Review React → EJS mapping",
+      due: "Tomorrow",
+      priority: "medium",
+      done: false,
+      description: "Revisit the component architecture and map each UI concept to the current server-rendered shell.",
+      notes: "Keep a short reference table for future implementation sprint notes.",
+    },
+    {
+      id: "t3",
+      title: "Push initial commit",
+      due: "This week",
+      priority: "low",
+      done: false,
+      description: "Package the current milestone and share the progress update with the team.",
+      notes: "Include the task and calendar panel updates in the summary.",
+    },
+    {
+      id: "t4",
+      title: "Read Butler style.css",
+      due: "Done",
+      priority: "low",
+      done: true,
+      description: "Review the shared styling system for later UI improvements.",
+      notes: "Captured the key spacing tokens that are already in place.",
+    },
   ];
 
   const priorityColor = {
-    high:   "var(--color-danger)",
+    high: "var(--color-danger)",
     medium: "var(--color-warning)",
-    low:    "var(--color-primary)",
+    low: "var(--color-primary)",
   };
+
+  const activeTasks = demoTasks.filter((task) => !task.done);
+  const completedTasks = demoTasks.filter((task) => task.done);
 %>
 
 <section class="tasks-panel">
   <header class="chat-composer" style="border-top: 0; border-bottom: 1px solid var(--color-border-soft); padding: 14px 22px;">
     <strong style="font-family: var(--font-display); font-size: 20px;">Tasks</strong>
-    <span style="color: var(--color-text-muted); margin-left: 8px;">Demo view</span>
+    <span style="color: var(--color-text-muted); margin-left: 8px;">Study productivity workspace</span>
   </header>
+
+  <div class="productivity-hero">
+    <div class="hero-card hero-main">
+      <p class="hero-kicker">Daily overview</p>
+      <h3>Keep the study sprint moving with a calm, focused plan.</h3>
+      <div class="hero-stats">
+        <div>
+          <strong><%= activeTasks.length %></strong>
+          <span>active tasks</span>
+        </div>
+        <div>
+          <strong><%= completedTasks.length %></strong>
+          <span>completed</span>
+        </div>
+        <div>
+          <strong>2h 15m</strong>
+          <span>focus time</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="hero-card">
+      <p class="hero-kicker">Achievements</p>
+      <ul class="chip-list">
+        <li>3 focus sessions</li>
+        <li>1 study streak</li>
+        <li>2 wins this week</li>
+      </ul>
+    </div>
+
+    <div class="hero-card">
+      <p class="hero-kicker">Focus tools</p>
+      <div class="focus-tools">
+        <span>Pomodoro 25:00</span>
+        <span>Deep work</span>
+        <span>Noise block</span>
+      </div>
+    </div>
+  </div>
 
   <div class="tasks-content">
     <div class="task-group">
       <div class="task-group-title">
         <span>Active</span>
-        <span><%= demoTasks.filter(t => !t.done).length %></span>
+        <span><%= activeTasks.length %></span>
       </div>
 
-      <% demoTasks.filter(t => !t.done).forEach(function(t) { %>
+      <% activeTasks.forEach(function(task) { %>
         <article
           class="task-card"
-          data-task-id="<%= t.id %>"
-          style="--task-color: <%= priorityColor[t.priority] %>"
+          data-task-id="<%= task.id %>"
+          data-title="<%= task.title %>"
+          data-due="<%= task.due %>"
+          data-priority="<%= task.priority %>"
+          data-description="<%= task.description %>"
+          data-notes="<%= task.notes %>"
+          style="--task-color: <%= priorityColor[task.priority] %>"
         >
           <input class="task-checkbox" type="checkbox" aria-label="Toggle complete" />
           <div class="task-main">
-            <div class="task-title"><%= t.title %></div>
+            <div class="task-title"><%= task.title %></div>
             <div class="task-meta">
-              <span>Due <%= t.due %></span>
-              <span>Priority: <%= t.priority %></span>
+              <span>Due <%= task.due %></span>
+              <span>Priority: <%= task.priority %></span>
             </div>
           </div>
           <div class="task-actions">
-            <button class="glass-btn" type="button">Edit</button>
+            <button class="glass-btn task-detail-trigger" type="button">Details</button>
           </div>
         </article>
       <% }) %>
@@ -59,24 +134,54 @@
     <div class="task-group">
       <div class="task-group-title">
         <span>Completed</span>
-        <span><%= demoTasks.filter(t => t.done).length %></span>
+        <span><%= completedTasks.length %></span>
       </div>
 
-      <% demoTasks.filter(t => t.done).forEach(function(t) { %>
+      <% completedTasks.forEach(function(task) { %>
         <article
           class="task-card completed"
-          data-task-id="<%= t.id %>"
-          style="--task-color: <%= priorityColor[t.priority] %>"
+          data-task-id="<%= task.id %>"
+          data-title="<%= task.title %>"
+          data-due="<%= task.due %>"
+          data-priority="<%= task.priority %>"
+          data-description="<%= task.description %>"
+          data-notes="<%= task.notes %>"
+          style="--task-color: <%= priorityColor[task.priority] %>"
         >
           <input class="task-checkbox" type="checkbox" checked aria-label="Toggle complete" />
           <div class="task-main">
-            <div class="task-title"><%= t.title %></div>
+            <div class="task-title"><%= task.title %></div>
             <div class="task-meta">
-              <span><%= t.due %></span>
+              <span><%= task.due %></span>
             </div>
           </div>
         </article>
       <% }) %>
+    </div>
+  </div>
+
+  <div class="task-detail-drawer" id="task-detail-drawer" hidden>
+    <div class="task-drawer-header">
+      <div>
+        <p class="hero-kicker">Task detail</p>
+        <h3 id="task-detail-title">Select a task</h3>
+      </div>
+      <button class="glass-btn" type="button" data-close-drawer>Close</button>
+    </div>
+    <div class="task-drawer-body">
+      <div class="drawer-meta-row">
+        <span class="drawer-pill" id="task-detail-priority">Priority</span>
+        <span class="drawer-pill" id="task-detail-due">Due</span>
+      </div>
+      <p id="task-detail-description" class="drawer-description">Pick a task card to open its detail view.</p>
+      <div class="drawer-section">
+        <h4>Study notes</h4>
+        <p id="task-detail-notes">No notes yet.</p>
+      </div>
+      <div class="drawer-section">
+        <h4>Suggested next step</h4>
+        <p>Break this task into one small action and keep the momentum going.</p>
+      </div>
     </div>
   </div>
 </section>
