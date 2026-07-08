@@ -1,7 +1,8 @@
 <%
   /*
     pages/calendar.ejs
-    Calendar workspace with a month grid, event pills, and a detail panel.
+    Calendar workspace with a month grid, event pills, and a detail panel
+    for the selected day.
     Event data comes from MongoDB via pages.js.
   */
   const events = Array.isArray(locals.events) ? locals.events : [];
@@ -9,7 +10,8 @@
   const year = today.getFullYear();
   const month = today.getMonth();
   const monthLabel = today.toLocaleDateString("en", { month: "long", year: "numeric" });
-
+  
+  // Weekday header labels shown above the grid.
   const weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const firstDayJs = new Date(year, month, 1).getDay(); // 0 = Sunday
