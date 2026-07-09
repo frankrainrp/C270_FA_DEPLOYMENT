@@ -36,7 +36,9 @@ module.exports = function mountRoutes(app) {
   // JSON / SSE API surface.
   app.use("/api/health", apiHealth);
   app.use("/api/chat", apiChat);
-<<<<<<< HEAD
+  app.use("/api/tasks", apiTasks);
+  app.use("/api/notes", apiNotes);
+  app.use("/api/calendar", apiCalendar);
 
   // =============================
   // Member 5 API Routes
@@ -46,11 +48,4 @@ module.exports = function mountRoutes(app) {
   app.use("/api/generate-panel", generatePanelRoutes);
   app.use("/api/research", researchRoutes);
   app.use("/api/visualization", visualizationRoutes);
-
 };
-=======
-  app.use("/api/tasks", apiTasks);
-  app.use("/api/notes", apiNotes);
-  app.use("/api/calendar", apiCalendar);
-};
->>>>>>> f22f8690686c97eb5d7b04d9aae23d15661c6f07
