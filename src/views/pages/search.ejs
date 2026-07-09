@@ -1,0 +1,70 @@
+<%
+  /*
+    pages/search.ejs
+    Global search results page. Shows matches for the query across the app.
+  */
+  let searchQuery = "";
+  if (typeof query !== "undefined") {
+    searchQuery = query;
+  }
+
+  let searchResults = { notes: [], tasks: [], chats: [] };
+  if (typeof results !== "undefined") {
+    searchResults = results;
+  }
+%>
+
+<section class="search-panel">
+  <header class="chat-composer" style="border-top: 0; border-bottom: 1px solid var(--color-border-soft); padding: 14px 22px;">
+    <strong style="font-family: var(--font-display); font-size: 20px;">Search</strong>
+    <span style="color: var(--color-text-muted); margin-left: 8px;">Showing matches for “<%= searchQuery %>”</span>
+  </header>
+
+  <% if (!searchQuery) { %>
+    <div class="search-empty">
+      <p>Enter a search term in the top-bar search box to find tasks, notes, and chats.</p>
+    </div>
+  <% } else if (searchResults.notes.length === 0 && searchResults.tasks.length === 0 && searchResults.chats.length === 0) { %>
+    <div class="search-empty">
+      <p>No results found for “<%= searchQuery %>”. Try a different keyword.</p>
+    </div>
+  <% } else { %>
+    <% if (searchResults.notes.length > 0) { %>
+      <section class="search-group">
+        <h2>Notes</h2>
+        <% searchResults.notes.forEach(function(note) { %>
+          <article class="search-item">
+            <h3><%= note.title %></h3>
+            <p><%= note.preview %></p>
+            <span class="search-meta">Updated <%= note.updated %></span>
+          </article>
+        <% }) %>
+      </section>
+    <% } %>
+
+    <% if (searchResults.tasks.length > 0) { %>
+      <section class="search-group">
+        <h2>Tasks</h2>
+        <% searchResults.tasks.forEach(function(task) { %>
+          <article class="search-item">
+            <h3><%= task.title %></h3>
+            <p><%= task.description %></p>
+            <span class="search-meta">Due <%= task.due %> • Priority <%= task.priority %></span>
+          </article>
+        <% }) %>
+      </section>
+    <% } %>
+
+    <% if (searchResults.chats.length > 0) { %>
+      <section class="search-group">
+        <h2>Chats</h2>
+        <% searchResults.chats.forEach(function(chat) { %>
+          <article class="search-item">
+            <h3><%= chat.title %></h3>
+            <p>Chat session match</p>
+          </article>
+        <% }) %>
+      </section>
+    <% } %>
+  <% } %>
+</section>

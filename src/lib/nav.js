@@ -22,7 +22,10 @@ const NAV_DEFAULTS = NAV_ITEMS.map((item) => item.id);
 
 // Whitelist of page partials we are allowed to include from renderLayout.
 // Prevents accidental path traversal via a bad `page` local.
-const PAGE_WHITELIST = new Set(NAV_ITEMS.map((item) => item.pageFile));
+const PAGE_WHITELIST = new Set([
+  ...NAV_ITEMS.map((item) => item.pageFile),
+  "search",
+]);
 
 module.exports = {
   NAV_ITEMS,

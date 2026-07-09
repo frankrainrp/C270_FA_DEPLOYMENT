@@ -157,6 +157,14 @@
         </a>
       <% }) %>
     </section>
+  <% } else if (active === "search" && !customActiveId) { %>
+    <section class="sidebar-section" aria-labelledby="sidebar-search-title">
+      <h2 id="sidebar-search-title" class="sidebar-heading"><%= L("rail.search.results", "Search") %></h2>
+      <p class="sidebar-hint"><%= L("rail.search.hint", "Search across notes, tasks, and chat sessions from the top bar.") %></p>
+      <div class="sidebar-item">
+        <span class="sidebar-item-label"><%= L("rail.search.quickTip", "Tip: try keywords like \"DevOps\" or \"React\".") %></span>
+      </div>
+    </section>
   <% } else if (active === "notes" && !customActiveId) { %>
     <a class="sidebar-primary" href="/notes/new" data-action="new-note">
       <span class="sidebar-primary-icon plus-icon" aria-hidden="true"></span>
