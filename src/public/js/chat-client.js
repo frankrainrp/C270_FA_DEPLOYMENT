@@ -45,6 +45,7 @@
           contextSummary: opts.contextSummary,
           userName: opts.userName,
           includeTools: opts.includeTools !== false,
+          sessionId: opts.sessionId || null,
         }),
       });
     } catch (err) {

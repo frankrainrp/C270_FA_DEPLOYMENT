@@ -15,9 +15,30 @@
 (function initAppState() {
   var listeners = [];
 
+  // If chat.ejs injected SSR-rendered history via window.__BUTLER_INIT__,
+  // start with those messages already in state so the AI keeps context
+  // after a page reload.
+  var seedMessages = [];
+  var seedSessionId = null;
+  try {
+    var init = window.__BUTLER_INIT__ || {};
+    if (Array.isArray(init.messages)) {
+      seedMessages = init.messages.map(function (m, i) {
+        return {
+          id: "seed-" + i,
+          role: m.role,
+          content: typeof m.content === "string" ? m.content : "",
+        };
+      });
+    }
+    if (typeof init.activeSessionId === "string" && init.activeSessionId) {
+      seedSessionId = init.activeSessionId;
+    }
+  } catch (_) { /* ignore */ }
+
   var state = {
-    activeSessionId: "local-session",
-    messages: [],
+    activeSessionId: seedSessionId,
+    messages: seedMessages,
     pendingReply: null,
     isStreaming: false,
   };
