@@ -2051,13 +2051,20 @@ html[data-theme="dark"] .sidebar-item:hover {
   z-index: 90;
   width: min(420px, 100vw);
   height: 100vh;
-  display: flex;
+  display: none;
   flex-direction: column;
   border-left: 1px solid var(--glass-border);
   background: var(--glass-bg-strong);
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
   box-shadow: var(--shadow-drawer);
+  transform: translateX(100%);
+  transition: transform 0.2s ease;
+}
+
+.task-detail-drawer.is-open {
+  display: flex;
+  transform: translateX(0);
 }
 
 /* ============================================================

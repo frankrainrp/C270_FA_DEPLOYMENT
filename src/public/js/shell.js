@@ -102,7 +102,10 @@
 
   function closeTaskDrawer() {
     var drawerEl = document.getElementById("task-detail-drawer");
-    if (drawerEl) drawerEl.hidden = true;
+    if (drawerEl) {
+      drawerEl.classList.remove("is-open");
+      drawerEl.removeAttribute("aria-hidden");
+    }
   }
 
   function openTaskDrawer(event) {
@@ -111,12 +114,12 @@
 
     if (!drawerEl || !card) return;
 
-    document.getElementById("task-detail-title").textContent = card.getAttribute("data-title");
-    document.getElementById("task-detail-priority").textContent = "Priority: " + card.getAttribute("data-priority");
-    document.getElementById("task-detail-due").textContent = "Due: " + card.getAttribute("data-due");
-    document.getElementById("task-detail-description").textContent = card.getAttribute("data-description");
-    document.getElementById("task-detail-notes").textContent = card.getAttribute("data-notes");
-    drawerEl.hidden = false;
+    document.getElementById("task-detail-title").textContent = card.getAttribute("data-title") || "Untitled";
+    document.getElementById("task-detail-priority").textContent = "Priority: " + (card.getAttribute("data-priority") || "medium");
+    document.getElementById("task-detail-due").textContent = card.getAttribute("data-due") || "No due date";
+    document.getElementById("task-detail-description").textContent = card.getAttribute("data-description") || "No description.";
+    document.getElementById("task-detail-notes").textContent = card.getAttribute("data-notes") || "No notes yet.";
+    drawerEl.classList.add("is-open");
   }
 
   document.querySelectorAll(".task-card").forEach(function (card) {

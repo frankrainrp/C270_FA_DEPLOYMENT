@@ -60,4 +60,13 @@
     var tool = ev && ev.detail && ev.detail.tool;
     if (!tool || tool.indexOf("task_") === 0) reload();
   });
+
+  // Cross-tab: reload when another tab (e.g. Chat) modifies tasks
+  try {
+    var bc = new BroadcastChannel("butler-data");
+    bc.onmessage = function (ev) {
+      var tool = ev.data && ev.data.tool;
+      if (!tool || tool.indexOf("task_") === 0) reload();
+    };
+  } catch (_) {}
 })();

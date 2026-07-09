@@ -19,6 +19,14 @@
 
   window.addEventListener("butler:data-changed", function (ev) {
     var tool = ev && ev.detail && ev.detail.tool;
-    if (!tool || tool.indexOf("event_") === 0) window.location.reload();
+    if (!tool || tool.indexOf("event_") === 0 || tool.indexOf("task_") === 0) window.location.reload();
   });
+
+  try {
+    var bc = new BroadcastChannel("butler-data");
+    bc.onmessage = function (ev) {
+      var tool = ev.data && ev.data.tool;
+      if (!tool || tool.indexOf("event_") === 0 || tool.indexOf("task_") === 0) window.location.reload();
+    };
+  } catch (_) {}
 })();

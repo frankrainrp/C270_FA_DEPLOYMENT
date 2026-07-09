@@ -121,4 +121,12 @@
     var tool = ev && ev.detail && ev.detail.tool;
     if (!tool || tool.indexOf("note_") === 0) reload();
   });
+
+  try {
+    var bc = new BroadcastChannel("butler-data");
+    bc.onmessage = function (ev) {
+      var tool = ev.data && ev.data.tool;
+      if (!tool || tool.indexOf("note_") === 0) reload();
+    };
+  } catch (_) {}
 })();

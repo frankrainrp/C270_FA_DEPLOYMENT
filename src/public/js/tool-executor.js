@@ -129,12 +129,21 @@
 
   // Fire a DOM event after any write so tasks/notes/calendar pages
   // can refresh themselves without a full navigation.
+  // Also broadcast cross-tab so other open pages refresh too.
+  var channel = null;
+  try { channel = new BroadcastChannel("butler-data"); } catch (_) {}
+
   function dispatchChanged(toolName) {
     try {
       window.dispatchEvent(new CustomEvent("butler:data-changed", {
         detail: { tool: toolName },
       }));
     } catch (_) { /* older browsers */ }
+
+    // Cross-tab broadcast
+    if (channel) {
+      try { channel.postMessage({ tool: toolName }); } catch (_) {}
+    }
   }
 
   var WRITE_TOOLS = /_(create|update|delete|toggle|toggle_pin)$/;
