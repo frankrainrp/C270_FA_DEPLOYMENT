@@ -173,17 +173,43 @@ router.get("/notes", async (_req, res, next) => {
 });
 
 // -----------------------------------------------------------
-// Calendar: load real events, overlay onto the month grid.
+// Calendar: load real events + tasks with dueDate, overlay
+// both onto the month grid.
 // -----------------------------------------------------------
 router.get("/calendar", async (_req, res, next) => {
   try {
-    const events = await CalendarService.findAll();
+    const [events, tasks] = await Promise.all([
+      CalendarService.findAll(),
+      TaskService.findAll("all"),
+    ]);
+
+    const taskEvents = tasks
+      .filter((t) => t.dueDate)
+      .map((t) => {
+        const plain = t.toObject();
+        return {
+          _id: plain._id,
+          title: plain.title,
+          date: plain.dueDate,
+          description: plain.description || "",
+          color: plain.completed ? "gray" : "green",
+          isTask: true,
+          completed: plain.completed,
+          priority: plain.priority,
+        };
+      });
+
+    const combined = [
+      ...events.map((e) => e.toObject()),
+      ...taskEvents,
+    ];
+
     renderLayout(res, {
       title: "Calendar",
       activeNav: "calendar",
       page: "calendar",
       rail: getMockRail("calendar"),
-      pageLocals: { events: events.map((e) => e.toObject()) },
+      pageLocals: { events: combined },
     });
   } catch (err) {
     next(err);

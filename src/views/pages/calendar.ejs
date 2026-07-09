@@ -120,6 +120,7 @@
           <div class="event-list">
             <% c.events.slice(0, 3).forEach(function(ev) { %>
               <span class="event-pill" style="--event-color: <%= colorVar[ev.color] || colorVar.blue %>">
+                <% if (ev.isTask) { %><span class="event-pill-badge">Task</span><% } %>
                 <span><%= ev.title %></span>
               </span>
             <% }) %>

@@ -149,6 +149,106 @@
     return assistantMsg || { role: "assistant", content: "" };
   }
 
+  // ---------- Confirmation card ----------
+  function getToolLabel(call) {
+    var name = (call.function && call.function.name) || "unknown";
+    var args = {};
+    try { args = JSON.parse(call.function.arguments || "{}"); } catch (_) {}
+    var type = name.split("_")[0] || "Action";
+    type = type.charAt(0).toUpperCase() + type.slice(1);
+    var title = args.title || args.name || "";
+    var due = args.dueDate || args.date || "";
+    if (due) {
+      try {
+        var d = new Date(due);
+        due = d.toLocaleDateString("en", { weekday: "short", month: "short", day: "numeric" });
+      } catch (_) {}
+    }
+    var summary = title || name.replace(/_/g, " ");
+    return { type: type, action: name.split("_")[1] || "", title: summary, due: due ? "Due: " + due : "" };
+  }
+
+  function showConfirmationCard(toolCalls) {
+    return new Promise(function (resolve) {
+      var row = document.createElement("div");
+      row.className = "message-row ai";
+
+      var card = document.createElement("div");
+      card.className = "tool-confirm-card";
+
+      var items = [];
+
+      toolCalls.forEach(function (call, idx) {
+        var info = getToolLabel(call);
+        var item = document.createElement("div");
+        item.className = "tool-confirm-item";
+        item.setAttribute("data-idx", idx);
+        item.innerHTML =
+          '<div class="tool-confirm-item-info">' +
+            '<span class="tool-confirm-badge">' + info.type + '</span>' +
+            '<strong>' + info.title + '</strong>' +
+            (info.due ? '<span class="tool-confirm-due">' + info.due + '</span>' : '') +
+          '</div>' +
+          '<div class="tool-confirm-item-actions">' +
+            '<button class="tool-confirm-accept" type="button" data-action="accept" data-idx="' + idx + '">Accept</button>' +
+            '<button class="tool-confirm-decline" type="button" data-action="decline" data-idx="' + idx + '">Decline</button>' +
+          '</div>';
+        card.appendChild(item);
+        items.push({ call: call, el: item, accepted: null });
+      });
+
+      var footer = document.createElement("div");
+      footer.className = "tool-confirm-footer";
+      footer.innerHTML =
+        '<button class="tool-confirm-accept-all" type="button" data-action="accept-all">' +
+          '<span>✓</span> Accept All</button>' +
+        '<button class="tool-confirm-decline-all" type="button" data-action="decline-all">' +
+          '<span>✗</span> Decline All</button>';
+      card.appendChild(footer);
+
+      row.appendChild(card);
+      stream.appendChild(row);
+      scrollToEnd();
+
+      function checkDone() {
+        var allDecided = items.every(function (it) { return it.accepted !== null; });
+        if (!allDecided) return;
+        var accepted = [];
+        var declined = [];
+        items.forEach(function (it) {
+          if (it.accepted) accepted.push(it.call);
+          else declined.push(it.call);
+        });
+        resolve({ accepted: accepted, declined: declined });
+      }
+
+      function markItem(idx, accepted) {
+        var it = items[idx];
+        if (!it || it.accepted !== null) return;
+        it.accepted = accepted;
+        it.el.classList.add(accepted ? "confirmed" : "declined");
+        var btns = it.el.querySelectorAll("button");
+        for (var b = 0; b < btns.length; b++) btns[b].disabled = true;
+        checkDone();
+      }
+
+      card.addEventListener("click", function (ev) {
+        var btn = ev.target.closest && ev.target.closest("button");
+        if (!btn) return;
+        var action = btn.getAttribute("data-action");
+        if (action === "accept-all") {
+          items.forEach(function (it, i) { markItem(i, true); });
+        } else if (action === "decline-all") {
+          items.forEach(function (it, i) { markItem(i, false); });
+        } else if (action === "accept") {
+          markItem(Number(btn.getAttribute("data-idx")), true);
+        } else if (action === "decline") {
+          markItem(Number(btn.getAttribute("data-idx")), false);
+        }
+      });
+    });
+  }
+
   // ---------- Tool execution ----------
   async function runToolCalls(toolCalls) {
     if (!window.ButlerToolExecutor) {
@@ -158,14 +258,28 @@
       });
     }
 
+    // Show confirmation card and wait for user decisions
+    var decision = await showConfirmationCard(toolCalls);
+
     var results = [];
-    for (var i = 0; i < toolCalls.length; i += 1) {
-      var call = toolCalls[i];
+
+    // Execute accepted calls
+    for (var i = 0; i < decision.accepted.length; i += 1) {
+      var call = decision.accepted[i];
       var name = call.function && call.function.name;
-      appendToolNotice("Calling " + name + "...");
+      appendToolNotice("Executing " + name + "...");
       var content = await ButlerToolExecutor.execute(call);
       results.push({ tool_call_id: call.id, content: content });
     }
+
+    // Return decline results for rejected calls
+    decision.declined.forEach(function (call) {
+      results.push({
+        tool_call_id: call.id,
+        content: JSON.stringify({ ok: false, error: "User declined this action." }),
+      });
+    });
+
     return results;
   }
 
