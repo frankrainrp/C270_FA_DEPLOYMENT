@@ -116,17 +116,36 @@
         </nav>
 
         <div class="topbar-actions">
-          <form class="global-search" role="search" action="/search" method="get" data-global-search>
-            <label class="sr-only" for="global-search-input"><%= label("search.label", "Search") %></label>
-            <span class="search-icon" aria-hidden="true"></span>
-            <input
-              id="global-search-input"
-              name="q"
-              type="search"
-              autocomplete="off"
-              placeholder="<%= label("search.placeholder", "Search tasks, notes, chats") %>"
-              value="<%= value("searchQuery", "") %>"
-            />
+          <form
+              class="global-search"
+              role="search"
+              action="/search"
+              method="GET"
+              data-global-search
+          >
+
+              <label class="sr-only" for="global-search-input">
+                  <%= label("search.label", "Search") %>
+              </label>
+
+              <button
+                  type="submit"
+                  class="search-submit"
+                  aria-label="Search"
+              >
+                  <span class="search-icon" aria-hidden="true"></span>
+              </button>
+
+              <input
+                  id="global-search-input"
+                  name="q"
+                  type="search"
+                  autocomplete="off"
+                  spellcheck="false"
+                  placeholder="Search anything..."
+                  value="<%= value("searchQuery", "") %>"
+              />
+
           </form>
 
           <button
