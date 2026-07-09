@@ -3494,6 +3494,7 @@ html[data-theme="retro"] main::after {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 12px;
   padding: 10px 14px;
   border-radius: 10px;
@@ -3515,9 +3516,10 @@ html[data-theme="retro"] main::after {
 .tool-confirm-item-info {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   min-width: 0;
   flex: 1;
+  flex-wrap: wrap;
 }
 
 .tool-confirm-item-info strong {
@@ -3527,10 +3529,52 @@ html[data-theme="retro"] main::after {
   text-overflow: ellipsis;
 }
 
+.tool-confirm-action-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
 .tool-confirm-due {
   font-size: 12px;
   color: var(--color-text-muted);
   white-space: nowrap;
+}
+
+.tool-confirm-priority {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+  text-transform: capitalize;
+}
+
+.tool-confirm-priority--high {
+  background: rgba(220, 80, 80, 0.12);
+  color: var(--color-danger);
+}
+
+.tool-confirm-priority--medium {
+  background: rgba(200, 150, 50, 0.12);
+  color: var(--color-warning);
+}
+
+.tool-confirm-priority--low {
+  background: rgba(74, 124, 153, 0.12);
+  color: var(--color-primary);
+}
+
+.tool-confirm-item-detail {
+  width: 100%;
+  padding: 4px 14px 0;
+}
+
+.tool-confirm-desc {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  line-height: 1.4;
 }
 
 .tool-confirm-badge {

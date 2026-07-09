@@ -150,22 +150,52 @@
   }
 
   // ---------- Confirmation card ----------
+  var ACTION_LABELS = {
+    create: "Create", update: "Update", delete: "Delete",
+    toggle: "Toggle", toggle_pin: "Pin/Unpin", list: "List",
+  };
+
+  function escHtml(str) {
+    var d = document.createElement("div");
+    d.textContent = str || "";
+    return d.innerHTML;
+  }
+
   function getToolLabel(call) {
     var name = (call.function && call.function.name) || "unknown";
     var args = {};
     try { args = JSON.parse(call.function.arguments || "{}"); } catch (_) {}
-    var type = name.split("_")[0] || "Action";
-    type = type.charAt(0).toUpperCase() + type.slice(1);
+
+    var parts = name.split("_");
+    var type = (parts[0] || "action").charAt(0).toUpperCase() + (parts[0] || "").slice(1);
+    var action = parts.slice(1).join("_");
+    var actionLabel = ACTION_LABELS[action] || action;
+
     var title = args.title || args.name || "";
     var due = args.dueDate || args.date || "";
     if (due) {
       try {
         var d = new Date(due);
-        due = d.toLocaleDateString("en", { weekday: "short", month: "short", day: "numeric" });
+        if (!isNaN(d.getTime())) {
+          due = d.toLocaleDateString("en", { weekday: "short", month: "short", day: "numeric" });
+        }
       } catch (_) {}
     }
+
+    var priority = args.priority || "";
+    var description = args.description || args.content || "";
+    if (description.length > 80) description = description.slice(0, 80) + "…";
+
     var summary = title || name.replace(/_/g, " ");
-    return { type: type, action: name.split("_")[1] || "", title: summary, due: due ? "Due: " + due : "" };
+    return {
+      type: type,
+      action: action,
+      actionLabel: actionLabel,
+      title: summary,
+      due: due ? "Due: " + due : "",
+      priority: priority,
+      description: description,
+    };
   }
 
   function showConfirmationCard(toolCalls) {
@@ -183,12 +213,27 @@
         var item = document.createElement("div");
         item.className = "tool-confirm-item";
         item.setAttribute("data-idx", idx);
+
+        var priorityHtml = "";
+        if (info.priority) {
+          var pClass = "tool-confirm-priority tool-confirm-priority--" + info.priority;
+          priorityHtml = '<span class="' + pClass + '">' + escHtml(info.priority) + '</span>';
+        }
+
+        var descHtml = "";
+        if (info.description) {
+          descHtml = '<span class="tool-confirm-desc">' + escHtml(info.description) + '</span>';
+        }
+
         item.innerHTML =
           '<div class="tool-confirm-item-info">' +
-            '<span class="tool-confirm-badge">' + info.type + '</span>' +
-            '<strong>' + info.title + '</strong>' +
-            (info.due ? '<span class="tool-confirm-due">' + info.due + '</span>' : '') +
+            '<span class="tool-confirm-badge">' + escHtml(info.type) + '</span>' +
+            '<span class="tool-confirm-action-label">' + escHtml(info.actionLabel) + '</span>' +
+            '<strong>' + escHtml(info.title) + '</strong>' +
+            (info.due ? '<span class="tool-confirm-due">' + escHtml(info.due) + '</span>' : '') +
+            priorityHtml +
           '</div>' +
+          (descHtml ? '<div class="tool-confirm-item-detail">' + descHtml + '</div>' : '') +
           '<div class="tool-confirm-item-actions">' +
             '<button class="tool-confirm-accept" type="button" data-action="accept" data-idx="' + idx + '">Accept</button>' +
             '<button class="tool-confirm-decline" type="button" data-action="decline" data-idx="' + idx + '">Decline</button>' +
