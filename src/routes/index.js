@@ -15,6 +15,9 @@
 const pages = require("./pages");
 const apiHealth = require("./api/health");
 const apiChat = require("./api/chat");
+const apiTasks = require("./api/tasks");
+const apiNotes = require("./api/notes");
+const apiCalendar = require("./api/calendar");
 
 // =============================
 // Member 5 API Routes
@@ -33,6 +36,7 @@ module.exports = function mountRoutes(app) {
   // JSON / SSE API surface.
   app.use("/api/health", apiHealth);
   app.use("/api/chat", apiChat);
+<<<<<<< HEAD
 
   // =============================
   // Member 5 API Routes
@@ -44,3 +48,9 @@ module.exports = function mountRoutes(app) {
   app.use("/api/visualization", visualizationRoutes);
 
 };
+=======
+  app.use("/api/tasks", apiTasks);
+  app.use("/api/notes", apiNotes);
+  app.use("/api/calendar", apiCalendar);
+};
+>>>>>>> f22f8690686c97eb5d7b04d9aae23d15661c6f07

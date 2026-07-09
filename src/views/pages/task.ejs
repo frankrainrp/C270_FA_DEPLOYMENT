@@ -2,61 +2,46 @@
   /*
     pages/task.ejs
     Study productivity task workspace with overview cards, task list,
-    and a detail drawer for each selected task.
+    and a detail drawer.  Task data comes from MongoDB via pages.js.
   */
-  const demoTasks = [
-    {
-      id: "t1",
-      title: "Finish DevOps CA2 report",
-      due: "Today",
-      priority: "high",
-      done: false,
-      description: "Polish the study dashboard, finalise the report, and prepare the hand-in summary.",
-      notes: "Focus on the deployment checklist and include the validation results.",
-    },
-    {
-      id: "t2",
-      title: "Review React → EJS mapping",
-      due: "Tomorrow",
-      priority: "medium",
-      done: false,
-      description: "Revisit the component architecture and map each UI concept to the current server-rendered shell.",
-      notes: "Keep a short reference table for future implementation sprint notes.",
-    },
-    {
-      id: "t3",
-      title: "Push initial commit",
-      due: "This week",
-      priority: "low",
-      done: false,
-      description: "Package the current milestone and share the progress update with the team.",
-      notes: "Include the task and calendar panel updates in the summary.",
-    },
-    {
-      id: "t4",
-      title: "Read Butler style.css",
-      due: "Done",
-      priority: "low",
-      done: true,
-      description: "Review the shared styling system for later UI improvements.",
-      notes: "Captured the key spacing tokens that are already in place.",
-    },
-  ];
+  const list = Array.isArray(locals.tasks) ? locals.tasks : [];
 
   const priorityColor = {
     high: "var(--color-danger)",
     medium: "var(--color-warning)",
-    low: "var(--color-primary)",
+    low: "var(--color-primary)"
   };
 
-  const activeTasks = demoTasks.filter((task) => !task.done);
-  const completedTasks = demoTasks.filter((task) => task.done);
+  function fmtDue(d) {
+    if (!d) return "No due date";
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const dt = new Date(d);
+    if (isNaN(dt.getTime())) return "";
+    dt.setHours(0, 0, 0, 0);
+    const diff = Math.round((dt - today) / (1000 * 60 * 60 * 24));
+    if (diff === 0)  return "Today";
+    if (diff === 1)  return "Tomorrow";
+    if (diff === -1) return "Yesterday";
+    if (diff > 1 && diff <= 7) return "In " + diff + " days";
+    if (diff < 0)    return Math.abs(diff) + " days ago";
+    return dt.toISOString().slice(0, 10);
+  }
+
+  const activeTasks = list.filter((t) => !t.completed);
+  const completedTasks = list.filter((t) => t.completed);
 %>
 
-<section class="tasks-panel">
-  <header class="chat-composer" style="border-top: 0; border-bottom: 1px solid var(--color-border-soft); padding: 14px 22px;">
-    <strong style="font-family: var(--font-display); font-size: 20px;">Tasks</strong>
-    <span style="color: var(--color-text-muted); margin-left: 8px;">Study productivity workspace</span>
+<section class="tasks-panel" data-tasks-root>
+  <header
+    class="chat-composer"
+    style="border-top: 0; border-bottom: 1px solid var(--color-border-soft); padding: 14px 22px; display: flex; align-items: center; justify-content: space-between;"
+  >
+    <div>
+      <strong style="font-family: var(--font-display); font-size: 20px;">Tasks</strong>
+      <span style="color: var(--color-text-muted); margin-left: 8px;">Study productivity workspace</span>
+    </div>
+    <button class="glass-btn" type="button" data-refresh-tasks>Refresh</button>
   </header>
 
   <div class="productivity-hero">
@@ -73,8 +58,8 @@
           <span>completed</span>
         </div>
         <div>
-          <strong>2h 15m</strong>
-          <span>focus time</span>
+          <strong><%= list.length %></strong>
+          <span>total</span>
         </div>
       </div>
     </div>
@@ -82,9 +67,9 @@
     <div class="hero-card">
       <p class="hero-kicker">Achievements</p>
       <ul class="chip-list">
-        <li>3 focus sessions</li>
-        <li>1 study streak</li>
-        <li>2 wins this week</li>
+        <li><%= completedTasks.length %> completed</li>
+        <li><%= activeTasks.length %> still open</li>
+        <li>Ask Butler to add more</li>
       </ul>
     </div>
 
@@ -98,69 +83,103 @@
     </div>
   </div>
 
-  <div class="tasks-content">
-    <div class="task-group">
-      <div class="task-group-title">
-        <span>Active</span>
-        <span><%= activeTasks.length %></span>
+  <div class="tasks-content" data-tasks-list>
+    <% if (list.length === 0) { %>
+      <div style="padding: 40px; text-align: center; color: var(--color-text-muted);">
+        <p>No tasks yet.</p>
+        <p>Ask Butler in <a href="/chat">chat</a> to add one, e.g.
+          <em>"Add a task: finish CA2 tomorrow, high priority"</em>.</p>
       </div>
+    <% } %>
 
-      <% activeTasks.forEach(function(task) { %>
-        <article
-          class="task-card"
-          data-task-id="<%= task.id %>"
-          data-title="<%= task.title %>"
-          data-due="<%= task.due %>"
-          data-priority="<%= task.priority %>"
-          data-description="<%= task.description %>"
-          data-notes="<%= task.notes %>"
-          style="--task-color: <%= priorityColor[task.priority] %>"
-        >
-          <input class="task-checkbox" type="checkbox" aria-label="Toggle complete" />
-          <div class="task-main">
-            <div class="task-title"><%= task.title %></div>
-            <div class="task-meta">
-              <span>Due <%= task.due %></span>
-              <span>Priority: <%= task.priority %></span>
+    <% if (activeTasks.length > 0) { %>
+      <div class="task-group">
+        <div class="task-group-title">
+          <span>Active</span>
+          <span><%= activeTasks.length %></span>
+        </div>
+
+        <% activeTasks.forEach(function(t) {
+          const dueLabel = fmtDue(t.dueDate);
+          const description = t.description || "";
+        %>
+          <article
+            class="task-card"
+            data-task-id="<%= t._id %>"
+            data-title="<%= t.title %>"
+            data-due="<%= dueLabel %>"
+            data-priority="<%= t.priority || 'medium' %>"
+            data-description="<%= description %>"
+            data-notes="<%= description || 'No notes yet.' %>"
+            style="--task-color: <%= priorityColor[t.priority] || priorityColor.medium %>"
+          >
+            <input
+              class="task-checkbox"
+              type="checkbox"
+              data-task-toggle
+              aria-label="Toggle complete"
+            />
+            <div class="task-main">
+              <div class="task-title"><%= t.title %></div>
+              <div class="task-meta">
+                <span>Due <%= dueLabel %></span>
+                <span>Priority: <%= t.priority || 'medium' %></span>
+              </div>
             </div>
-          </div>
-          <div class="task-actions">
-            <button class="glass-btn task-detail-trigger" type="button">Details</button>
-          </div>
-        </article>
-      <% }) %>
-    </div>
-
-    <div class="task-group">
-      <div class="task-group-title">
-        <span>Completed</span>
-        <span><%= completedTasks.length %></span>
+            <div class="task-actions">
+              <button class="glass-btn task-detail-trigger" type="button">Details</button>
+              <button class="glass-btn" type="button" data-task-delete>Delete</button>
+            </div>
+          </article>
+        <% }) %>
       </div>
+    <% } %>
 
-      <% completedTasks.forEach(function(task) { %>
-        <article
-          class="task-card completed"
-          data-task-id="<%= task.id %>"
-          data-title="<%= task.title %>"
-          data-due="<%= task.due %>"
-          data-priority="<%= task.priority %>"
-          data-description="<%= task.description %>"
-          data-notes="<%= task.notes %>"
-          style="--task-color: <%= priorityColor[task.priority] %>"
-        >
-          <input class="task-checkbox" type="checkbox" checked aria-label="Toggle complete" />
-          <div class="task-main">
-            <div class="task-title"><%= task.title %></div>
-            <div class="task-meta">
-              <span><%= task.due %></span>
+    <% if (completedTasks.length > 0) { %>
+      <div class="task-group">
+        <div class="task-group-title">
+          <span>Completed</span>
+          <span><%= completedTasks.length %></span>
+        </div>
+
+        <% completedTasks.forEach(function(t) {
+          const dueLabel = fmtDue(t.dueDate);
+          const description = t.description || "";
+        %>
+          <article
+            class="task-card completed"
+            data-task-id="<%= t._id %>"
+            data-title="<%= t.title %>"
+            data-due="<%= dueLabel %>"
+            data-priority="<%= t.priority || 'medium' %>"
+            data-description="<%= description %>"
+            data-notes="<%= description || 'No notes yet.' %>"
+            style="--task-color: <%= priorityColor[t.priority] || priorityColor.medium %>"
+          >
+            <input
+              class="task-checkbox"
+              type="checkbox"
+              checked
+              data-task-toggle
+              aria-label="Toggle complete"
+            />
+            <div class="task-main">
+              <div class="task-title"><%= t.title %></div>
+              <div class="task-meta">
+                <span><%= dueLabel %></span>
+              </div>
             </div>
-          </div>
-        </article>
-      <% }) %>
-    </div>
+            <div class="task-actions">
+              <button class="glass-btn task-detail-trigger" type="button">Details</button>
+              <button class="glass-btn" type="button" data-task-delete>Delete</button>
+            </div>
+          </article>
+        <% }) %>
+      </div>
+    <% } %>
   </div>
 
-  <div class="task-detail-drawer" id="task-detail-drawer" hidden>
+  <div class="task-detail-drawer" id="task-detail-drawer">
     <div class="task-drawer-header">
       <div>
         <p class="hero-kicker">Task detail</p>
@@ -185,3 +204,6 @@
     </div>
   </div>
 </section>
+
+<script src="/js/api.js" defer></script>
+<script src="/js/tasks-ui.js" defer></script>

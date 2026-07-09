@@ -102,7 +102,10 @@
 
   function closeTaskDrawer() {
     var drawerEl = document.getElementById("task-detail-drawer");
-    if (drawerEl) drawerEl.hidden = true;
+    if (drawerEl) {
+      drawerEl.classList.remove("is-open");
+      drawerEl.removeAttribute("aria-hidden");
+    }
   }
 
   function openTaskDrawer(event) {
@@ -111,12 +114,12 @@
 
     if (!drawerEl || !card) return;
 
-    document.getElementById("task-detail-title").textContent = card.getAttribute("data-title");
-    document.getElementById("task-detail-priority").textContent = "Priority: " + card.getAttribute("data-priority");
-    document.getElementById("task-detail-due").textContent = "Due: " + card.getAttribute("data-due");
-    document.getElementById("task-detail-description").textContent = card.getAttribute("data-description");
-    document.getElementById("task-detail-notes").textContent = card.getAttribute("data-notes");
-    drawerEl.hidden = false;
+    document.getElementById("task-detail-title").textContent = card.getAttribute("data-title") || "Untitled";
+    document.getElementById("task-detail-priority").textContent = "Priority: " + (card.getAttribute("data-priority") || "medium");
+    document.getElementById("task-detail-due").textContent = card.getAttribute("data-due") || "No due date";
+    document.getElementById("task-detail-description").textContent = card.getAttribute("data-description") || "No description.";
+    document.getElementById("task-detail-notes").textContent = card.getAttribute("data-notes") || "No notes yet.";
+    drawerEl.classList.add("is-open");
   }
 
   document.querySelectorAll(".task-card").forEach(function (card) {
@@ -129,6 +132,7 @@
 
   document.querySelectorAll(".calendar-day").forEach(function (button) {
     button.addEventListener("click", function () {
+      if (button.disabled) return;
       document.querySelectorAll(".calendar-day").forEach(function (day) {
         day.classList.remove("is-active");
       });
@@ -141,45 +145,20 @@
     });
   });
 
+  // Note search only.  Open / save / delete are handled by notes-ui.js
+  // against the real MongoDB API — do not wire mock select/save here.
   var noteButtons = document.querySelectorAll(".note-list-item");
-  var titleInput = document.getElementById("note-title-input");
-  var bodyInput = document.getElementById("note-body-input");
-  var updatedLabel = document.getElementById("note-updated-label");
   var searchInput = document.getElementById("note-search");
-
-  function selectNote(button) {
-    if (!button) return;
-    noteButtons.forEach(function (item) {
-      item.classList.remove("active");
-    });
-    button.classList.add("active");
-    if (titleInput) titleInput.value = button.getAttribute("data-note-title");
-    if (bodyInput) bodyInput.value = button.getAttribute("data-note-body");
-    if (updatedLabel) updatedLabel.textContent = "Updated " + button.getAttribute("data-note-updated");
-  }
-
-  noteButtons.forEach(function (button) {
-    button.addEventListener("click", function () {
-      selectNote(button);
-    });
-  });
-
   if (searchInput) {
     searchInput.addEventListener("input", function () {
       var query = searchInput.value.trim().toLowerCase();
       noteButtons.forEach(function (button) {
-        var text = (button.getAttribute("data-note-title") + " " + button.getAttribute("data-note-preview")).toLowerCase();
-        button.style.display = text.includes(query) ? "grid" : "none";
+        var text = (
+          (button.getAttribute("data-note-title") || "") + " " +
+          (button.getAttribute("data-note-preview") || "")
+        ).toLowerCase();
+        button.style.display = text.indexOf(query) >= 0 ? "" : "none";
       });
-    });
-  }
-
-  var saveButton = document.getElementById("save-note-btn");
-  if (saveButton) {
-    saveButton.addEventListener("click", function () {
-      if (titleInput && bodyInput) {
-        updatedLabel.textContent = "Updated just now";
-      }
     });
   }
 })();
