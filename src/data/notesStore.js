@@ -1,18 +1,11 @@
 // ============================================================
 // src/data/notesStore.js
-// In-memory notes store — the single source of truth for Notes.
-// Replaces the hardcoded demo list that used to live in note.ejs.
-// A later phase can swap this for a real DB (Mongoose) without
-// touching the routes or client, as long as these functions stay.
+// Notes store backed by MongoDB (Mongoose). Same public API the
+// routes/client already use — now async (each returns a Promise).
 // ============================================================
 
-let sequence = 0;
-const notes = new Map();
-
-function nextId() {
-  sequence += 1;
-  return "n" + sequence;
-}
+const mongoose = require("mongoose");
+const Note = require("../models/Note");
 
 // First meaningful line of the body, trimmed to a short preview.
 function makePreview(body) {
@@ -35,75 +28,71 @@ function relativeTime(timestamp) {
   return day === 1 ? "Yesterday" : day + " days ago";
 }
 
-// Shape sent to the template / browser.
-function toClient(note) {
+// Shape sent to the template / browser. Maps a Mongo document to the
+// exact fields the EJS + client JS expect (note: string id, not _id).
+function toClient(doc) {
+  const updatedAt = doc.updatedAt ? doc.updatedAt.getTime() : Date.now();
   return {
-    id: note.id,
-    title: note.title,
-    body: note.body,
-    preview: makePreview(note.body),
-    updated: relativeTime(note.updatedAt),
-    updatedAt: note.updatedAt,
+    id: doc._id.toString(),
+    title: doc.title,
+    body: doc.body,
+    preview: makePreview(doc.body),
+    updated: relativeTime(updatedAt),
+    updatedAt,
   };
 }
 
-// ---------- Public API ----------
-function listNotes() {
-  return [...notes.values()]
-    .sort((a, b) => b.updatedAt - a.updatedAt) // newest first
-    .map(toClient);
+// Guard so a malformed id (e.g. old "n1") doesn't throw a CastError.
+const isValidId = (id) => mongoose.Types.ObjectId.isValid(id);
+
+// ---------- Public API (unchanged names, now async) ----------
+async function listNotes() {
+  const docs = await Note.find().sort({ updatedAt: -1 }); // newest first
+  return docs.map(toClient);
 }
 
-function getNote(id) {
-  const note = notes.get(id);
-  return note ? toClient(note) : null;
+async function getNote(id) {
+  if (!isValidId(id)) return null;
+  const doc = await Note.findById(id);
+  return doc ? toClient(doc) : null;
 }
 
-function createNote(input = {}) {
-  const now = Date.now();
-  const note = {
-    id: nextId(),
+async function createNote(input = {}) {
+  const doc = await Note.create({
     title: (input.title || "").trim() || "Untitled note",
     body: input.body || "",
-    createdAt: now,
-    updatedAt: now,
-  };
-  notes.set(note.id, note);
-  return toClient(note);
-}
-
-function updateNote(id, input = {}) {
-  const note = notes.get(id);
-  if (!note) return null;
-  if (typeof input.title === "string") note.title = input.title.trim() || "Untitled note";
-  if (typeof input.body === "string") note.body = input.body;
-  note.updatedAt = Date.now();
-  return toClient(note);
-}
-
-function deleteNote(id) {
-  return notes.delete(id);
-}
-
-function countNotes() {
-  return notes.size;
-}
-
-// Seed the same three demo notes the UI used to hardcode.
-(function seed() {
-  const now = Date.now();
-  const drafts = [
-    { title: "DevOps CA2 spec", updatedAt: now - 5 * 60000,
-      body: "# DevOps CA2 spec\n\n- Bring tasks, calendar, notes, and AI chat together.\n- Keep the experience calm and visually clear.\n- Record the final reflection for the hand-in." },
-    { title: "React → EJS mapping", updatedAt: now - 60 * 60000,
-      body: "# React → EJS mapping\n\n- Use the current layout shell for the main app chrome.\n- Reuse the chat stream logic and the existing state container.\n- Keep the styling system consistent across the workspace." },
-    { title: "Ideas for the data panel", updatedAt: now - 24 * 60 * 60000,
-      body: "# Ideas for the data panel\n\n- Generate a tiny insight card for task completion.\n- Highlight the daily focus trend.\n- Save the best view as a custom panel." },
-  ];
-  drafts.forEach((d) => {
-    const id = nextId();
-    notes.set(id, { id, title: d.title, body: d.body, createdAt: d.updatedAt, updatedAt: d.updatedAt });
   });
-})();
+  return toClient(doc);
+}
 
-module.exports = { listNotes, getNote, createNote, updateNote, deleteNote, countNotes };
+async function updateNote(id, input = {}) {
+  if (!isValidId(id)) return null;
+  const update = {};
+  if (typeof input.title === "string") update.title = input.title.trim() || "Untitled note";
+  if (typeof input.body === "string") update.body = input.body;
+  const doc = await Note.findByIdAndUpdate(id, update, { new: true });
+  return doc ? toClient(doc) : null;
+}
+
+async function deleteNote(id) {
+  if (!isValidId(id)) return false;
+  return Boolean(await Note.findByIdAndDelete(id));
+}
+
+async function countNotes() {
+  return Note.countDocuments();
+}
+
+// Seed the three demo notes ONLY when the collection is empty, so a
+// server restart doesn't keep duplicating them.
+async function seedIfEmpty() {
+  if ((await Note.countDocuments()) > 0) return;
+  await Note.create([
+    { title: "DevOps CA2 spec", body: "# DevOps CA2 spec\n\n- Bring tasks, calendar, notes, and AI chat together.\n- Keep the experience calm and visually clear.\n- Record the final reflection for the hand-in." },
+    { title: "React → EJS mapping", body: "# React → EJS mapping\n\n- Use the current layout shell for the main app chrome.\n- Reuse the chat stream logic and the existing state container.\n- Keep the styling system consistent across the workspace." },
+    { title: "Ideas for the data panel", body: "# Ideas for the data panel\n\n- Generate a tiny insight card for task completion.\n- Highlight the daily focus trend.\n- Save the best view as a custom panel." },
+  ]);
+  console.log("[db] seeded 3 demo notes into butlernotes");
+}
+
+module.exports = { listNotes, getNote, createNote, updateNote, deleteNote, countNotes, seedIfEmpty };

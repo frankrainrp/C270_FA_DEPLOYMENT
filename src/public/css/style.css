@@ -1104,7 +1104,6 @@ html[data-theme="dark"] .sidebar-item:hover {
 .database-icon,
 .card-icon,
 .settings-icon,
-.trophy-icon,
 .crown-icon,
 .logout-icon,
 .pin-icon,
@@ -1352,10 +1351,6 @@ html[data-theme="dark"] .sidebar-item:hover {
   top: 4px;
   height: 2px;
   background: currentColor;
-}
-
-.trophy-icon {
-  border-radius: 2px 2px 6px 6px;
 }
 
 .crown-icon {
@@ -1901,7 +1896,6 @@ html[data-theme="dark"] .sidebar-item:hover {
   gap: 6px;
 }
 
-.productivity-hero,
 .calendar-summary {
   display: grid;
   grid-template-columns: minmax(0, 1.3fr) minmax(220px, 0.8fr) minmax(220px, 0.8fr);
@@ -1936,36 +1930,14 @@ html[data-theme="dark"] .sidebar-item:hover {
   font-size: 16px;
 }
 
-.hero-stats {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.hero-stats div {
-  display: grid;
-  gap: 2px;
-}
-
-.hero-stats strong {
-  font-size: 15px;
-}
-
-.hero-stats span {
-  color: var(--color-text-muted);
-  font-size: 12px;
-}
-
-.chip-list,
-.focus-tools {
+.chip-list {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
 
 .chip-list li,
-.calendar-chip,
-.focus-tools span {
+.calendar-chip {
   display: inline-flex;
   align-items: center;
   padding: 6px 10px;
@@ -2050,6 +2022,12 @@ html[data-theme="dark"] .sidebar-item:hover {
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
   box-shadow: var(--shadow-drawer);
+}
+
+/* Respect the [hidden] attribute the drawer toggles in JS — without
+   this, display:flex above keeps the drawer permanently visible. */
+.task-detail-drawer[hidden] {
+  display: none;
 }
 
 /* ============================================================
@@ -2312,7 +2290,8 @@ html[data-theme="dark"] .sidebar-item:hover {
   gap: 8px;
 }
 
-.notes-empty {
+.notes-empty,
+.tasks-empty {
   padding: 24px 14px;
   color: var(--color-text-muted);
   font-size: 13px;

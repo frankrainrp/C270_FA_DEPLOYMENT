@@ -9,14 +9,11 @@
 //   - Configure EJS view engine
 //   - Mount every route through routes/index.js
 //   - Register 404 and error handlers
-//   - Start the HTTP server
+//   - Connect to MongoDB, then start the HTTP server
 //
 // Business logic lives in services/*.js, and every URL is registered
 // in routes/index.js.  Do not add inline route handlers here.
 // ============================================================
-
-const express = require("express");
-const path = require("path");
 
 // Optional .env loader.  Wrapped in try/catch so the app still boots
 // if `dotenv` is not installed yet — useful during the very first run.
@@ -24,8 +21,13 @@ try {
   require("dotenv").config();
 } catch (_) { /* dotenv is optional */ }
 
+const express = require("express");
+const path = require("path");
+
+const { connectDb } = require("./lib/db");
 const mountRoutes = require("./routes");
 const { makeFail } = require("./lib/apiResponse");
+const notesStore = require("./data/notesStore");
 
 const app = express();
 
@@ -75,10 +77,19 @@ app.use((err, req, res, _next) => {
 });
 
 // ------------------------------------------------------------------
-// Server bootstrap
+// Server bootstrap.  Connect to MongoDB first, seed if empty, then
+// start listening.  If the DB is unreachable, fail loudly.
 // ------------------------------------------------------------------
 const PORT = process.env.PORT || 3000;
 
-app.listen(PORT, () => {
-  console.log(`Butler is running at http://localhost:${PORT}`);
-});
+connectDb()
+  .then(() => notesStore.seedIfEmpty())
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`Butler is running at http://localhost:${PORT}`);
+    });
+  })
+  .catch((err) => {
+    console.error("[app] failed to start — is MongoDB running?", err);
+    process.exit(1);
+  });
