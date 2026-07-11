@@ -3,13 +3,10 @@
 // Simple client-side state container.  Replaces the React hooks
 // (useCoreAppData / useChatSessions) with a minimal event emitter.
 //
-// State fields (Phase 0 scope):
+// State fields:
 //   messages        - full chat history for the current session
 //   activeSessionId - currently focused chat session
-//   pendingReply    - text of the assistant message being streamed
-//
-// Later phases will grow this to include tasks, notes, and full
-// multi-session support.
+// Task, note, and calendar state stays in their focused UI modules.
 // ============================================================
 
 (function initAppState() {
@@ -28,6 +25,7 @@
           id: "seed-" + i,
           role: m.role,
           content: typeof m.content === "string" ? m.content : "",
+          attachments: Array.isArray(m.attachments) ? m.attachments : undefined,
         };
       });
     }
@@ -39,7 +37,6 @@
   var state = {
     activeSessionId: seedSessionId,
     messages: seedMessages,
-    pendingReply: null,
     isStreaming: false,
   };
 
@@ -70,20 +67,11 @@
     emit();
   }
 
-  function updatePendingReply(text) {
-    state.pendingReply = text;
-    emit();
-  }
-
-  function commitPendingReply() {
-    if (state.pendingReply != null) {
-      state.messages.push({
-        id: "m-" + Date.now(),
-        role: "assistant",
-        content: state.pendingReply,
-      });
-      state.pendingReply = null;
-    }
+  function replaceMessages(messages, activeSessionId) {
+    state.messages = Array.isArray(messages) ? messages.map(function (message, index) {
+      return Object.assign({ id: "loaded-" + index }, message);
+    }) : [];
+    state.activeSessionId = activeSessionId || null;
     emit();
   }
 
@@ -92,7 +80,6 @@
     set: set,
     subscribe: subscribe,
     addMessage: addMessage,
-    updatePendingReply: updatePendingReply,
-    commitPendingReply: commitPendingReply,
+    replaceMessages: replaceMessages,
   };
 })();

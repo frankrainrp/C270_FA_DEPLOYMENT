@@ -5,7 +5,7 @@
 // Responsibilities (this file only):
 //   - Load environment variables
 //   - Create the Express app
-//   - Register global middleware (body parsers, static, cookies)
+//   - Register global middleware (body parsers and static assets)
 //   - Configure EJS view engine
 //   - Mount every route through routes/index.js
 //   - Register 404 and error handlers
@@ -18,12 +18,9 @@
 const express = require("express");
 const path = require("path");
 const mongoose = require("mongoose");
+mongoose.set("bufferCommands", false);
 
-// Optional .env loader.  Wrapped in try/catch so the app still boots
-// if `dotenv` is not installed yet — useful during the very first run.
-try {
-  require("dotenv").config();
-} catch (_) { /* dotenv is optional */ }
+require("dotenv").config();
 
 const mountRoutes = require("./routes");
 const { makeFail } = require("./lib/apiResponse");
@@ -81,11 +78,13 @@ app.use((err, req, res, _next) => {
 const connectDB = async () => {
   try {
     const mongoUri = process.env.MONGO_URI || "mongodb://localhost:27017/butler";
-    await mongoose.connect(mongoUri, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    });
-    console.log("[db] Connected to MongoDB:", mongoUri);
+    const configuredTimeout = Number(process.env.MONGO_CONNECT_TIMEOUT_MS);
+    const serverSelectionTimeoutMS = Number.isFinite(configuredTimeout) && configuredTimeout > 0
+      ? configuredTimeout
+      : 5000;
+    await mongoose.connect(mongoUri, { serverSelectionTimeoutMS });
+    const safeMongoUri = mongoUri.replace(/(mongodb(?:\+srv)?:\/\/)([^@/]+)@/i, "$1***:***@");
+    console.log("[db] Connected to MongoDB:", safeMongoUri);
   } catch (err) {
     console.error("[db] MongoDB connection failed:", err.message);
     // Don't exit — allow app to run without DB (useful for dev/testing)

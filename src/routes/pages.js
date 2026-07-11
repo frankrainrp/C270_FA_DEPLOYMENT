@@ -10,11 +10,16 @@
 const express = require("express");
 
 const { renderLayout } = require("../lib/renderLayout");
-const { getMockRail } = require("../data/mockRail");
 const TaskService = require("../services/TaskService");
 const NoteService = require("../services/NoteService");
 const CalendarService = require("../services/CalendarService");
 const ChatSessionService = require("../services/ChatSessionService");
+const {
+  buildTasksRail,
+  buildNotesRail,
+  buildCalendarRail,
+  buildChatRail,
+} = require("../services/RailService");
 
 const router = express.Router();
 
@@ -28,44 +33,23 @@ router.get("/", (_req, res) => {
 // -----------------------------------------------------------
 // Chat: load the latest ChatSession's messages from MongoDB and
 // hydrate ButlerState in the browser so history survives reloads.
-// The sidebar rail also lists real recent sessions from the DB
-// (derived title = first user message, truncated).
+// The sidebar rail also lists recent persisted sessions.
 // -----------------------------------------------------------
-function summariseTitle(session) {
-  const msgs = Array.isArray(session.messages) ? session.messages : [];
-  const firstUser = msgs.find((m) => m.role === "user" && typeof m.content === "string");
-  if (firstUser) {
-    const t = firstUser.content.trim();
-    return t.length > 40 ? t.slice(0, 40) + "…" : t || "Untitled chat";
-  }
-  return "New chat";
-}
-
-async function loadSessionsList() {
-  try {
-    const all = await ChatSessionService.findAll();
-    return all.slice(0, 12).map((s) => ({
-      id: String(s._id),
-      title: summariseTitle(s),
-      updatedAt: s.updatedAt ? new Date(s.updatedAt).getTime() : Date.now(),
-    }));
-  } catch (err) {
-    console.warn("[pages] chat sessions unavailable:", err.message);
-    return [];
-  }
-}
-
-function renderChatPage(res, session, sessions) {
+function renderChatPage(res, session, rail) {
   const activeSessionId = session ? String(session._id) : null;
   const initialMessages = session && Array.isArray(session.messages)
-    ? session.messages.map((m) => ({ role: m.role, content: m.content }))
+    ? session.messages.map((m) => ({
+      role: m.role,
+      content: m.content,
+      attachments: Array.isArray(m.attachments) ? m.attachments : undefined,
+    }))
     : [];
 
   renderLayout(res, {
     title: "Chat",
     activeNav: "chat",
     page: "chat",
-    rail: { sessions, activeSessionId },
+    rail: rail || { sessions: [], activeSessionId },
     pageLocals: { initialMessages, activeSessionId },
   });
 }
@@ -80,8 +64,8 @@ router.get("/chat", async (_req, res, _next) => {
     res.redirect("/chat/" + String(session._id));
   } catch (err) {
     console.warn("[pages] chat redirect failed:", err.message);
-    // MongoDB unavailable — render an empty chat page so the UI still works.
-    renderChatPage(res, null, []);
+    // Render an empty chat page when MongoDB is unavailable.
+    renderChatPage(res, null, { sessions: [], activeSessionId: null });
   }
 });
 
@@ -103,8 +87,8 @@ router.get("/chat/:id", async (req, res, next) => {
 
     if (!session) return res.redirect("/chat");
 
-    const sessions = await loadSessionsList();
-    renderChatPage(res, session, sessions);
+    const rail = await buildChatRail(null, String(session._id));
+    renderChatPage(res, session, rail);
   } catch (err) {
     next(err);
   }
@@ -117,10 +101,10 @@ router.get("/chat/:id", async (req, res, next) => {
 // -----------------------------------------------------------
 router.get("/search", async (req, res, next) => {
   try {
-    const query = String(req.query.q || "").trim();
+    const query = String(req.query.q || "").trim().slice(0, 200);
     const normalizedQuery = query.toLowerCase();
 
-    // Empty search
+    // Render an empty result set until the user enters a query.
     if (!normalizedQuery) {
       return renderLayout(res, {
         title: "Search — Butler",
@@ -137,20 +121,17 @@ router.get("/search", async (req, res, next) => {
       });
     }
 
-    // Load data from MongoDB
+    // Load each searchable collection in parallel.
     const [allNotes, allTasks, allChats] = await Promise.all([
       NoteService.findAll("all"),
       TaskService.findAll("all"),
       ChatSessionService.findAll(),
     ]);
 
-    // Helper
     const contains = (text) =>
       String(text || "").toLowerCase().includes(normalizedQuery);
 
-    // ----------------------------
-    // Search Notes
-    // ----------------------------
+    // Search notes by title, content, or preview.
     const notes = allNotes
       .filter(
         (note) =>
@@ -167,9 +148,7 @@ router.get("/search", async (req, res, next) => {
           : "Recently",
       }));
 
-    // ----------------------------
-    // Search Tasks
-    // ----------------------------
+    // Search tasks by title or description.
     const tasks = allTasks
       .filter(
         (task) =>
@@ -186,9 +165,7 @@ router.get("/search", async (req, res, next) => {
         priority: task.priority || "Normal",
       }));
 
-    // ----------------------------
-    // Search Chats
-    // ----------------------------
+    // Search the text of every persisted chat message.
     const chats = allChats
       .filter((chat) =>
         Array.isArray(chat.messages) &&
@@ -234,25 +211,16 @@ router.get("/search", async (req, res, next) => {
 // -----------------------------------------------------------
 router.get("/tasks", async (_req, res, next) => {
   try {
-    const [tasks, stats] = await Promise.all([
+    const [tasks, rail] = await Promise.all([
       TaskService.findAll("all"),
-      TaskService.getStats(),
+      buildTasksRail("all"),
     ]);
 
     renderLayout(res, {
       title: "Tasks",
       activeNav: "tasks",
       page: "task",
-      rail: {
-        taskCounts: {
-          active: stats.active,
-          completed: stats.completed,
-          upcoming: stats.upcoming,
-          all: stats.total,
-          in_progress: 0,
-        },
-        taskView: "all",
-      },
+      rail,
       pageLocals: { tasks: tasks.map((t) => t.toObject()) },
     });
   } catch (err) {
@@ -267,23 +235,13 @@ router.get("/notes", async (_req, res, next) => {
   try {
     const notes = await NoteService.findAll("all");
     const plain = notes.map((n) => n.toObject());
-    const pinned = plain.filter((n) => n.pinned);
+    const rail = await buildNotesRail(notes);
 
     renderLayout(res, {
       title: "Notes",
       activeNav: "notes",
       page: "note",
-      rail: {
-        noteCounts: {
-          all: plain.length,
-          pinned: pinned.length,
-          linked: 0,
-        },
-        pinnedNotes: pinned.slice(0, 5).map((n) => ({
-          id: String(n._id),
-          title: n.title,
-        })),
-      },
+      rail,
       pageLocals: { notes: plain },
     });
   } catch (err) {
@@ -301,6 +259,7 @@ router.get("/calendar", async (_req, res, next) => {
       CalendarService.findAll(),
       TaskService.findAll("all"),
     ]);
+    const rail = await buildCalendarRail(events);
 
     const taskEvents = tasks
       .filter((t) => t.dueDate)
@@ -327,7 +286,7 @@ router.get("/calendar", async (_req, res, next) => {
       title: "Calendar",
       activeNav: "calendar",
       page: "calendar",
-      rail: getMockRail("calendar"),
+      rail,
       pageLocals: { events: combined },
     });
   } catch (err) {

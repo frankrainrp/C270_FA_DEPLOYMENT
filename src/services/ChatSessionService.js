@@ -13,7 +13,7 @@ class ChatSessionService {
    * Get the latest active chat session, or create a new one if none exists
    */
   async getLatestSession() {
-    let session = await ChatSession.findOne({ active: true }).sort({ createdAt: -1 });
+    let session = await ChatSession.findOne({ active: true }).sort({ updatedAt: -1 });
 
     if (!session) {
       session = await this.create();
@@ -32,7 +32,7 @@ class ChatSessionService {
   /**
    * Add a message to a session
    */
-  async addMessage(sessionId, role, content) {
+  async addMessage(sessionId, role, content, attachments) {
     const session = await ChatSession.findById(sessionId);
     if (!session) {
       throw new Error("Session not found");
@@ -41,6 +41,7 @@ class ChatSessionService {
     session.messages.push({
       role,
       content,
+      attachments: Array.isArray(attachments) && attachments.length ? attachments : undefined,
       timestamp: new Date(),
     });
 
@@ -87,7 +88,7 @@ class ChatSessionService {
    * Get all chat sessions (for history/archive)
    */
   async findAll() {
-    return await ChatSession.find().sort({ createdAt: -1 });
+    return await ChatSession.find().sort({ updatedAt: -1 });
   }
 
   /**

@@ -3,10 +3,8 @@
 // Streams a chat completion from POST /api/chat and parses the SSE
 // response into content deltas, tool calls, and errors.
 //
-// Ported from C270_FA lib/chat-client.ts, simplified to plain JS.
-// Tool execution is deferred to a later phase; this file already
-// surfaces tool_calls to the caller so the tool-executor can be
-// added without touching the streaming layer.
+// Tool execution remains separate from transport: this module surfaces
+// complete tool calls to chat-ui.js, which delegates them to tool-executor.js.
 // ============================================================
 
 (function initChatClient() {

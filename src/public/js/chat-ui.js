@@ -29,11 +29,32 @@
   var sendBtn = document.querySelector("[data-composer-send]");
   var stopBtn = document.querySelector("[data-composer-stop]");
   var promptCards = document.querySelectorAll("[data-prompt]");
+  var documentInput = document.querySelector("[data-document-input]");
+  var documentPick = document.querySelector("[data-document-pick]");
+  var documentList = document.querySelector("[data-document-list]");
 
   if (!stream || !form || !input || !sendBtn) return;
 
   var abortController = null;
   var pendingBubble = null;
+  var selectedDocuments = [];
+
+  var sessionReady = Promise.resolve();
+  if (!ButlerState.get().activeSessionId && window.ButlerApi) {
+    sessionReady = ButlerApi.get("/chat/session/latest").then(function (data) {
+      var session = data && data.session;
+      if (!session) return;
+      ButlerState.replaceMessages(session.messages || [], session.id);
+      if ((session.messages || []).length > 0) {
+        hideEmptyBlock();
+        (session.messages || []).forEach(function (message) {
+          appendMessageBubble(message.role, message.content || "");
+        });
+      }
+    }).catch(function (err) {
+      console.warn("[chat] history unavailable:", err.message);
+    });
+  }
 
   // ---------- DOM helpers ----------
   function scrollToEnd() {
@@ -78,6 +99,7 @@
     sendBtn.disabled = streaming;
     stopBtn.hidden = !streaming;
     input.disabled = false;
+    if (documentPick) documentPick.disabled = streaming;
   }
 
   function autoResize(el) {
@@ -98,6 +120,9 @@
         if (!out.content) out.content = "";
       }
       if (m.tool_call_id) out.tool_call_id = m.tool_call_id;
+      if (Array.isArray(m.attachments) && m.attachments.length > 0) {
+        out.attachments = m.attachments;
+      }
       return out;
     });
   }
@@ -331,12 +356,21 @@
   // ---------- Main send flow ----------
   async function sendMessage(text) {
     var trimmed = String(text || "").trim();
-    if (!trimmed) return;
+    if (!trimmed && selectedDocuments.length === 0) return;
+
+    await sessionReady;
 
     hideEmptyBlock();
 
-    record({ role: "user", content: trimmed });
-    appendMessageBubble("user", trimmed);
+    var documentsForMessage = selectedDocuments.slice();
+    var visibleText = trimmed || "Please review the attached document(s).";
+    record({ role: "user", content: visibleText, attachments: documentsForMessage });
+    appendMessageBubble("user", visibleText + (documentsForMessage.length
+      ? "\n\nAttached: " + documentsForMessage.map(function (doc) { return doc.name; }).join(", ")
+      : ""));
+
+    selectedDocuments = [];
+    renderSelectedDocuments();
 
     input.value = "";
     autoResize(input);
@@ -390,6 +424,65 @@
   });
 
   input.addEventListener("input", function () { autoResize(input); });
+
+  function renderSelectedDocuments() {
+    if (!documentList) return;
+    documentList.innerHTML = "";
+    documentList.hidden = selectedDocuments.length === 0;
+    selectedDocuments.forEach(function (attachedDocument, index) {
+      var chip = window.document.createElement("div");
+      chip.className = "attachment-preview";
+      var label = window.document.createElement("span");
+      label.textContent = attachedDocument.name + (attachedDocument.truncated ? " (text truncated)" : "");
+      var remove = window.document.createElement("button");
+      remove.type = "button";
+      remove.className = "glass-btn";
+      remove.textContent = "Remove";
+      remove.addEventListener("click", function () {
+        selectedDocuments.splice(index, 1);
+        renderSelectedDocuments();
+      });
+      chip.appendChild(label);
+      chip.appendChild(remove);
+      documentList.appendChild(chip);
+    });
+  }
+
+  async function uploadDocument(file) {
+    var body = new FormData();
+    body.append("document", file);
+    var response = await fetch("/api/documents/decode", {
+      method: "POST",
+      credentials: "same-origin",
+      body: body,
+    });
+    var payload = await response.json();
+    if (!response.ok || !payload || payload.ok === false) {
+      throw new Error((payload && payload.error) || ("HTTP " + response.status));
+    }
+    return payload.data.document;
+  }
+
+  if (documentPick && documentInput) {
+    documentPick.addEventListener("click", function () { documentInput.click(); });
+    documentInput.addEventListener("change", async function () {
+      var files = Array.from(documentInput.files || []).slice(0, Math.max(0, 3 - selectedDocuments.length));
+      documentPick.disabled = true;
+      documentPick.textContent = "Decoding...";
+      try {
+        for (var i = 0; i < files.length; i += 1) {
+          selectedDocuments.push(await uploadDocument(files[i]));
+          renderSelectedDocuments();
+        }
+      } catch (err) {
+        appendToolNotice("Document upload failed: " + err.message);
+      } finally {
+        documentInput.value = "";
+        documentPick.disabled = false;
+        documentPick.textContent = "Attach";
+      }
+    });
+  }
 
   input.addEventListener("keydown", function (event) {
     if (event.key === "Enter" && !event.shiftKey) {

@@ -3,10 +3,6 @@
 // Shared helpers for tasks / notes / calendar page rendering.
 // ============================================================
 
-function pad2(n) {
-  return String(n).padStart(2, "0");
-}
-
 function formatDueDate(dueDate) {
   if (!dueDate) return "No due date";
   const due = new Date(dueDate);
@@ -68,22 +64,8 @@ function buildMonthGrid(year, month, events) {
   return cells;
 }
 
-function serializeDoc(doc) {
-  if (!doc) return null;
-  const plain = typeof doc.toObject === "function" ? doc.toObject() : { ...doc };
-  if (plain._id) plain.id = String(plain._id);
-  return plain;
-}
-
-function serializeList(list) {
-  return (list || []).map(serializeDoc);
-}
-
 module.exports = {
-  pad2,
   formatDueDate,
   notePreview,
   buildMonthGrid,
-  serializeDoc,
-  serializeList,
 };

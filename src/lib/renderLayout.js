@@ -62,7 +62,7 @@ function renderLayout(res, options) {
     page,
     pageLocals: options.pageLocals || {},
 
-    // Sidebar data (shape varies by activeNav; see data/mockRail.js)
+    // Sidebar data. Its shape varies by the active navigation section.
     rail: options.rail || {},
 
     // User + plan for topbar user menu
