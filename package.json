@@ -1,0 +1,21 @@
+{
+  "name": "butler",
+  "version": "1.0.0",
+  "description": "Butler - Comprehensive DevOps Web Application",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "node src/app.js",
+    "test:ci": "node ci-validate.mjs",
+    "migrate:owner": "node scripts/migrate-owner-email.js"
+  },
+  "dependencies": {
+    "cookie-parser": "^1.4.6",
+    "dotenv": "^16.4.5",
+    "ejs": "^3.1.10",
+    "express": "^4.22.2",
+    "jsonwebtoken": "^9.0.0",
+    "mongoose": "^7.0.3",
+    "multer": "^1.4.5-lts.1",
+    "openai": "^4.71.0"
+  }
+}

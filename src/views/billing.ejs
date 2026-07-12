@@ -1,0 +1,170 @@
+<%
+  /*
+    billing.ejs
+    Standalone Billing & Credits page (Task 6).
+    Everything here is simulated — there is no real payment
+    processor wired up anywhere in this app. Top-ups and plan
+    changes just adjust numbers in MongoDB via UserProfileService
+    so the UI has real, persisted state to show instead of static
+    mock numbers.
+
+    Locals:
+    - profile        : { plan, credits, creditsUsed, history }
+    - dbUnavailable  : true if MongoDB could not be reached
+  */
+  const pageTitle = typeof title !== "undefined" ? title : "Billing & Credits — Butler";
+  const langCode = typeof lang !== "undefined" ? lang : "en";
+  const p = typeof profile !== "undefined" && profile ? profile : { plan: "free", credits: 0, creditsUsed: 0, history: [] };
+  const showDbWarning = typeof dbUnavailable !== "undefined" && dbUnavailable;
+  const planLabel = p.plan === "max" ? "Max" : p.plan === "pro" ? "Pro" : "Free";
+  const history = Array.isArray(p.history) ? p.history : [];
+%>
+<!doctype html>
+<html lang="<%= langCode %>" data-theme="retro">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f3eee0" />
+    <title><%= pageTitle %></title>
+    <script>
+      (function () {
+        try {
+          var saved = localStorage.getItem("butler-theme");
+          if (saved === "paper" || saved === "retro" || saved === "dark") {
+            document.documentElement.setAttribute("data-theme", saved);
+          }
+        } catch (_) { /* ignore */ }
+      })();
+    </script>
+    <link rel="stylesheet" href="/css/style.css" />
+    <style>
+      .pref-shell {
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 32px 20px;
+        background: var(--color-bg);
+      }
+      .pref-card {
+        width: min(760px, 100%);
+        padding: 28px;
+        border: 1px solid var(--glass-border);
+        border-radius: var(--radius-modal);
+        background: var(--glass-bg-strong);
+        backdrop-filter: var(--glass-blur);
+        -webkit-backdrop-filter: var(--glass-blur);
+        box-shadow: var(--shadow-card-hover);
+      }
+      .pref-header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+      .pref-header h1 { margin: 0; color: var(--color-text); font-family: var(--font-display); font-size: 30px; }
+      .pref-header a { color: var(--color-primary); font-weight: 700; text-decoration: none; }
+      .pref-header a:hover { text-decoration: underline; }
+      .pref-sub { margin: 0 0 22px; color: var(--color-text-muted); font-size: 14px; }
+      .pref-section-title {
+        margin: 22px 0 12px;
+        color: var(--color-text-faint);
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.8px;
+        text-transform: uppercase;
+      }
+      .pref-section-title:first-of-type { margin-top: 6px; }
+      .settings-banner {
+        margin-bottom: 16px;
+        padding: 10px 14px;
+        border-radius: 10px;
+        background: rgba(255, 149, 0, 0.14);
+        color: var(--color-text);
+        font-size: 13px;
+      }
+
+      .billing-plan-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 14px;
+        border: 1px solid var(--color-border-soft);
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.34);
+      }
+
+      .credits-card { padding: 16px; border: 1px solid var(--color-border-soft); border-radius: 12px; background: rgba(255, 255, 255, 0.34); }
+      .credits-number { font-family: var(--font-display); font-size: 40px; color: var(--color-text); line-height: 1; }
+      .credits-sub { margin: 4px 0 14px; font-size: 13px; color: var(--color-text-muted); }
+      .credits-bar-track { height: 8px; border-radius: 999px; background: var(--color-border-soft); overflow: hidden; margin-bottom: 16px; }
+      .credits-bar-fill { height: 100%; background: var(--color-primary); border-radius: 999px; }
+      .topup-row { display: flex; gap: 10px; flex-wrap: wrap; }
+      .topup-status { margin-top: 10px; font-size: 13px; color: var(--color-text-muted); min-height: 16px; }
+
+      .history-list { display: grid; gap: 8px; }
+      .history-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 10px 12px;
+        border: 1px solid var(--color-border-soft);
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.28);
+        font-size: 13px;
+      }
+      .history-item .history-note { color: var(--color-text); }
+      .history-item .history-meta { color: var(--color-text-muted); white-space: nowrap; }
+      .history-empty { color: var(--color-text-muted); font-size: 13px; }
+    </style>
+  </head>
+  <body>
+    <main class="pref-shell">
+      <section class="pref-card">
+        <header class="pref-header">
+          <h1>Billing &amp; Credits</h1>
+          <a href="/chat">← Back to Butler</a>
+        </header>
+        <p class="pref-sub">This is a simulated billing flow for the demo — no real payment is processed. See <a href="/pricing">Pricing</a> to change plans.</p>
+
+        <% if (showDbWarning) { %>
+          <div class="settings-banner">Database is unavailable right now — top-ups won't be saved until it reconnects.</div>
+        <% } %>
+
+        <h2 class="pref-section-title">Current plan</h2>
+        <div class="billing-plan-row">
+          <div>
+            <strong><%= planLabel %></strong>
+            <span style="color: var(--color-text-muted); font-size: 13px; margin-left: 8px;">Simulated subscription</span>
+          </div>
+          <a class="btn btn-secondary" href="/pricing">Change plan</a>
+        </div>
+
+        <h2 class="pref-section-title">Credits</h2>
+        <div class="credits-card">
+          <div class="credits-number" data-credits-number><%= p.credits %></div>
+          <p class="credits-sub"><span data-credits-used><%= p.creditsUsed || 0 %></span> used all-time (simulated)</p>
+
+          <div class="topup-row">
+            <button type="button" class="btn btn-primary" data-topup="10">+10 credits</button>
+            <button type="button" class="btn btn-primary" data-topup="50">+50 credits</button>
+            <button type="button" class="btn btn-primary" data-topup="100">+100 credits</button>
+          </div>
+          <p class="topup-status" data-topup-status></p>
+        </div>
+
+        <h2 class="pref-section-title">History</h2>
+        <div class="history-list" data-history-list>
+          <% if (history.length === 0) { %>
+            <p class="history-empty" data-history-empty>No billing activity yet.</p>
+          <% } else { %>
+            <% history.slice(0, 10).forEach((entry) => { %>
+              <div class="history-item">
+                <span class="history-note"><%= entry.note %></span>
+                <span class="history-meta"><%= entry.createdAt ? new Date(entry.createdAt).toLocaleString() : "" %></span>
+              </div>
+            <% }) %>
+          <% } %>
+        </div>
+      </section>
+    </main>
+
+    <script src="/js/billing.js" defer></script>
+  </body>
+</html>

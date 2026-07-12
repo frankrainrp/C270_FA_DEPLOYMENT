@@ -1,0 +1,188 @@
+<%
+  /*
+    settings.ejs
+    Standalone Settings / User Profile page (Task 6).
+    Lets the user update their display name + email and upload an
+    avatar image (with a client-side preview before it's saved).
+
+    Locals:
+    - profile        : { name, email, avatarUrl }
+    - dbUnavailable  : true if MongoDB could not be reached
+    - loggedIn       : true if there's a real login session (email
+                       becomes read-only — it's the verified identity)
+  */
+  const pageTitle = typeof title !== "undefined" ? title : "Settings — Butler";
+  const langCode = typeof lang !== "undefined" ? lang : "en";
+  const p = typeof profile !== "undefined" && profile ? profile : { name: "", email: "", avatarUrl: "" };
+  const showDbWarning = typeof dbUnavailable !== "undefined" && dbUnavailable;
+  const isLoggedIn = typeof loggedIn !== "undefined" && loggedIn;
+%>
+<!doctype html>
+<html lang="<%= langCode %>" data-theme="retro">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f3eee0" />
+    <title><%= pageTitle %></title>
+    <script>
+      (function () {
+        try {
+          var saved = localStorage.getItem("butler-theme");
+          if (saved === "paper" || saved === "retro" || saved === "dark") {
+            document.documentElement.setAttribute("data-theme", saved);
+          }
+        } catch (_) { /* ignore */ }
+      })();
+    </script>
+    <link rel="stylesheet" href="/css/style.css" />
+    <style>
+      .pref-shell {
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 32px 20px;
+        background: var(--color-bg);
+      }
+      .pref-card {
+        width: min(680px, 100%);
+        padding: 28px;
+        border: 1px solid var(--glass-border);
+        border-radius: var(--radius-modal);
+        background: var(--glass-bg-strong);
+        backdrop-filter: var(--glass-blur);
+        -webkit-backdrop-filter: var(--glass-blur);
+        box-shadow: var(--shadow-card-hover);
+      }
+      .pref-header {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 6px;
+      }
+      .pref-header h1 {
+        margin: 0;
+        color: var(--color-text);
+        font-family: var(--font-display);
+        font-size: 30px;
+      }
+      .pref-header a { color: var(--color-primary); font-weight: 700; text-decoration: none; }
+      .pref-header a:hover { text-decoration: underline; }
+      .pref-sub { margin: 0 0 22px; color: var(--color-text-muted); font-size: 14px; }
+      .pref-section-title {
+        margin: 22px 0 12px;
+        color: var(--color-text-faint);
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.8px;
+        text-transform: uppercase;
+      }
+      .pref-section-title:first-of-type { margin-top: 6px; }
+
+      .settings-banner {
+        margin-bottom: 16px;
+        padding: 10px 14px;
+        border-radius: 10px;
+        background: var(--color-danger-soft, rgba(255, 149, 0, 0.14));
+        color: var(--color-text);
+        font-size: 13px;
+      }
+
+      .avatar-row { display: flex; align-items: center; gap: 16px; }
+      .avatar-preview {
+        width: 76px;
+        height: 76px;
+        border-radius: 50%;
+        overflow: hidden;
+        border: 2px solid var(--color-border-soft);
+        background: var(--color-surface);
+        display: grid;
+        place-items: center;
+        font-family: var(--font-display);
+        font-size: 28px;
+        color: var(--color-text-muted);
+        flex-shrink: 0;
+      }
+      .avatar-preview img { width: 100%; height: 100%; object-fit: cover; }
+      .avatar-actions { display: flex; flex-direction: column; gap: 6px; }
+      .avatar-hint { margin: 0; font-size: 12px; color: var(--color-text-muted); }
+      .avatar-error { margin: 4px 0 0; font-size: 12px; color: var(--color-danger, #c0392b); min-height: 14px; }
+
+      .field-group { display: grid; gap: 6px; margin-bottom: 14px; }
+      .field-group label { font-size: 13px; font-weight: 700; color: var(--color-text); }
+      .field-error { margin: 0; font-size: 12px; color: var(--color-danger, #c0392b); min-height: 14px; }
+
+      .settings-actions { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
+      .settings-save-status { font-size: 13px; color: var(--color-text-muted); }
+    </style>
+  </head>
+  <body>
+    <main class="pref-shell">
+      <section class="pref-card">
+        <header class="pref-header">
+          <h1>Settings</h1>
+          <a href="/chat">← Back to Butler</a>
+        </header>
+        <p class="pref-sub">Manage your profile. See also <a href="/preferences">Theme preferences</a> and <a href="/billing">Billing &amp; Credits</a>.</p>
+
+        <% if (isLoggedIn) { %>
+          <p class="pref-sub" style="margin-top: -14px;">Signed in as <strong><%= p.email %></strong>.</p>
+        <% } %>
+
+        <% if (showDbWarning) { %>
+          <div class="settings-banner">Database is unavailable right now — changes here won't be saved until it reconnects.</div>
+        <% } %>
+
+        <h2 class="pref-section-title">Profile photo</h2>
+        <div class="avatar-row">
+          <div class="avatar-preview" data-avatar-preview>
+            <% if (p.avatarUrl) { %>
+              <img src="<%= p.avatarUrl %>" alt="" data-avatar-image />
+            <% } else { %>
+              <span data-avatar-fallback><%= (p.name || "S").slice(0, 1).toUpperCase() %></span>
+            <% } %>
+          </div>
+          <div class="avatar-actions">
+            <input type="file" id="avatar-input" accept="image/png,image/jpeg,image/webp,image/gif" hidden />
+            <button type="button" class="btn btn-secondary" data-avatar-trigger>Upload new photo</button>
+            <p class="avatar-hint">PNG, JPEG, WEBP or GIF. Max 2MB.</p>
+            <p class="avatar-error" data-avatar-error></p>
+          </div>
+        </div>
+
+        <h2 class="pref-section-title">Profile details</h2>
+        <form data-settings-form novalidate>
+          <div class="field-group">
+            <label for="settings-name">Display name</label>
+            <input class="input" id="settings-name" name="name" type="text" maxlength="80" value="<%= p.name || '' %>" required />
+            <p class="field-error" data-error-for="name"></p>
+          </div>
+          <div class="field-group">
+            <label for="settings-email">Email</label>
+            <input
+              class="input"
+              id="settings-email"
+              name="email"
+              type="email"
+              maxlength="200"
+              value="<%= p.email || '' %>"
+              required
+              <% if (isLoggedIn) { %>readonly<% } %>
+            />
+            <% if (isLoggedIn) { %>
+              <p class="avatar-hint">This is your verified login email and can't be changed here.</p>
+            <% } %>
+            <p class="field-error" data-error-for="email"></p>
+          </div>
+
+          <div class="settings-actions">
+            <button type="submit" class="btn btn-primary" data-save-button>Save changes</button>
+            <span class="settings-save-status" data-save-status></span>
+          </div>
+        </form>
+      </section>
+    </main>
+
+    <script src="/js/settings.js" defer></script>
+  </body>
+</html>

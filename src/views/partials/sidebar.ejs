@@ -1,0 +1,231 @@
+<%
+  /*
+    sidebar.ejs
+    左侧二级导航模板。它对应当前 React 版本里的 LeftRail、ChatRail、
+    TasksRail、CalendarRail、NotesRail，并给自定义面板保留同样的容器结构。
+
+    rail 可传入的常用字段：
+    - sessions: chat 会话列表，字段包含 id、title、updatedAt
+    - activeSessionId: 当前会话 id
+    - taskCounts: 任务计数字段 active、in_progress、upcoming、all、completed
+    - taskView: 当前任务视图
+    - miniMonth: 月历格子，字段包含 label、date、active、muted、hasEvents
+    - calendarTags: 日历标签列表，字段包含 label、count、color
+    - noteCounts: 笔记计数字段 all、pinned、linked
+    - pinnedNotes: 置顶笔记列表，字段包含 id、title
+    - customPanel: 自定义面板信息，字段包含 id、label、emoji、description
+  */
+  const railData = typeof rail !== "undefined" && rail ? rail : {};
+  const active = typeof activeNav !== "undefined" ? activeNav : "chat";
+  const customActiveId = typeof activeCustomPanelId !== "undefined" ? activeCustomPanelId : null;
+  const L = typeof label === "function" ? label : ((key, fallback) => fallback);
+  const sessions = Array.isArray(railData.sessions) ? railData.sessions : [];
+  const recentSessions = sessions.slice(0, 12);
+  const activeSessionId = railData.activeSessionId || null;
+  const taskCounts = railData.taskCounts || {};
+  const taskView = railData.taskView || "active";
+  const miniMonth = Array.isArray(railData.miniMonth) ? railData.miniMonth : [];
+  const calendarTags = Array.isArray(railData.calendarTags) ? railData.calendarTags : [];
+  const noteCounts = railData.noteCounts || {};
+  const pinnedNotes = Array.isArray(railData.pinnedNotes) ? railData.pinnedNotes : [];
+  const customPanel = railData.customPanel || {};
+
+  const count = (name) => Number.isFinite(Number(taskCounts[name])) ? Number(taskCounts[name]) : 0;
+  const noteCount = (name) => Number.isFinite(Number(noteCounts[name])) ? Number(noteCounts[name]) : 0;
+%>
+
+<div class="sidebar-inner" data-sidebar-content>
+  <% if (active === "chat" && !customActiveId) { %>
+    <a class="sidebar-primary" href="/chat/new" data-action="new-chat">
+      <span class="sidebar-primary-icon plus-icon" aria-hidden="true"></span>
+      <span><%= L("rail.chat.new", "New Chat") %></span>
+    </a>
+
+    <section class="sidebar-section" aria-labelledby="sidebar-chat-title">
+      <h2 id="sidebar-chat-title" class="sidebar-heading"><%= L("rail.chat.recent", "Recent Chats") %></h2>
+
+      <div class="sidebar-scroll">
+        <% if (recentSessions.length === 0) { %>
+          <div class="sidebar-empty">
+            <span class="empty-tray" aria-hidden="true"></span>
+            <p><%= L("rail.chat.empty1", "No conversations yet") %></p>
+            <span><%= L("rail.chat.empty2", "Start with a new chat") %></span>
+          </div>
+        <% } %>
+
+        <% recentSessions.forEach((session) => { %>
+          <a
+            class="sidebar-item <%= session.id === activeSessionId ? "active" : "" %>"
+            href="/chat/<%= session.id %>"
+            data-session-id="<%= session.id %>"
+          >
+            <span class="sidebar-item-icon chat-icon" aria-hidden="true"></span>
+            <span class="sidebar-item-label"><%= session.title || L("rail.chat.untitled", "Untitled chat") %></span>
+            <button class="sidebar-more" type="button" data-session-menu="<%= session.id %>" aria-label="<%= L("rail.chat.more", "More actions") %>">
+              <span aria-hidden="true">•••</span>
+            </button>
+          </a>
+        <% }) %>
+
+        <% if (sessions.length > recentSessions.length) { %>
+          <a class="sidebar-link" href="/chat"><%= L("rail.chat.viewAll", "View all") %> (<%= sessions.length %>)</a>
+        <% } %>
+      </div>
+    </section>
+  <% } else if (active === "tasks" && !customActiveId) { %>
+    <a class="sidebar-primary" href="/tasks/new" data-action="new-task">
+      <span class="sidebar-primary-icon plus-icon" aria-hidden="true"></span>
+      <span><%= L("rail.tasks.new", "New Task") %></span>
+    </a>
+
+    <section class="sidebar-section" aria-labelledby="sidebar-task-title">
+      <h2 id="sidebar-task-title" class="sidebar-heading"><%= L("rail.tasks.views", "Views") %></h2>
+
+      <a class="sidebar-item <%= taskView === "active" ? "active" : "" %>" href="/tasks?view=active" data-task-view="active">
+        <span class="sidebar-item-icon inbox-icon" aria-hidden="true"></span>
+        <span class="sidebar-item-label"><%= L("rail.tasks.active", "Active") %></span>
+        <% if (count("active") > 0) { %><span class="sidebar-count"><%= count("active") %></span><% } %>
+      </a>
+
+      <a class="sidebar-item <%= taskView === "in_progress" ? "active" : "" %>" href="/tasks?view=in_progress" data-task-view="in_progress">
+        <span class="sidebar-item-icon alert-icon" aria-hidden="true"></span>
+        <span class="sidebar-item-label"><%= L("rail.tasks.inProgress", "In Progress") %></span>
+        <% if (count("in_progress") > 0) { %><span class="sidebar-count"><%= count("in_progress") %></span><% } %>
+      </a>
+
+      <a class="sidebar-item <%= taskView === "upcoming" ? "active" : "" %>" href="/tasks?view=upcoming" data-task-view="upcoming">
+        <span class="sidebar-item-icon clock-icon" aria-hidden="true"></span>
+        <span class="sidebar-item-label"><%= L("rail.tasks.upcoming", "Upcoming") %></span>
+        <% if (count("upcoming") > 0) { %><span class="sidebar-count"><%= count("upcoming") %></span><% } %>
+      </a>
+
+      <a class="sidebar-item <%= taskView === "all" ? "active" : "" %>" href="/tasks?view=all" data-task-view="all">
+        <span class="sidebar-item-icon list-icon" aria-hidden="true"></span>
+        <span class="sidebar-item-label"><%= L("rail.tasks.all", "All Tasks") %></span>
+        <% if (count("all") > 0) { %><span class="sidebar-count"><%= count("all") %></span><% } %>
+      </a>
+
+      <a class="sidebar-item <%= taskView === "completed" ? "active" : "" %>" href="/tasks?view=completed" data-task-view="completed">
+        <span class="sidebar-item-icon check-icon" aria-hidden="true"></span>
+        <span class="sidebar-item-label"><%= L("rail.tasks.completed", "Completed") %></span>
+        <% if (count("completed") > 0) { %><span class="sidebar-count"><%= count("completed") %></span><% } %>
+      </a>
+    </section>
+  <% } else if (active === "calendar" && !customActiveId) { %>
+    <a class="sidebar-primary" href="/calendar/new" data-action="new-event">
+      <span class="sidebar-primary-icon plus-icon" aria-hidden="true"></span>
+      <span><%= L("rail.calendar.new", "New Event") %></span>
+    </a>
+
+    <section class="sidebar-section" aria-labelledby="sidebar-calendar-title">
+      <h2 id="sidebar-calendar-title" class="sidebar-heading"><%= L("rail.calendar.myCalendar", "My Calendar") %></h2>
+
+      <% if (miniMonth.length > 0) { %>
+        <div class="mini-calendar" aria-label="<%= L("rail.calendar.month", "Month overview") %>">
+          <% miniMonth.forEach((day) => { %>
+            <a
+              class="mini-calendar-day <%= day.active ? "active" : "" %> <%= day.muted ? "muted" : "" %> <%= day.hasEvents ? "has-events" : "" %>"
+              href="/calendar?date=<%= day.date || "" %>"
+              data-date="<%= day.date || "" %>"
+            >
+              <span><%= day.label %></span>
+            </a>
+          <% }) %>
+        </div>
+      <% } else { %>
+        <div class="mini-calendar skeleton-calendar" aria-hidden="true">
+          <% for (let i = 1; i <= 35; i += 1) { %>
+            <span class="mini-calendar-day muted"><%= i <= 31 ? i : "" %></span>
+          <% } %>
+        </div>
+      <% } %>
+    </section>
+
+    <section class="sidebar-section" aria-labelledby="sidebar-calendar-tags">
+      <h2 id="sidebar-calendar-tags" class="sidebar-heading"><%= L("rail.calendar.tags", "Calendars") %></h2>
+      <% if (calendarTags.length === 0) { %>
+        <a class="sidebar-item active" href="/calendar">
+          <span class="sidebar-item-icon calendar-icon" aria-hidden="true"></span>
+          <span class="sidebar-item-label"><%= L("rail.calendar.default", "Default") %></span>
+        </a>
+      <% } %>
+      <% calendarTags.forEach((tag) => { %>
+        <a class="sidebar-item" href="/calendar?tag=<%= encodeURIComponent(tag.label || "") %>">
+          <span class="tag-dot" style="--tag-color: <%= tag.color || "var(--color-primary)" %>"></span>
+          <span class="sidebar-item-label"><%= tag.label || L("rail.calendar.untitled", "Untitled calendar") %></span>
+          <% if (Number(tag.count) > 0) { %><span class="sidebar-count"><%= tag.count %></span><% } %>
+        </a>
+      <% }) %>
+    </section>
+  <% } else if (active === "search" && !customActiveId) { %>
+    <section class="sidebar-section" aria-labelledby="sidebar-search-title">
+      <h2 id="sidebar-search-title" class="sidebar-heading"><%= L("rail.search.results", "Search") %></h2>
+      <p class="sidebar-hint"><%= L("rail.search.hint", "Search across notes, tasks, and chat sessions from the top bar.") %></p>
+      <div class="sidebar-item">
+        <span class="sidebar-item-label"><%= L("rail.search.quickTip", "Tip: try keywords like \"DevOps\" or \"React\".") %></span>
+      </div>
+    </section>
+  <% } else if (active === "notes" && !customActiveId) { %>
+    <a class="sidebar-primary" href="/notes/new" data-action="new-note">
+      <span class="sidebar-primary-icon plus-icon" aria-hidden="true"></span>
+      <span><%= L("rail.notes.new", "New Note") %></span>
+    </a>
+
+    <section class="sidebar-section" aria-labelledby="sidebar-notes-title">
+      <h2 id="sidebar-notes-title" class="sidebar-heading"><%= L("rail.notes.library", "Library") %></h2>
+
+      <a class="sidebar-item active" href="/notes">
+        <span class="sidebar-item-icon note-icon" aria-hidden="true"></span>
+        <span class="sidebar-item-label"><%= L("rail.notes.all", "All Notes") %></span>
+        <% if (noteCount("all") > 0) { %><span class="sidebar-count"><%= noteCount("all") %></span><% } %>
+      </a>
+
+      <a class="sidebar-item" href="/notes?pinned=1">
+        <span class="sidebar-item-icon pin-icon" aria-hidden="true"></span>
+        <span class="sidebar-item-label"><%= L("rail.notes.pinned", "Pinned") %></span>
+        <% if (noteCount("pinned") > 0) { %><span class="sidebar-count"><%= noteCount("pinned") %></span><% } %>
+      </a>
+
+      <a class="sidebar-item" href="/notes?linked=1">
+        <span class="sidebar-item-icon link-icon" aria-hidden="true"></span>
+        <span class="sidebar-item-label"><%= L("rail.notes.linked", "Linked to tasks") %></span>
+        <% if (noteCount("linked") > 0) { %><span class="sidebar-count"><%= noteCount("linked") %></span><% } %>
+      </a>
+    </section>
+
+    <section class="sidebar-section" aria-labelledby="sidebar-pinned-notes">
+      <h2 id="sidebar-pinned-notes" class="sidebar-heading"><%= L("rail.notes.pinnedNotes", "Pinned Notes") %></h2>
+      <% if (pinnedNotes.length === 0) { %>
+        <div class="sidebar-hint"><%= L("rail.notes.emptyPinned", "Pin important notes for quick access.") %></div>
+      <% } %>
+      <% pinnedNotes.forEach((note) => { %>
+        <a class="sidebar-item compact" href="/notes/<%= note.id %>">
+          <span class="sidebar-item-icon note-icon" aria-hidden="true"></span>
+          <span class="sidebar-item-label"><%= note.title || L("rail.notes.untitled", "Untitled note") %></span>
+        </a>
+      <% }) %>
+    </section>
+  <% } else { %>
+    <a class="sidebar-primary" href="/panel/<%= customPanel.id || customActiveId || "custom" %>/edit" data-action="edit-panel">
+      <span class="sidebar-primary-icon settings-icon" aria-hidden="true"></span>
+      <span><%= L("rail.custom.configure", "Configure Panel") %></span>
+    </a>
+
+    <section class="sidebar-section" aria-labelledby="sidebar-custom-title">
+      <h2 id="sidebar-custom-title" class="sidebar-heading"><%= L("rail.custom.panel", "Custom Panel") %></h2>
+      <div class="custom-panel-card">
+        <span class="custom-panel-mark" aria-hidden="true"><%= customPanel.emoji || "P" %></span>
+        <strong><%= customPanel.label || L("rail.custom.untitled", "Untitled panel") %></strong>
+        <p><%= customPanel.description || L("rail.custom.description", "This panel uses the same layout shell and can render generated modules, charts, lists, or saved AI output.") %></p>
+      </div>
+      <a class="sidebar-item active" href="/panel/<%= customPanel.id || customActiveId || "custom" %>">
+        <span class="sidebar-item-icon panel-icon" aria-hidden="true"></span>
+        <span class="sidebar-item-label"><%= L("rail.custom.overview", "Overview") %></span>
+      </a>
+      <a class="sidebar-item" href="/panel/<%= customPanel.id || customActiveId || "custom" %>/data">
+        <span class="sidebar-item-icon database-icon" aria-hidden="true"></span>
+        <span class="sidebar-item-label"><%= L("rail.custom.data", "Data Sources") %></span>
+      </a>
+    </section>
+  <% } %>
+</div>

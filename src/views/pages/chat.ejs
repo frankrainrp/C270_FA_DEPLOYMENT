@@ -1,0 +1,109 @@
+<%
+  /*
+    pages/chat.ejs
+    Chat workspace.  Renders inside layout.ejs .layout-main.
+    Corresponds to C270_FA ChatCanvas + InputPod.
+
+    Locals available:
+    - activeNav (always "chat" here)
+    - rail       (chat rail data; sessions, activeSessionId)
+    - initialMessages (optional array of pre-rendered messages)
+    - userName / isLoggedIn (forwarded by layout.ejs for the greeting)
+  */
+  const initialMessagesList = Array.isArray(locals && locals.initialMessages)
+    ? locals.initialMessages
+    : [];
+  // Only greet by name for a real login session — the shared demo
+  // profile's "Student User" placeholder isn't worth personalising for.
+  const greetLoggedIn = typeof isLoggedIn !== "undefined" && isLoggedIn;
+  const greetName = typeof userName !== "undefined" ? userName : "";
+%>
+
+<section class="chat-shell" data-chat-root>
+  <!-- Message stream. New messages are appended by chat-ui.js at runtime. -->
+  <div class="message-stream" data-message-stream>
+    <% if (initialMessagesList.length === 0) { %>
+      <div class="chat-empty" data-chat-empty>
+        <% if (greetLoggedIn && greetName) { %>
+          <h1>Hello, <%= greetName %>!</h1>
+        <% } else { %>
+          <h1>Good to see you.</h1>
+        <% } %>
+        <p>
+          Ask Butler about your studies, tasks, or notes.
+          Try a suggestion below or type your own question.
+        </p>
+
+        <div class="prompt-grid">
+          <button type="button" class="prompt-card" data-prompt="Give me a 3-step plan to prepare for my finals.">
+            <strong>Plan finals prep</strong>
+            <span>3-step study plan</span>
+          </button>
+          <button type="button" class="prompt-card" data-prompt="Add a task: finish the DevOps CA2 report tomorrow, high priority.">
+            <strong>Create a task</strong>
+            <span>Writes to MongoDB</span>
+          </button>
+          <button type="button" class="prompt-card" data-prompt="List all my tasks.">
+            <strong>List tasks</strong>
+            <span>Read from MongoDB</span>
+          </button>
+          <button type="button" class="prompt-card" data-prompt="Add a calendar event: DevOps final exam next Friday, tag exam.">
+            <strong>Add event</strong>
+            <span>Calendar CRUD</span>
+          </button>
+        </div>
+      </div>
+    <% } %>
+
+    <% initialMessagesList.forEach(function(msg) { %>
+      <div class="message-row <%= msg.role === 'user' ? 'user' : 'ai' %>">
+        <div class="chat-bubble <%= msg.role === 'user' ? 'chat-bubble-user' : 'chat-bubble-ai' %>">
+          <%= msg.content || "" %>
+        </div>
+      </div>
+    <% }) %>
+  </div>
+
+  <!-- Composer: textarea + send button.  chat-ui.js wires up the events. -->
+  <div class="chat-composer">
+    <form class="composer-box" data-composer autocomplete="off">
+      <textarea
+        rows="1"
+        name="message"
+        data-composer-input
+        placeholder="Message Butler..."
+        aria-label="Message Butler"
+      ></textarea>
+      <div class="composer-tools">
+        <button
+          class="glass-btn"
+          type="button"
+          data-composer-stop
+          hidden
+          aria-label="Stop generating"
+        >Stop</button>
+        <button
+          class="glass-btn glass-btn-primary"
+          type="submit"
+          data-composer-send
+          aria-label="Send message"
+        >Send</button>
+      </div>
+    </form>
+  </div>
+</section>
+
+<script>
+  // Hand SSR-rendered chat history to the client so ButlerState is
+  // seeded before chat-ui.js sends its first message.  Without this,
+  // subsequent turns would forget everything before the reload.
+  window.__BUTLER_INIT__ = {
+    messages: <%- JSON.stringify(initialMessagesList) %>,
+    activeSessionId: <%- JSON.stringify((locals && locals.activeSessionId) || null) %>,
+  };
+</script>
+<script src="/js/app-state.js" defer></script>
+<script src="/js/api.js" defer></script>
+<script src="/js/chat-client.js" defer></script>
+<script src="/js/tool-executor.js" defer></script>
+<script src="/js/chat-ui.js" defer></script>

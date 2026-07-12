@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+
+# Environment / secrets
+.env
+.env.local
+*.key
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS / editor junk
+.DS_Store
+Thumbs.db
+.vscode/
+
+# Uploads (user files — don't commit these)
+uploads/
+
+# Build output
+dist/
+build/

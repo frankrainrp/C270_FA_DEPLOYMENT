@@ -1,0 +1,113 @@
+<%
+  /*
+    pages/note.ejs
+    Notes workspace with a searchable note list and an editable editor.
+    Note data comes from MongoDB via pages.js.
+  */
+  const list = Array.isArray(locals.notes) ? locals.notes : [];
+  const active = list[0] || { _id: "", title: "", content: "", updatedAt: null };
+
+  function previewOf(n) {
+    const body = String((n && n.content) || "").trim();
+    if (!body) return "(empty)";
+    return body.length > 120 ? body.slice(0, 120) + "…" : body;
+  }
+
+  function fmtUpdated(d) {
+    if (!d) return "just now";
+    const dt = new Date(d);
+    if (isNaN(dt.getTime())) return "just now";
+    const diffMs = Date.now() - dt.getTime();
+    const mins = Math.round(diffMs / 60000);
+    if (mins < 1) return "just now";
+    if (mins < 60) return mins + " min ago";
+    const hours = Math.round(mins / 60);
+    if (hours < 24) return hours + " hour" + (hours === 1 ? "" : "s") + " ago";
+    const days = Math.round(hours / 24);
+    if (days === 1) return "Yesterday";
+    return days + " days ago";
+  }
+%>
+
+<section class="notes-panel" data-notes-root>
+  <aside class="notes-list" data-notes-list>
+    <header class="notes-list-header">
+      <div class="notes-summary">
+        <strong>Notes (<%= list.length %>)</strong>
+        <p>Capture ideas, keep them searchable, and revisit them later.</p>
+      </div>
+      <div style="display: flex; gap: 8px; align-items: center;">
+        <input
+          id="note-search"
+          class="auth-input-wrap"
+          style="height: 34px; flex: 1;"
+          type="search"
+          placeholder="Search notes"
+          aria-label="Search notes"
+        />
+        <button class="glass-btn glass-btn-primary" type="button" data-new-note>New</button>
+      </div>
+    </header>
+
+    <% if (list.length === 0) { %>
+      <div style="padding: 20px; color: var(--color-text-muted);">
+        No notes yet.  Click <strong>New</strong>, or ask Butler in
+        <a href="/chat">chat</a>.
+      </div>
+    <% } %>
+
+    <% list.forEach(function(n, i) {
+      const preview = previewOf(n);
+    %>
+      <button
+        class="note-list-item <%= i === 0 ? 'active' : '' %>"
+        type="button"
+        data-note-id="<%= n._id %>"
+        data-note-title="<%= n.title || '' %>"
+        data-note-preview="<%= preview %>"
+        data-note-body="<%= n.content || '' %>"
+        data-note-updated="<%= fmtUpdated(n.updatedAt) %>"
+      >
+        <strong><%= n.title || 'Untitled' %><% if (n.pinned) { %> ★<% } %></strong>
+        <p><%= preview %></p>
+      </button>
+    <% }) %>
+  </aside>
+
+  <article
+    class="note-editor"
+    data-note-editor
+    data-note-id="<%= active._id || '' %>"
+  >
+    <div class="note-editor-toolbar">
+      <div>
+        <p class="hero-kicker">Study note</p>
+        <input
+          id="note-title-input"
+          class="note-title-input"
+          type="text"
+          value="<%= active.title || '' %>"
+          placeholder="Untitled note"
+          aria-label="Note title"
+          data-note-title
+        />
+      </div>
+      <button id="save-note-btn" class="glass-btn glass-btn-primary" type="button" data-note-save>Save</button>
+      <button class="glass-btn" type="button" data-note-delete>Delete</button>
+    </div>
+    <div class="note-editor-meta">
+      <span id="note-updated-label">Updated <%= fmtUpdated(active.updatedAt) %></span>
+      <span class="drawer-pill">Markdown</span>
+    </div>
+    <textarea
+      id="note-body-input"
+      class="note-body-input"
+      aria-label="Note body"
+      placeholder="Write in markdown..."
+      data-note-body
+    ><%= active.content || "" %></textarea>
+  </article>
+</section>
+
+<script src="/js/api.js" defer></script>
+<script src="/js/notes-ui.js" defer></script>

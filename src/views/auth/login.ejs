@@ -1,0 +1,147 @@
+<%
+  /*
+    auth/login.ejs
+    Standalone login/signup page.  Does NOT use layout.ejs so we can
+    keep it decoupled from the main app shell.
+
+    Two-step email OTP flow:
+      1. Enter name (optional, only matters for new accounts) + email,
+         POST /api/auth/request-otp. n8n emails a 6-digit code; Butler
+         holds onto the code server-side (see AuthService) and never
+         sends it to this page.
+      2. Enter the code from the email, POST /api/auth/verify-otp.
+         On success the server sets a session cookie and this page
+         redirects into the app.
+
+    Locals:
+    - title (browser tab title)
+    - theme (paper | dark | retro)
+    - lang  (en | zh)
+  */
+  const pageTitle = typeof title !== "undefined" ? title : "Sign in — Butler";
+  const themeName = typeof theme !== "undefined" ? theme : "paper";
+  const langCode = typeof lang !== "undefined" ? lang : "en";
+%>
+<!doctype html>
+<html lang="<%= langCode %>" data-theme="<%= themeName %>">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f3eee0" />
+    <title><%= pageTitle %></title>
+    <script>
+      // Same theme-preloader as layout.ejs (see comment there).
+      (function () {
+        try {
+          var saved = localStorage.getItem("butler-theme");
+          if (saved === "paper" || saved === "retro" || saved === "dark") {
+            document.documentElement.setAttribute("data-theme", saved);
+          }
+        } catch (_) { /* localStorage unavailable */ }
+      })();
+    </script>
+    <link rel="stylesheet" href="/css/style.css" />
+  </head>
+  <body>
+    <main class="auth-paper-shell">
+      <section class="auth-paper-hero">
+        <div class="auth-paper-brand">
+          <span class="auth-paper-logo" aria-hidden="true"></span>
+          <span>Butler</span>
+        </div>
+
+        <div class="auth-paper-copy">
+          <h1>Study, planned by your Butler.</h1>
+          <p>
+            Butler keeps your tasks, calendar, notes, and AI conversations in one
+            calm workspace, so you can focus on the work that actually matters.
+          </p>
+        </div>
+
+        <div class="auth-paper-benefits">
+          <div class="auth-benefit">
+            <strong>Deadline aware</strong>
+            <span>Tasks and events in one place.</span>
+          </div>
+          <div class="auth-benefit">
+            <strong>AI first</strong>
+            <span>Butler writes, plans, and organises.</span>
+          </div>
+          <div class="auth-benefit">
+            <strong>Private by default</strong>
+            <span>Your data stays scoped to your account.</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="auth-paper-panel">
+        <!-- Step 1: email + name -->
+        <div data-auth-step="email">
+          <div class="auth-form-head">
+            <h2>Welcome</h2>
+            <p>Enter your email and we'll send you a one-time code — no password to remember.</p>
+          </div>
+
+          <form class="auth-form" data-email-form novalidate>
+            <p class="auth-error" data-auth-error hidden></p>
+
+            <label class="auth-field">
+              <span>Name <span style="text-transform: none; font-weight: 400;">(only needed the first time)</span></span>
+              <span class="auth-input-wrap">
+                <input type="text" name="name" id="auth-name" maxlength="80" autocomplete="name" placeholder="Your name" />
+              </span>
+            </label>
+
+            <label class="auth-field">
+              <span>Email</span>
+              <span class="auth-input-wrap">
+                <input type="email" name="email" id="auth-email" required autocomplete="email" placeholder="you@example.com" />
+              </span>
+            </label>
+
+            <button class="auth-submit" type="submit" data-send-code-button>Send code</button>
+          </form>
+        </div>
+
+        <!-- Step 2: enter the emailed code -->
+        <div data-auth-step="code" hidden>
+          <div class="auth-form-head">
+            <h2>Check your email</h2>
+            <p data-code-sent-to>We sent a code to your email.</p>
+          </div>
+
+          <form class="auth-form" data-code-form novalidate>
+            <p class="auth-error" data-auth-error-code hidden></p>
+
+            <label class="auth-field">
+              <span>6-digit code</span>
+              <span class="auth-input-wrap">
+                <input
+                  type="text"
+                  name="code"
+                  id="auth-code"
+                  inputmode="numeric"
+                  autocomplete="one-time-code"
+                  maxlength="8"
+                  placeholder="123456"
+                  required
+                />
+              </span>
+            </label>
+
+            <button class="auth-submit" type="submit" data-verify-button>Verify &amp; continue</button>
+
+            <div class="auth-switch" style="display: flex; justify-content: space-between; gap: 8px;">
+              <button type="button" data-back-button style="background: none; border: 0; color: var(--color-text-muted); cursor: pointer; text-decoration: underline;">Use a different email</button>
+              <button type="button" data-resend-button style="background: none; border: 0; color: var(--color-primary); cursor: pointer; font-weight: 700;">Resend code</button>
+            </div>
+          </form>
+        </div>
+
+        <p class="auth-note" data-auth-status></p>
+      </section>
+    </main>
+
+    <script src="/js/auth-login.js" defer></script>
+  </body>
+</html>

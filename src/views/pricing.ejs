@@ -1,0 +1,138 @@
+<%
+  /*
+    pricing.ejs
+    Standalone Pricing / plan-upgrade page (Task 6).
+    Simulated only — clicking "Choose plan" calls POST /api/billing/plan
+    which just updates the plan field in MongoDB. No payment processor.
+
+    Locals:
+    - currentPlan    : "free" | "pro" | "max"
+    - dbUnavailable  : true if MongoDB could not be reached
+  */
+  const pageTitle = typeof title !== "undefined" ? title : "Pricing — Butler";
+  const langCode = typeof lang !== "undefined" ? lang : "en";
+  const current = typeof currentPlan !== "undefined" ? currentPlan : "free";
+  const showDbWarning = typeof dbUnavailable !== "undefined" && dbUnavailable;
+
+  const plans = [
+    {
+      id: "free",
+      name: "Free",
+      price: "$0",
+      tagline: "For getting started.",
+      features: ["Chat, tasks, calendar, notes", "20 starter credits", "Community support"],
+    },
+    {
+      id: "pro",
+      name: "Pro",
+      price: "$9/mo",
+      tagline: "For regular study sessions.",
+      features: ["Everything in Free", "Priority AI responses", "Higher monthly credit allowance"],
+      featured: true,
+    },
+    {
+      id: "max",
+      name: "Max",
+      price: "$19/mo",
+      tagline: "For heavy daily use.",
+      features: ["Everything in Pro", "Highest credit allowance", "Early access to new features"],
+    },
+  ];
+%>
+<!doctype html>
+<html lang="<%= langCode %>" data-theme="retro">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f3eee0" />
+    <title><%= pageTitle %></title>
+    <script>
+      (function () {
+        try {
+          var saved = localStorage.getItem("butler-theme");
+          if (saved === "paper" || saved === "retro" || saved === "dark") {
+            document.documentElement.setAttribute("data-theme", saved);
+          }
+        } catch (_) { /* ignore */ }
+      })();
+    </script>
+    <link rel="stylesheet" href="/css/style.css" />
+    <style>
+      .pref-shell {
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 32px 20px;
+        background: var(--color-bg);
+      }
+      .pref-card {
+        width: min(920px, 100%);
+        padding: 28px;
+        border: 1px solid var(--glass-border);
+        border-radius: var(--radius-modal);
+        background: var(--glass-bg-strong);
+        backdrop-filter: var(--glass-blur);
+        -webkit-backdrop-filter: var(--glass-blur);
+        box-shadow: var(--shadow-card-hover);
+      }
+      .pref-header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+      .pref-header h1 { margin: 0; color: var(--color-text); font-family: var(--font-display); font-size: 30px; }
+      .pref-header a { color: var(--color-primary); font-weight: 700; text-decoration: none; }
+      .pref-header a:hover { text-decoration: underline; }
+      .pref-sub { margin: 0 0 22px; color: var(--color-text-muted); font-size: 14px; }
+      .settings-banner {
+        margin-bottom: 16px;
+        padding: 10px 14px;
+        border-radius: 10px;
+        background: rgba(255, 149, 0, 0.14);
+        color: var(--color-text);
+        font-size: 13px;
+      }
+
+      .pricing-card h3 { margin: 0; font-family: var(--font-display); font-size: 20px; color: var(--color-text); }
+      .pricing-price { font-size: 24px; font-weight: 800; color: var(--color-text); }
+      .pricing-tagline { margin: 0; font-size: 13px; color: var(--color-text-muted); }
+      .pricing-features { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 13px; color: var(--color-text); }
+      .pricing-features li::before { content: "✓ "; color: var(--color-primary); font-weight: 700; }
+      .pricing-status { margin-top: 12px; font-size: 13px; color: var(--color-text-muted); min-height: 16px; }
+    </style>
+  </head>
+  <body>
+    <main class="pref-shell">
+      <section class="pref-card">
+        <header class="pref-header">
+          <h1>Pricing</h1>
+          <a href="/billing">← Back to Billing</a>
+        </header>
+        <p class="pref-sub">Simulated plans for this demo — choosing a plan below just updates your account, no payment is charged.</p>
+
+        <% if (showDbWarning) { %>
+          <div class="settings-banner">Database is unavailable right now — plan changes won't be saved until it reconnects.</div>
+        <% } %>
+
+        <div class="pricing-grid">
+          <% plans.forEach((plan) => { %>
+            <div class="pricing-card <%= plan.featured ? 'featured' : '' %>">
+              <h3><%= plan.name %></h3>
+              <div class="pricing-price"><%= plan.price %></div>
+              <p class="pricing-tagline"><%= plan.tagline %></p>
+              <ul class="pricing-features">
+                <% plan.features.forEach((f) => { %>
+                  <li><%= f %></li>
+                <% }) %>
+              </ul>
+              <% if (plan.id === current) { %>
+                <button type="button" class="btn btn-secondary" disabled>Current plan</button>
+              <% } else { %>
+                <button type="button" class="btn btn-primary" data-choose-plan="<%= plan.id %>">Choose <%= plan.name %></button>
+              <% } %>
+            </div>
+          <% }) %>
+        </div>
+        <p class="pricing-status" data-pricing-status></p>
+      </section>
+    </main>
+
+    <script src="/js/pricing.js" defer></script>
+  </body>
+</html>
