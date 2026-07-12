@@ -14,7 +14,6 @@
 const express = require("express");
 
 const { renderLayout } = require("../lib/renderLayout");
-const { getMockRail } = require("../data/mockRail");
 const TaskService = require("../services/TaskService");
 const NoteService = require("../services/NoteService");
 const CalendarService = require("../services/CalendarService");
@@ -22,6 +21,12 @@ const ChatSessionService = require("../services/ChatSessionService");
 const UserProfileService = require("../services/UserProfileService");
 const AuthService = require("../services/AuthService");
 const { requireAuthPage, getSessionUser } = require("../middleware/requireAuth");
+const {
+  buildTasksRail,
+  buildNotesRail,
+  buildCalendarRail,
+  buildChatRail,
+} = require("../services/RailService");
 
 const router = express.Router();
 
@@ -102,7 +107,11 @@ async function loadSessionsList(ownerEmail) {
 async function renderChatPage(req, res, session, sessions) {
   const activeSessionId = session ? String(session._id) : null;
   const initialMessages = session && Array.isArray(session.messages)
-    ? session.messages.map((m) => ({ role: m.role, content: m.content }))
+    ? session.messages.map((m) => ({
+      role: m.role,
+      content: m.content,
+      attachments: Array.isArray(m.attachments) ? m.attachments : undefined,
+    }))
     : [];
   const authContext = await loadAuthContext(req);
 
@@ -169,7 +178,7 @@ router.get("/chat/:id", requireAuthPage, async (req, res, next) => {
 router.get("/search", requireAuthPage, async (req, res, next) => {
   const ownerEmail = req.sessionUser.email;
   try {
-    const query = String(req.query.q || "").trim();
+    const query = String(req.query.q || "").trim().slice(0, 200);
     const normalizedQuery = query.toLowerCase();
 
     // Empty search
@@ -295,22 +304,16 @@ router.get("/tasks", requireAuthPage, async (req, res, next) => {
       TaskService.findAll("all", ownerEmail),
       TaskService.getStats(ownerEmail),
     ]);
-    const authContext = await loadAuthContext(req);
+    const [rail, authContext] = await Promise.all([
+      buildTasksRail("all", ownerEmail, stats),
+      loadAuthContext(req),
+    ]);
 
     renderLayout(res, {
       title: "Tasks",
       activeNav: "tasks",
       page: "task",
-      rail: {
-        taskCounts: {
-          active: stats.active,
-          completed: stats.completed,
-          upcoming: stats.upcoming,
-          all: stats.total,
-          in_progress: 0,
-        },
-        taskView: "all",
-      },
+      rail,
       pageLocals: { tasks: tasks.map((t) => t.toObject()) },
       ...authContext,
     });
@@ -328,24 +331,16 @@ router.get("/notes", requireAuthPage, async (req, res, next) => {
   try {
     const notes = await NoteService.findAll("all", ownerEmail);
     const plain = notes.map((n) => n.toObject());
-    const pinned = plain.filter((n) => n.pinned);
-    const authContext = await loadAuthContext(req);
+    const [rail, authContext] = await Promise.all([
+      buildNotesRail(ownerEmail, notes),
+      loadAuthContext(req),
+    ]);
 
     renderLayout(res, {
       title: "Notes",
       activeNav: "notes",
       page: "note",
-      rail: {
-        noteCounts: {
-          all: plain.length,
-          pinned: pinned.length,
-          linked: 0,
-        },
-        pinnedNotes: pinned.slice(0, 5).map((n) => ({
-          id: String(n._id),
-          title: n.title,
-        })),
-      },
+      rail,
       pageLocals: { notes: plain },
       ...authContext,
     });
@@ -364,6 +359,10 @@ router.get("/calendar", requireAuthPage, async (req, res, next) => {
     const [events, tasks] = await Promise.all([
       CalendarService.findAll(ownerEmail),
       TaskService.findAll("all", ownerEmail),
+    ]);
+    const [rail, authContext] = await Promise.all([
+      buildCalendarRail(ownerEmail, events),
+      loadAuthContext(req),
     ]);
 
     const taskEvents = tasks
@@ -386,13 +385,12 @@ router.get("/calendar", requireAuthPage, async (req, res, next) => {
       ...events.map((e) => e.toObject()),
       ...taskEvents,
     ];
-    const authContext = await loadAuthContext(req);
 
     renderLayout(res, {
       title: "Calendar",
       activeNav: "calendar",
       page: "calendar",
-      rail: getMockRail("calendar"),
+      rail,
       pageLocals: { events: combined },
       ...authContext,
     });

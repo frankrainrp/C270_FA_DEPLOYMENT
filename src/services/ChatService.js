@@ -35,6 +35,9 @@ const DEFAULT_MODEL_ID = "deepseek-v4-flash";
 
 const HISTORY_LIMIT = 20;
 const CONTENT_LIMIT = 12000;
+const HISTORY_CONTENT_LIMIT = 100000;
+const MAX_ATTACHMENTS = 3;
+const ATTACHMENT_TEXT_LIMIT = 60000;
 
 function clampText(text, max) {
   if (typeof text !== "string") return text;
@@ -42,13 +45,43 @@ function clampText(text, max) {
   return text.slice(0, max);
 }
 
+function clampAttachments(attachments) {
+  if (!Array.isArray(attachments)) return [];
+  return attachments.slice(0, MAX_ATTACHMENTS).map((attachment) => ({
+    name: clampText(String(attachment.name || "document"), 255),
+    mimeType: clampText(String(attachment.mimeType || "application/octet-stream"), 128),
+    size: Number.isFinite(Number(attachment.size)) ? Number(attachment.size) : 0,
+    text: clampText(String(attachment.text || ""), ATTACHMENT_TEXT_LIMIT),
+    truncated: Boolean(attachment.truncated),
+  })).filter((attachment) => attachment.text);
+}
+
+function contentWithAttachments(content, attachments) {
+  const base = typeof content === "string" ? clampText(content, CONTENT_LIMIT) : "";
+  const documents = clampAttachments(attachments);
+  if (!documents.length) return base;
+  const sections = documents.map((document) => [
+    `--- Uploaded document: ${document.name} ---`,
+    document.text,
+    `--- End document: ${document.name} ---`,
+  ].join("\n"));
+  return [base, ...sections].filter(Boolean).join("\n\n");
+}
+
 // Preserve tool_calls / tool_call_id so multi-round tool loops work.
 function clampMessages(messages) {
   const list = Array.isArray(messages) ? messages : [];
-  return list.slice(-HISTORY_LIMIT).map((m) => {
+  let remaining = HISTORY_CONTENT_LIMIT;
+  const result = [];
+  const recent = list.slice(-HISTORY_LIMIT);
+  for (let i = recent.length - 1; i >= 0; i -= 1) {
+    const m = recent[i];
+    const expandedContent = contentWithAttachments(m.content, m.attachments);
+    const content = remaining > 0 ? clampText(expandedContent, remaining) : "[Earlier content omitted]";
+    remaining = Math.max(0, remaining - content.length);
     const out = {
       role: m.role,
-      content: typeof m.content === "string" ? clampText(m.content, CONTENT_LIMIT) : m.content,
+      content,
     };
     if (Array.isArray(m.tool_calls) && m.tool_calls.length > 0) {
       out.tool_calls = m.tool_calls;
@@ -56,8 +89,9 @@ function clampMessages(messages) {
     if (m.tool_call_id) {
       out.tool_call_id = m.tool_call_id;
     }
-    return out;
-  });
+    result.unshift(out);
+  }
+  return result;
 }
 
 function writeSse(res, payload) {
@@ -95,23 +129,23 @@ async function safeGetSession(sessionId, ownerEmail) {
   }
 }
 
-async function safeSaveMessage(session, role, content, ownerEmail) {
+async function safeSaveMessage(session, role, content, ownerEmail, attachments) {
   if (!session || !content) return;
   // ChatSession model only allows role "user" | "assistant".
   if (role !== "user" && role !== "assistant") return;
   try {
-    await ChatSessionService.addMessage(session._id, role, content, ownerEmail);
+    await ChatSessionService.addMessage(session._id, role, content, ownerEmail, clampAttachments(attachments));
   } catch (err) {
     console.warn("[ChatService] failed to persist message:", err.message);
   }
 }
 
 // Only persist the LAST user turn (not the entire history every time).
-function extractLastUserContent(messages) {
+function extractLastUserMessage(messages) {
   const list = Array.isArray(messages) ? messages : [];
   for (let i = list.length - 1; i >= 0; i -= 1) {
     if (list[i].role === "user" && typeof list[i].content === "string") {
-      return list[i].content;
+      return list[i];
     }
   }
   return null;
@@ -128,8 +162,8 @@ function isFollowUpToolRound(messages) {
 async function streamMock(input, res) {
   beginSse(res);
 
-  const lastUser = extractLastUserContent(input.messages);
-  const echo = lastUser || "Hello!";
+  const lastUser = extractLastUserMessage(input.messages);
+  const echo = lastUser ? lastUser.content : "Hello!";
   const reply = `Butler (mock mode): I received "${echo}". Configure DEEPSEEK_API_KEY in .env to enable tool calling against MongoDB.`;
 
   const words = reply.split(/(\s+)/);
@@ -140,6 +174,12 @@ async function streamMock(input, res) {
   writeSse(res, { choices: [{ delta: {}, finish_reason: "stop" }] });
   res.write("data: [DONE]\n\n");
   res.end();
+
+  const session = await safeGetSession(input.sessionId, input.ownerEmail);
+  if (session && !isFollowUpToolRound(input.messages)) {
+    if (lastUser) await safeSaveMessage(session, "user", lastUser.content, input.ownerEmail, lastUser.attachments);
+    await safeSaveMessage(session, "assistant", reply, input.ownerEmail);
+  }
 }
 
 async function streamReal(input, res) {
@@ -222,8 +262,8 @@ async function streamReal(input, res) {
     // message (not on tool follow-up rounds).
     const session = await safeGetSession(input.sessionId, input.ownerEmail);
     if (session && !isFollowUpToolRound(input.messages)) {
-      const lastUser = extractLastUserContent(input.messages);
-      if (lastUser) await safeSaveMessage(session, "user", lastUser, input.ownerEmail);
+      const lastUser = extractLastUserMessage(input.messages);
+      if (lastUser) await safeSaveMessage(session, "user", lastUser.content, input.ownerEmail, lastUser.attachments);
     }
     if (session && fullResponse) {
       await safeSaveMessage(session, "assistant", fullResponse, input.ownerEmail);
@@ -241,7 +281,8 @@ async function streamChat(input, res) {
     return;
   }
 
-  if (process.env.DEEPSEEK_API_KEY) {
+  const forceMock = /^(1|true|yes)$/i.test(process.env.CHAT_MOCK_MODE || "");
+  if (process.env.DEEPSEEK_API_KEY && !forceMock) {
     await streamReal(input, res);
   } else {
     await streamMock(input, res);

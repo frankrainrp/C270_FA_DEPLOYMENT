@@ -14,7 +14,7 @@ class ChatSessionService {
    * one if none exists yet.
    */
   async getLatestSession(ownerEmail) {
-    let session = await ChatSession.findOne({ active: true, ownerEmail }).sort({ createdAt: -1 });
+    let session = await ChatSession.findOne({ active: true, ownerEmail }).sort({ updatedAt: -1 });
 
     if (!session) {
       session = await this.create(ownerEmail);
@@ -35,7 +35,7 @@ class ChatSessionService {
   /**
    * Add a message to a session, scoped to ownerEmail.
    */
-  async addMessage(sessionId, role, content, ownerEmail) {
+  async addMessage(sessionId, role, content, ownerEmail, attachments) {
     const session = await ChatSession.findOne({ _id: sessionId, ownerEmail });
     if (!session) {
       throw new Error("Session not found");
@@ -44,6 +44,7 @@ class ChatSessionService {
     session.messages.push({
       role,
       content,
+      attachments: Array.isArray(attachments) && attachments.length ? attachments : undefined,
       timestamp: new Date(),
     });
 
@@ -91,7 +92,7 @@ class ChatSessionService {
    * Get all chat sessions for ownerEmail (for history/archive sidebar).
    */
   async findAll(ownerEmail) {
-    return await ChatSession.find({ ownerEmail }).sort({ createdAt: -1 });
+    return await ChatSession.find({ ownerEmail }).sort({ updatedAt: -1 });
   }
 
   /**

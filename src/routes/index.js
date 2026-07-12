@@ -14,6 +14,7 @@ const apiCalendar = require("./api/calendar");
 const apiProfile = require("./api/profile");
 const apiBilling = require("./api/billing");
 const apiAuth = require("./api/auth");
+const apiDocuments = require("./api/documents");
 
 module.exports = function mountRoutes(app) {
   // HTML pages served with the shared layout shell.
@@ -31,4 +32,5 @@ module.exports = function mountRoutes(app) {
   app.use("/api/profile", apiProfile);
   app.use("/api/billing", apiBilling);
   app.use("/api/auth", apiAuth);
+  app.use("/api/documents", apiDocuments);
 };

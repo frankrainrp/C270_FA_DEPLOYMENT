@@ -1,16 +1,50 @@
-version: '3.8'
 services:
   butler-app:
     build: .
-    ports: ["3000:3000"]
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3000}:3000"
     environment:
-      - MONGO_URI=mongodb://mongo:27017/butlerdb
-      - JWT_SECRET=supersecret_butler_key
+      PORT: 3000
+      NODE_ENV: production
+      MONGO_URI: mongodb://${MONGO_ROOT_USERNAME:-butler}:${MONGO_ROOT_PASSWORD:-butler-local-password}@mongo:27017/${MONGO_DATABASE:-butler}?authSource=admin
+      MONGO_CONNECT_TIMEOUT_MS: ${MONGO_CONNECT_TIMEOUT_MS:-5000}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com/v1}
+      CHAT_MOCK_MODE: ${CHAT_MOCK_MODE:-false}
+      DOCUMENT_MAX_MB: ${DOCUMENT_MAX_MB:-10}
+      DOCUMENT_TEXT_LIMIT: ${DOCUMENT_TEXT_LIMIT:-60000}
+      JWT_SECRET: ${JWT_SECRET:-change-me}
+      N8N_OTP_WEBHOOK_URL: ${N8N_OTP_WEBHOOK_URL:-}
+      OTP_EXPIRY_MINUTES: ${OTP_EXPIRY_MINUTES:-5}
+      OTP_MAX_ATTEMPTS: ${OTP_MAX_ATTEMPTS:-5}
     depends_on:
-      - mongo
+      mongo:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 15s
+
   mongo:
-    image: mongo:latest
-    ports: ["27017:27017"]
-    volumes: ["butler_data:/data/db"]
+    image: mongo:7.0
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME:-butler}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-butler-local-password}
+      MONGO_INITDB_DATABASE: ${MONGO_DATABASE:-butler}
+    ports:
+      - "${MONGO_PORT:-27017}:27017"
+    volumes:
+      - butler_data:/data/db
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --username \"$$MONGO_INITDB_ROOT_USERNAME\" --password \"$$MONGO_INITDB_ROOT_PASSWORD\" --authenticationDatabase admin --eval \"db.adminCommand('ping').ok\" | grep 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
 volumes:
   butler_data:

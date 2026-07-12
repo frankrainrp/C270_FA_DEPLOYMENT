@@ -5,7 +5,8 @@
   "main": "src/app.js",
   "scripts": {
     "start": "node src/app.js",
-    "test:ci": "node ci-validate.mjs",
+    "test": "node --test",
+    "test:ci": "node ci-validate.mjs && npm test",
     "migrate:owner": "node scripts/migrate-owner-email.js"
   },
   "dependencies": {
@@ -14,8 +15,10 @@
     "ejs": "^3.1.10",
     "express": "^4.22.2",
     "jsonwebtoken": "^9.0.0",
+    "mammoth": "^1.12.0",
     "mongoose": "^7.0.3",
     "multer": "^1.4.5-lts.1",
-    "openai": "^4.71.0"
+    "openai": "^4.71.0",
+    "pdf-parse": "^1.1.1"
   }
 }

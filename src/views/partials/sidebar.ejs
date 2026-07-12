@@ -1,19 +1,18 @@
 <%
   /*
     sidebar.ejs
-    左侧二级导航模板。它对应当前 React 版本里的 LeftRail、ChatRail、
-    TasksRail、CalendarRail、NotesRail，并给自定义面板保留同样的容器结构。
+    Contextual sidebar for chat, tasks, calendar, notes, and custom panels.
 
-    rail 可传入的常用字段：
-    - sessions: chat 会话列表，字段包含 id、title、updatedAt
-    - activeSessionId: 当前会话 id
-    - taskCounts: 任务计数字段 active、in_progress、upcoming、all、completed
-    - taskView: 当前任务视图
-    - miniMonth: 月历格子，字段包含 label、date、active、muted、hasEvents
-    - calendarTags: 日历标签列表，字段包含 label、count、color
-    - noteCounts: 笔记计数字段 all、pinned、linked
-    - pinnedNotes: 置顶笔记列表，字段包含 id、title
-    - customPanel: 自定义面板信息，字段包含 id、label、emoji、description
+    Common rail fields:
+    - sessions: chat rows with id, title, and updatedAt
+    - activeSessionId: selected chat session id
+    - taskCounts: active, in_progress, upcoming, all, and completed totals
+    - taskView: selected task filter
+    - miniMonth: calendar cells with label, date, active, muted, and hasEvents
+    - calendarTags: calendar tag rows with label, count, and color
+    - noteCounts: all, pinned, and linked totals
+    - pinnedNotes: note rows with id and title
+    - customPanel: custom panel metadata
   */
   const railData = typeof rail !== "undefined" && rail ? rail : {};
   const active = typeof activeNav !== "undefined" ? activeNav : "chat";

@@ -67,6 +67,7 @@
   <!-- Composer: textarea + send button.  chat-ui.js wires up the events. -->
   <div class="chat-composer">
     <form class="composer-box" data-composer autocomplete="off">
+      <div class="composer-attachments" data-document-list hidden></div>
       <textarea
         rows="1"
         name="message"
@@ -75,6 +76,14 @@
         aria-label="Message Butler"
       ></textarea>
       <div class="composer-tools">
+        <input
+          type="file"
+          data-document-input
+          accept=".txt,.md,.markdown,.csv,.tsv,.json,.xml,.html,.css,.js,.ts,.tsx,.jsx,.py,.java,.c,.cpp,.h,.hpp,.sql,.yaml,.yml,.toml,.ini,.log,.pdf,.docx"
+          multiple
+          hidden
+        />
+        <button class="glass-btn" type="button" data-document-pick aria-label="Attach documents">Attach</button>
         <button
           class="glass-btn"
           type="button"

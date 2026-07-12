@@ -15,7 +15,12 @@ function requireFile(filePath, label) {
 // --- Deployment configuration ---
 requireFile('Dockerfile', 'Dockerfile');
 requireFile('docker-compose.yml', 'docker-compose.yml');
+requireFile('docker-compose.db.yml', 'docker-compose.db.yml (MongoDB-only dev stack)');
 requireFile('.env.example', '.env.example');
+
+// --- Document decoding (OCR/import) feature: required files ---
+requireFile('src/routes/api/documents.js', 'Documents API route');
+requireFile('src/services/DocumentDecodeService.js', 'DocumentDecodeService');
 
 // --- Task 6 (Platform / Billing / QA): required files ---
 requireFile('src/models/UserProfile.js', 'UserProfile model');

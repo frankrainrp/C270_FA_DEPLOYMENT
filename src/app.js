@@ -5,7 +5,7 @@
 // Responsibilities (this file only):
 //   - Load environment variables
 //   - Create the Express app
-//   - Register global middleware (body parsers, static, cookies)
+//   - Register global middleware (body parsers, static assets, cookies)
 //   - Configure EJS view engine
 //   - Mount every route through routes/index.js
 //   - Register 404 and error handlers
@@ -19,6 +19,8 @@ const express = require("express");
 const path = require("path");
 const mongoose = require("mongoose");
 const cookieParser = require("cookie-parser");
+
+mongoose.set("bufferCommands", false);
 
 // Optional .env loader.  Wrapped in try/catch so the app still boots
 // if `dotenv` is not installed yet — useful during the very first run.
@@ -36,8 +38,9 @@ const app = express();
 // ------------------------------------------------------------------
 app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 app.use(express.json({ limit: "5mb" }));
-// cookie-parser was already a dependency but never wired in — needed now
-// to read the login session cookie set by /api/auth/verify-otp.
+// cookie-parser reads the login session cookie set by /api/auth/verify-otp,
+// and is what every requireAuth check (tasks/notes/calendar/chat/search)
+// relies on to identify the current account.
 app.use(cookieParser());
 
 // Static assets served from src/public.
@@ -85,11 +88,13 @@ app.use((err, req, res, _next) => {
 const connectDB = async () => {
   try {
     const mongoUri = process.env.MONGO_URI || "mongodb://localhost:27017/butler";
-    await mongoose.connect(mongoUri, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    });
-    console.log("[db] Connected to MongoDB:", mongoUri);
+    const configuredTimeout = Number(process.env.MONGO_CONNECT_TIMEOUT_MS);
+    const serverSelectionTimeoutMS = Number.isFinite(configuredTimeout) && configuredTimeout > 0
+      ? configuredTimeout
+      : 5000;
+    await mongoose.connect(mongoUri, { serverSelectionTimeoutMS });
+    const safeMongoUri = mongoUri.replace(/(mongodb(?:\+srv)?:\/\/)([^@/]+)@/i, "$1***:***@");
+    console.log("[db] Connected to MongoDB:", safeMongoUri);
   } catch (err) {
     console.error("[db] MongoDB connection failed:", err.message);
     // Don't exit — allow app to run without DB (useful for dev/testing)

@@ -1,7 +1,8 @@
 // ============================================================
 // src/services/RailService.js
-// Builds real sidebar rail data from MongoDB.
-// Replaces mockRail.js for tasks / notes / calendar / chat.
+// Builds real sidebar rail data from MongoDB, scoped to the current
+// account (ownerEmail) so one user never sees another's tasks, notes,
+// events, or chat sessions in the sidebar.
 // ============================================================
 
 const TaskService = require("./TaskService");
@@ -12,8 +13,8 @@ const { buildMonthGrid } = require("../lib/panelHelpers");
 
 const TAG_COLORS = ["#4a7c99", "#1fa39a", "#ff9500", "#8b5cf6", "#ef4444"];
 
-async function buildTasksRail(taskView = "active") {
-  const stats = await TaskService.getStats();
+async function buildTasksRail(taskView = "active", ownerEmail, existingStats) {
+  const stats = existingStats || await TaskService.getStats(ownerEmail);
   return {
     taskCounts: {
       active: stats.active,
@@ -26,9 +27,9 @@ async function buildTasksRail(taskView = "active") {
   };
 }
 
-async function buildNotesRail() {
-  const all = await NoteService.findAll("all");
-  const pinned = await NoteService.getPinned();
+async function buildNotesRail(ownerEmail, existingNotes) {
+  const all = existingNotes || await NoteService.findAll("all", ownerEmail);
+  const pinned = all.filter((note) => note.pinned);
   return {
     noteCounts: {
       all: all.length,
@@ -42,11 +43,11 @@ async function buildNotesRail() {
   };
 }
 
-async function buildCalendarRail() {
+async function buildCalendarRail(ownerEmail, existingEvents) {
   const today = new Date();
   const year = today.getFullYear();
   const month = today.getMonth();
-  const events = await CalendarService.findByMonth(year, month);
+  const events = existingEvents || await CalendarService.findByMonth(year, month, ownerEmail);
   const cells = buildMonthGrid(year, month, events);
 
   const miniMonth = cells.map((cell, index) => {
@@ -65,7 +66,7 @@ async function buildCalendarRail() {
     };
   });
 
-  const tagRows = await CalendarService.getTagsSummary();
+  const tagRows = await CalendarService.getTagsSummary(ownerEmail);
   const calendarTags = tagRows.map((row, i) => ({
     label: row._id || "Untagged",
     count: row.count,
@@ -75,8 +76,8 @@ async function buildCalendarRail() {
   return { miniMonth, calendarTags };
 }
 
-async function buildChatRail() {
-  const sessions = await ChatSessionService.findAll();
+async function buildChatRail(ownerEmail, existingSessions, activeSessionId) {
+  const sessions = existingSessions || await ChatSessionService.findAll(ownerEmail);
   const mapped = sessions.map((s) => {
     const firstUser = (s.messages || []).find((m) => m.role === "user");
     const title = firstUser && firstUser.content
@@ -91,27 +92,11 @@ async function buildChatRail() {
 
   return {
     sessions: mapped.slice(0, 12),
-    activeSessionId: mapped[0] ? mapped[0].id : null,
+    activeSessionId: activeSessionId || (mapped[0] ? mapped[0].id : null),
   };
 }
 
-async function buildRail(activeNav, options = {}) {
-  switch (activeNav) {
-    case "tasks":
-      return buildTasksRail(options.taskView || "active");
-    case "notes":
-      return buildNotesRail();
-    case "calendar":
-      return buildCalendarRail();
-    case "chat":
-      return buildChatRail();
-    default:
-      return {};
-  }
-}
-
 module.exports = {
-  buildRail,
   buildTasksRail,
   buildNotesRail,
   buildCalendarRail,
