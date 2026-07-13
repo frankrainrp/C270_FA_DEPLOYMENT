@@ -62,11 +62,13 @@ function renderLayout(res, options) {
     page,
     pageLocals: options.pageLocals || {},
 
-    // Sidebar data (shape varies by activeNav; see data/mockRail.js)
+    // Sidebar data. Its shape varies by the active navigation section.
     rail: options.rail || {},
 
-    // User + plan for topbar user menu
-    authProfile: options.authProfile || DEFAULT_AUTH_PROFILE,
+    // User + plan for topbar user menu. authGuard.js attaches the real
+    // logged-in user to res.locals.authProfile before any route handler
+    // runs; options.authProfile lets a specific route override it.
+    authProfile: options.authProfile || res.locals.authProfile || DEFAULT_AUTH_PROFILE,
     plan: options.plan || "free",
     planName: options.planName,
 

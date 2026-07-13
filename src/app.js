@@ -5,29 +5,25 @@
 // Responsibilities (this file only):
 //   - Load environment variables
 //   - Create the Express app
-//   - Register global middleware (body parsers, static, cookies)
+//   - Register global middleware (body parsers and static assets)
 //   - Configure EJS view engine
 //   - Mount every route through routes/index.js
 //   - Register 404 and error handlers
-//   - Connect to MongoDB, then start the HTTP server
+//   - Start the HTTP server
 //
 // Business logic lives in services/*.js, and every URL is registered
 // in routes/index.js.  Do not add inline route handlers here.
 // ============================================================
 
-// Optional .env loader.  Wrapped in try/catch so the app still boots
-// if `dotenv` is not installed yet — useful during the very first run.
-try {
-  require("dotenv").config();
-} catch (_) { /* dotenv is optional */ }
-
 const express = require("express");
 const path = require("path");
+const mongoose = require("mongoose");
+mongoose.set("bufferCommands", false);
 
-const { connectDb } = require("./lib/db");
+require("dotenv").config();
+
 const mountRoutes = require("./routes");
 const { makeFail } = require("./lib/apiResponse");
-const notesStore = require("./data/notesStore");
 
 const app = express();
 
@@ -77,19 +73,32 @@ app.use((err, req, res, _next) => {
 });
 
 // ------------------------------------------------------------------
-// Server bootstrap.  Connect to MongoDB first, seed if empty, then
-// start listening.  If the DB is unreachable, fail loudly.
+// Database connection (MongoDB via Mongoose)
+// ------------------------------------------------------------------
+const connectDB = async () => {
+  try {
+    const mongoUri = process.env.MONGO_URI || "mongodb://localhost:27017/butler";
+    const configuredTimeout = Number(process.env.MONGO_CONNECT_TIMEOUT_MS);
+    const serverSelectionTimeoutMS = Number.isFinite(configuredTimeout) && configuredTimeout > 0
+      ? configuredTimeout
+      : 5000;
+    await mongoose.connect(mongoUri, { serverSelectionTimeoutMS });
+    const safeMongoUri = mongoUri.replace(/(mongodb(?:\+srv)?:\/\/)([^@/]+)@/i, "$1***:***@");
+    console.log("[db] Connected to MongoDB:", safeMongoUri);
+  } catch (err) {
+    console.error("[db] MongoDB connection failed:", err.message);
+    // Don't exit — allow app to run without DB (useful for dev/testing)
+    // In production, you'd want to exit here
+  }
+};
+
+// ------------------------------------------------------------------
+// Server bootstrap
 // ------------------------------------------------------------------
 const PORT = process.env.PORT || 3000;
 
-connectDb()
-  .then(() => notesStore.seedIfEmpty())
-  .then(() => {
-    app.listen(PORT, () => {
-      console.log(`Butler is running at http://localhost:${PORT}`);
-    });
-  })
-  .catch((err) => {
-    console.error("[app] failed to start — is MongoDB running?", err);
-    process.exit(1);
-  });
+connectDB();
+
+app.listen(PORT, () => {
+  console.log(`Butler is running at http://localhost:${PORT}`);
+});

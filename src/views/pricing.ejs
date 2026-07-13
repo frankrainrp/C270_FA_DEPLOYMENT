@@ -1,0 +1,216 @@
+<%
+  /*
+    pricing.ejs
+    Standalone "Upgrade" page. Shows the Free/Pro/Max plan catalog
+    from BillingService and posts the chosen plan to
+    POST /pricing/upgrade, which simulates the change (see
+    BillingService.js — no real payment gateway is wired up yet).
+  */
+  const pageTitle = typeof title !== "undefined" ? title : "Upgrade — Butler";
+  const langCode = typeof lang !== "undefined" ? lang : "en";
+  const planList = Array.isArray(plans) ? plans : [];
+  const activePlanId = typeof currentPlanId !== "undefined" ? currentPlanId : "free";
+%>
+<!doctype html>
+<html lang="<%= langCode %>" data-theme="retro">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="data:," />
+    <meta name="theme-color" content="#f3eee0" />
+    <title><%= pageTitle %></title>
+    <script>
+      (function () {
+        try {
+          var saved = localStorage.getItem("butler-theme");
+          if (saved === "paper" || saved === "retro" || saved === "dark") {
+            document.documentElement.setAttribute("data-theme", saved);
+          }
+        } catch (_) { /* ignore */ }
+      })();
+    </script>
+    <link rel="stylesheet" href="/css/style.css" />
+    <style>
+      .pref-shell {
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 32px 20px;
+        background: var(--color-bg);
+      }
+      .pref-card {
+        width: min(980px, 100%);
+        padding: 28px;
+        border: 1px solid var(--glass-border);
+        border-radius: var(--radius-modal);
+        background: var(--glass-bg-strong);
+        backdrop-filter: var(--glass-blur);
+        -webkit-backdrop-filter: var(--glass-blur);
+        box-shadow: var(--shadow-card-hover);
+      }
+      .pref-header {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 6px;
+      }
+      .pref-header h1 {
+        margin: 0;
+        color: var(--color-text);
+        font-family: var(--font-display);
+        font-size: 30px;
+      }
+      .account-subnav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 2px 0 22px;
+      }
+      .account-subnav a {
+        padding: 6px 12px;
+        border-radius: var(--radius-pill);
+        border: 1px solid var(--color-border-soft);
+        color: var(--color-text-muted);
+        font-size: 12px;
+        font-weight: 700;
+        text-decoration: none;
+        background: var(--color-surface);
+      }
+      .account-subnav a.active {
+        color: #ffffff;
+        background: var(--color-primary);
+        border-color: transparent;
+      }
+      .pref-sub {
+        margin: 0 0 22px;
+        color: var(--color-text-muted);
+        font-size: 14px;
+      }
+      .plan-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 16px;
+      }
+      .plan-card {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        padding: 20px;
+        border: 2px solid var(--color-border-soft);
+        border-radius: var(--radius-card);
+        background: var(--color-surface);
+      }
+      .plan-card.current {
+        border-color: var(--color-primary);
+        box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-primary) 18%, transparent);
+      }
+      .plan-card.popular {
+        border-color: var(--color-primary);
+      }
+      .plan-name-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .plan-name {
+        margin: 0;
+        color: var(--color-text);
+        font-family: var(--font-display);
+        font-size: 22px;
+      }
+      .plan-price {
+        color: var(--color-text);
+        font-size: 30px;
+        font-weight: 800;
+      }
+      .plan-price span {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--color-text-muted);
+      }
+      .plan-tagline {
+        margin: 0;
+        color: var(--color-text-muted);
+        font-size: 13px;
+      }
+      .plan-features {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        gap: 8px;
+      }
+      .plan-features li {
+        display: flex;
+        gap: 8px;
+        align-items: flex-start;
+        color: var(--color-text);
+        font-size: 13px;
+      }
+      .plan-features li::before {
+        content: "✓";
+        color: var(--color-primary);
+        font-weight: 800;
+      }
+      .plan-cta {
+        margin-top: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="pref-shell">
+      <section class="pref-card">
+        <header class="pref-header">
+          <h1>Upgrade</h1>
+          <a href="/chat">← Back to Butler</a>
+        </header>
+
+        <nav class="account-subnav" aria-label="Account settings">
+          <a href="/billing">Billing</a>
+          <a href="/preferences">Preferences</a>
+          <a href="/achievements">Achievements</a>
+          <a href="/pricing" class="active">Upgrade</a>
+        </nav>
+
+        <p class="pref-sub">
+          Choose the plan that fits how often you study with Butler.
+          This is a simulated checkout for now — no card is charged.
+        </p>
+
+        <div class="plan-grid">
+          <% planList.forEach((plan) => { %>
+            <% const isCurrent = plan.id === activePlanId; %>
+            <div class="plan-card <%= isCurrent ? "current" : "" %> <%= plan.id === "pro" ? "popular" : "" %>">
+              <div class="plan-name-row">
+                <h2 class="plan-name"><%= plan.name %></h2>
+                <% if (isCurrent) { %><span class="pref-tag">Current</span><% } %>
+              </div>
+              <div class="plan-price">
+                $<%= plan.price %><span> / <%= plan.period %></span>
+              </div>
+              <p class="plan-tagline"><%= plan.tagline %></p>
+              <ul class="plan-features">
+                <% (plan.features || []).forEach((feature) => { %>
+                  <li><%= feature %></li>
+                <% }) %>
+              </ul>
+              <div class="plan-cta">
+                <% if (isCurrent) { %>
+                  <button class="glass-btn" type="button" disabled>Current plan</button>
+                <% } else { %>
+                  <form action="/pricing/upgrade" method="POST">
+                    <input type="hidden" name="planId" value="<%= plan.id %>" />
+                    <button class="glass-btn glass-btn-primary" type="submit">
+                      <%= plan.price === 0 ? "Switch to Free" : "Upgrade to " + plan.name %>
+                    </button>
+                  </form>
+                <% } %>
+              </div>
+            </div>
+          <% }) %>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

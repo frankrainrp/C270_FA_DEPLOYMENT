@@ -1,0 +1,285 @@
+{
+  "name": "My workflow 370",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "send-otp",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -512,
+        0
+      ],
+      "id": "662947bd-3cb2-4059-a082-efcba4b0e659",
+      "name": "Webhook",
+      "webhookId": "a5d962aa-5ef8-4ebb-a264-caa39c59be5f"
+    },
+    {
+      "parameters": {
+        "jsCode": "const email = $json.body.email;\nconst code = Math.floor(100000 + Math.random() * 900000).toString();\nreturn [{ json: { email, code } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -336,
+        0
+      ],
+      "id": "52322a05-142d-4842-a1f6-f7bb64ad69e8",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "fromEmail": "hnyi690@gmail.com",
+        "toEmail": "={{ $('Code in JavaScript1').first().json.email }}",
+        "subject": "Your Study Butler code",
+        "html": "=Your Study Butler verification code is: <b>{{ $('Code in JavaScript1').first().json.code }}</b>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        368,
+        0
+      ],
+      "id": "a11b58fc-3c18-4bec-9055-970106caac19",
+      "name": "Send an Email",
+      "webhookId": "8cda28d0-0b8f-4d9e-b270-331072f129e0",
+      "credentials": {
+        "smtp": {
+          "id": "z3hfLDkaE5At8b5h",
+          "name": "SMTP account 4"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ JSON.stringify({ ok: true, code: $('Code in JavaScript1').first().json.code, isNew: $('Code in JavaScript1').first().json.isNew, name: $('Code in JavaScript1').first().json.name }) }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        528,
+        0
+      ],
+      "id": "6d6896a7-49bb-47c5-b018-4c94eebae8e7",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "YDcBSaJXGzEwoLzV",
+          "mode": "list",
+          "cachedResultName": "users",
+          "cachedResultUrl": "/projects/9d300460-8bdc-4957-9008-215bb6208fee/datatables/YDcBSaJXGzEwoLzV"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "email",
+              "keyValue": "={{ $json.email }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        -176,
+        0
+      ],
+      "id": "336e8a4c-bb33-487f-9930-40e7f596bcc8",
+      "name": "Get row(s)",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const email = $('Code in JavaScript').first().json.email;\nconst code = $('Code in JavaScript').first().json.code;\n\nlet name = \"\";\ntry { name = $('Webhook').first().json.body.name || \"\"; } catch (e) { name = \"\"; }\n\nlet found = false;\nlet existingName = \"\";\ntry {\n  const rows = $input.all();\n  if (rows.length > 0 && rows[0].json && rows[0].json.email) {\n    found = true;\n    existingName = rows[0].json.name || \"\";\n  }\n} catch (e) { found = false; }\n\nconst isNew = !found;\nconst finalName = found ? (existingName || name) : name;\n\nreturn [{ json: { email, code, name: finalName, isNew } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "a12e5024-0150-4b15-b5ed-5d1e4a60caaf",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "dataTableId": {
+          "__rl": true,
+          "value": "YDcBSaJXGzEwoLzV",
+          "mode": "list",
+          "cachedResultName": "users",
+          "cachedResultUrl": "/projects/9d300460-8bdc-4957-9008-215bb6208fee/datatables/YDcBSaJXGzEwoLzV"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "email",
+              "keyValue": "={{ $json.email }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "email": "={{ $json.email }}",
+            "name": "={{ $json.name }}",
+            "createAt": "={{ $now }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "name",
+              "displayName": "name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "createAt",
+              "displayName": "createAt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        208,
+        0
+      ],
+      "id": "3565829a-ac38-4328-8c69-2832a5faf0c7",
+      "name": "Upsert row(s)"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Get row(s)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send an Email": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond to Webhook": {
+      "main": [
+        []
+      ]
+    },
+    "Get row(s)": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Upsert row(s)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert row(s)": {
+      "main": [
+        [
+          {
+            "node": "Send an Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "f54cdaf4-e0c1-46a0-b01d-a302a9a40012",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "d4ebadb9d95df0efff4e8784a1811953a63bd62f8d7a2a45b7c8f23992108d48"
+  },
+  "nodeGroups": [],
+  "id": "fMwTH5I5foRYdFC4",
+  "tags": []
+}

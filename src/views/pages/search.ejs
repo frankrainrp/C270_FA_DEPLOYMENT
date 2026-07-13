@@ -1,0 +1,217 @@
+<%
+  /*
+    pages/search.ejs
+    Displays search results from MongoDB.
+  */
+
+  const searchQuery = typeof query !== "undefined" ? query : "";
+
+  const searchResults =
+    typeof results !== "undefined"
+      ? results
+      : {
+          notes: [],
+          tasks: [],
+          chats: [],
+        };
+
+  const totalResults =
+    searchResults.notes.length +
+    searchResults.tasks.length +
+    searchResults.chats.length;
+%>
+
+<section class="search-panel">
+
+  <header
+    class="chat-composer"
+    style="border-top:0;border-bottom:1px solid var(--color-border-soft);padding:18px 22px;"
+  >
+
+    <h1 style="margin:0;font-size:24px;">
+      🔍 Search
+    </h1>
+
+    <% if(searchQuery){ %>
+
+      <p style="margin-top:8px;color:var(--color-text-muted);">
+        <strong><%= totalResults %></strong>
+        result<%= totalResults === 1 ? "" : "s" %>
+        found for
+
+        "<strong><%= searchQuery %></strong>"
+      </p>
+
+    <% } %>
+
+  </header>
+
+
+  <% if(!searchQuery){ %>
+
+      <div class="search-empty">
+          <h2>Start searching</h2>
+
+          <p>
+              Search across all your Notes,
+              Tasks and Chat history.
+          </p>
+      </div>
+
+  <% } else if(totalResults === 0){ %>
+
+      <div class="search-empty">
+
+          <h2>No results found</h2>
+
+          <p>
+
+              Nothing matched
+
+              "<strong><%= searchQuery %></strong>"
+
+          </p>
+
+          <p style="margin-top:20px;">
+
+              Try searching for:
+
+          </p>
+
+          <ul>
+
+              <li>Task names</li>
+
+              <li>Note titles</li>
+
+              <li>Words inside notes</li>
+
+              <li>Chat messages</li>
+
+          </ul>
+
+      </div>
+
+  <% } else { %>
+
+      <% if(searchResults.notes.length){ %>
+
+          <section class="search-group">
+
+              <h2>
+                  📝 Notes
+                  (<%= searchResults.notes.length %>)
+              </h2>
+
+              <% searchResults.notes.forEach(note=>{ %>
+
+                  <article class="search-item">
+
+                      <h3><%= note.title %></h3>
+
+                      <p><%= note.preview %></p>
+
+                      <span class="search-meta">
+
+                          Updated
+                          <%= note.updated %>
+
+                      </span>
+
+                  </article>
+
+              <% }) %>
+
+          </section>
+
+      <% } %>
+
+
+
+      <% if(searchResults.tasks.length){ %>
+
+          <section class="search-group">
+
+              <h2>
+
+                  ✅ Tasks
+                  (<%= searchResults.tasks.length %>)
+
+              </h2>
+
+              <% searchResults.tasks.forEach(task=>{ %>
+
+                  <article class="search-item">
+
+                      <h3>
+
+                          <%= task.title %>
+
+                      </h3>
+
+                      <p>
+
+                          <%= task.description %>
+
+                      </p>
+
+                      <span class="search-meta">
+
+                          Due:
+                          <%= task.due %>
+
+                          |
+
+                          Priority:
+                          <%= task.priority %>
+
+                      </span>
+
+                  </article>
+
+              <% }) %>
+
+          </section>
+
+      <% } %>
+
+
+
+      <% if(searchResults.chats.length){ %>
+
+          <section class="search-group">
+
+              <h2>
+
+                  💬 Chats
+                  (<%= searchResults.chats.length %>)
+
+              </h2>
+
+              <% searchResults.chats.forEach(chat=>{ %>
+
+                  <article class="search-item">
+
+                      <h3>
+
+                          <%= chat.title %>
+
+                      </h3>
+
+                      <p>
+
+                          Matching conversation
+
+                      </p>
+
+                  </article>
+
+              <% }) %>
+
+          </section>
+
+      <% } %>
+
+  <% } %>
+
+</section>

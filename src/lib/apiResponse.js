@@ -13,12 +13,4 @@ function makeFail(error) {
   return { ok: false, error: String(error || "Unknown error") };
 }
 
-// Wraps an async Express handler and forwards thrown errors to next().
-// Lets route files stay flat instead of nesting try/catch everywhere.
-function runSafe(handler) {
-  return function safeHandler(req, res, next) {
-    Promise.resolve(handler(req, res, next)).catch(next);
-  };
-}
-
-module.exports = { makeOk, makeFail, runSafe };
+module.exports = { makeOk, makeFail };

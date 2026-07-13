@@ -10,17 +10,19 @@
 // This module writes SSE directly to the Express Response object; the
 // caller MUST NOT call res.json() after invoking streamChat().
 //
-// Ported from C270_FA apps/api/src/services/ChatService.ts, simplified
-// to plain JS (no zod, no reasoning mode) and adapted to run inside
-// the same Express process as the EJS UI.
+// On every request the server:
+//   1. Builds a fresh MongoDB snapshot (tasks/notes/events) and
+//      injects it into the system prompt so the AI has current ids.
+//   2. Best-effort persists the last user message and the assistant
+//      reply into the ChatSession collection.  If MongoDB is down,
+//      persistence is silently skipped so the chat still works.
 // ============================================================
 
 const { buildSystemPrompt } = require("./ChatPrompt");
 const { CHAT_TOOLS } = require("./ChatToolDefinitions");
+const { buildSnapshot } = require("./ContextService");
+const ChatSessionService = require("./ChatSessionService");
 
-// UI model id -> upstream DeepSeek model id.
-// Kept as a whitelist so a client cannot smuggle arbitrary model names
-// through to the provider.
 const MODEL_MAP = {
   "deepseek-v4-flash":    { apiModel: "deepseek-chat",     supportsTools: true  },
   "deepseek-v4-thinking": { apiModel: "deepseek-reasoner", supportsTools: false },
@@ -28,10 +30,11 @@ const MODEL_MAP = {
 
 const DEFAULT_MODEL_ID = "deepseek-v4-flash";
 
-// Only keep the last N messages so a very long history does not blow
-// past the model context window or run up cost unexpectedly.
 const HISTORY_LIMIT = 20;
 const CONTENT_LIMIT = 12000;
+const HISTORY_CONTENT_LIMIT = 100000;
+const MAX_ATTACHMENTS = 3;
+const ATTACHMENT_TEXT_LIMIT = 60000;
 
 function clampText(text, max) {
   if (typeof text !== "string") return text;
@@ -39,22 +42,59 @@ function clampText(text, max) {
   return text.slice(0, max);
 }
 
-function clampMessages(messages) {
-  const list = Array.isArray(messages) ? messages : [];
-  return list.slice(-HISTORY_LIMIT).map((m) => ({
-    role: m.role,
-    content: typeof m.content === "string" ? clampText(m.content, CONTENT_LIMIT) : m.content,
-    tool_calls: m.tool_calls,
-    tool_call_id: m.tool_call_id,
-  }));
+// Preserve tool_calls / tool_call_id so multi-round tool loops work.
+function clampAttachments(attachments) {
+  if (!Array.isArray(attachments)) return [];
+  return attachments.slice(0, MAX_ATTACHMENTS).map((attachment) => ({
+    name: clampText(String(attachment.name || "document"), 255),
+    mimeType: clampText(String(attachment.mimeType || "application/octet-stream"), 128),
+    size: Number.isFinite(Number(attachment.size)) ? Number(attachment.size) : 0,
+    text: clampText(String(attachment.text || ""), ATTACHMENT_TEXT_LIMIT),
+    truncated: Boolean(attachment.truncated),
+  })).filter((attachment) => attachment.text);
 }
 
-// Write one SSE data event.
+function contentWithAttachments(content, attachments) {
+  const base = typeof content === "string" ? clampText(content, CONTENT_LIMIT) : "";
+  const documents = clampAttachments(attachments);
+  if (!documents.length) return base;
+  const sections = documents.map((document) => [
+    `--- Uploaded document: ${document.name} ---`,
+    document.text,
+    `--- End document: ${document.name} ---`,
+  ].join("\n"));
+  return [base, ...sections].filter(Boolean).join("\n\n");
+}
+
+function clampMessages(messages) {
+  const list = Array.isArray(messages) ? messages : [];
+  let remaining = HISTORY_CONTENT_LIMIT;
+  const result = [];
+  const recent = list.slice(-HISTORY_LIMIT);
+  for (let i = recent.length - 1; i >= 0; i -= 1) {
+    const m = recent[i];
+    const expandedContent = contentWithAttachments(m.content, m.attachments);
+    const content = remaining > 0 ? clampText(expandedContent, remaining) : "[Earlier content omitted]";
+    remaining = Math.max(0, remaining - content.length);
+    const out = {
+      role: m.role,
+      content,
+    };
+    if (Array.isArray(m.tool_calls) && m.tool_calls.length > 0) {
+      out.tool_calls = m.tool_calls;
+    }
+    if (m.tool_call_id) {
+      out.tool_call_id = m.tool_call_id;
+    }
+    result.unshift(out);
+  }
+  return result;
+}
+
 function writeSse(res, payload) {
   res.write(`data: ${JSON.stringify(payload)}\n\n`);
 }
 
-// Configure the response for streaming SSE.
 function beginSse(res) {
   res.status(200);
   res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
@@ -65,37 +105,84 @@ function beginSse(res) {
   }
 }
 
-// Emit a small, deterministic mock stream so the UI works without an API key.
-// The chunk shape mimics the OpenAI/DeepSeek delta format so chat-client.js
-// can parse both real and mock streams with the same code path.
+// Best-effort chat session helpers.  Never throw — if MongoDB is not
+// available the chat should still work in-memory.
+//
+// If the client passes a sessionId, we save into that specific
+// conversation.  Different tabs / URLs isolate their history this way.
+// If sessionId is missing or invalid, we fall back to the latest
+// session (creating one if none exists).
+async function safeGetSession(sessionId) {
+  try {
+    if (sessionId) {
+      const s = await ChatSessionService.findById(sessionId);
+      if (s) return s;
+    }
+    return await ChatSessionService.getLatestSession();
+  } catch (err) {
+    console.warn("[ChatService] session unavailable:", err.message);
+    return null;
+  }
+}
+
+async function safeSaveMessage(session, role, content, attachments) {
+  if (!session || !content) return;
+  // ChatSession model only allows role "user" | "assistant".
+  if (role !== "user" && role !== "assistant") return;
+  try {
+    await ChatSessionService.addMessage(session._id, role, content, clampAttachments(attachments));
+  } catch (err) {
+    console.warn("[ChatService] failed to persist message:", err.message);
+  }
+}
+
+// Only persist the LAST user turn (not the entire history every time).
+function extractLastUserMessage(messages) {
+  const list = Array.isArray(messages) ? messages : [];
+  for (let i = list.length - 1; i >= 0; i -= 1) {
+    if (list[i].role === "user" && typeof list[i].content === "string") {
+      return list[i];
+    }
+  }
+  return null;
+}
+
+// Determine whether this request is the first turn of a user message
+// (worth persisting) or a follow-up tool round (already persisted).
+function isFollowUpToolRound(messages) {
+  const list = Array.isArray(messages) ? messages : [];
+  if (list.length === 0) return false;
+  return list[list.length - 1].role === "tool";
+}
+
 async function streamMock(input, res) {
   beginSse(res);
 
-  const lastUser = [...(input.messages || [])].reverse().find((m) => m.role === "user");
-  const echo = lastUser && typeof lastUser.content === "string" ? lastUser.content : "Hello!";
-  const reply = `Butler (mock mode): I received "${echo}". Configure DEEPSEEK_API_KEY in .env to enable the real model.`;
+  const lastUser = extractLastUserMessage(input.messages);
+  const echo = lastUser ? lastUser.content : "Hello!";
+  const reply = `Butler (mock mode): I received "${echo}". Configure DEEPSEEK_API_KEY in .env to enable tool calling against MongoDB.`;
 
   const words = reply.split(/(\s+)/);
   for (const chunk of words) {
-    writeSse(res, {
-      choices: [{ delta: { content: chunk }, finish_reason: null }],
-    });
-    // Small delay so the UI shows a streaming effect.
-    await new Promise((resolve) => setTimeout(resolve, 25));
+    writeSse(res, { choices: [{ delta: { content: chunk }, finish_reason: null }] });
+    await new Promise((resolve) => setTimeout(resolve, 20));
   }
   writeSse(res, { choices: [{ delta: {}, finish_reason: "stop" }] });
   res.write("data: [DONE]\n\n");
   res.end();
+
+  const session = await safeGetSession(input.sessionId);
+  if (session && !isFollowUpToolRound(input.messages)) {
+    if (lastUser) await safeSaveMessage(session, "user", lastUser.content, lastUser.attachments);
+    await safeSaveMessage(session, "assistant", reply);
+  }
 }
 
-// Real streaming path against the DeepSeek Chat Completions API.
-// We keep this dependency lazy so the server still boots when the
-// `openai` package is not installed.
 async function streamReal(input, res) {
   let OpenAI;
   try {
     OpenAI = require("openai").OpenAI;
-  } catch (err) {
+  } catch (_) {
     beginSse(res);
     writeSse(res, { error: "The 'openai' package is not installed. Run: npm install openai" });
     res.write("data: [DONE]\n\n");
@@ -106,8 +193,20 @@ async function streamReal(input, res) {
   const modelChoice = MODEL_MAP[input.model] || MODEL_MAP[DEFAULT_MODEL_ID];
   const useTools = input.includeTools !== false && modelChoice.supportsTools;
 
+  // Auto-inject the MongoDB snapshot on the FIRST turn only (not on
+  // follow-up tool rounds, where the snapshot would be stale anyway
+  // and the model already knows what it just did).
+  let contextSummary = input.contextSummary;
+  if (!isFollowUpToolRound(input.messages) && !contextSummary) {
+    try {
+      contextSummary = await buildSnapshot();
+    } catch (err) {
+      console.warn("[ChatService] snapshot unavailable:", err.message);
+    }
+  }
+
   const messages = [
-    { role: "system", content: buildSystemPrompt(input) },
+    { role: "system", content: buildSystemPrompt({ ...input, contextSummary }) },
     ...clampMessages((input.messages || []).filter((m) => m.role !== "system")),
   ];
 
@@ -137,10 +236,15 @@ async function streamReal(input, res) {
 
   beginSse(res);
   let hasEmitted = false;
+  let fullResponse = "";
   try {
     for await (const chunk of stream) {
       res.write(`data: ${JSON.stringify(chunk)}\n\n`);
       hasEmitted = true;
+      const delta = chunk.choices && chunk.choices[0] && chunk.choices[0].delta;
+      if (delta && typeof delta.content === "string") {
+        fullResponse += delta.content;
+      }
     }
   } catch (err) {
     if (!hasEmitted) {
@@ -149,17 +253,28 @@ async function streamReal(input, res) {
   } finally {
     res.write("data: [DONE]\n\n");
     res.end();
+
+    // Best-effort persistence.  Only on the first turn of a user
+    // message (not on tool follow-up rounds).
+    const session = await safeGetSession(input.sessionId);
+    if (session && !isFollowUpToolRound(input.messages)) {
+      const lastUser = extractLastUserMessage(input.messages);
+      if (lastUser) await safeSaveMessage(session, "user", lastUser.content, lastUser.attachments);
+    }
+    if (session && fullResponse) {
+      await safeSaveMessage(session, "assistant", fullResponse);
+    }
   }
 }
 
-// Public entry: pick real or mock based on env, then delegate.
 async function streamChat(input, res) {
   if (!Array.isArray(input.messages)) {
     res.status(400).json({ ok: false, error: "messages must be an array." });
     return;
   }
 
-  if (process.env.DEEPSEEK_API_KEY) {
+  const forceMock = /^(1|true|yes)$/i.test(process.env.CHAT_MOCK_MODE || "");
+  if (process.env.DEEPSEEK_API_KEY && !forceMock) {
     await streamReal(input, res);
   } else {
     await streamMock(input, res);

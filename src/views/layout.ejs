@@ -58,6 +58,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <link rel="icon" href="data:," />
     <meta name="theme-color" content="#f3eee0" />
     <title><%= pageTitle %></title>
     <script>
@@ -113,30 +114,39 @@
               <span class="pill-nav-label"><%= panel.label || label("nav.customPanel", "Custom panel") %></span>
             </a>
           <% }) %>
-
-          <button
-            class="pill-nav-item icon-only"
-            type="button"
-            data-action="create-custom-panel"
-            aria-label="<%= label("nav.newPanel", "New panel") %>"
-            title="<%= label("nav.newPanel", "New panel") %>"
-          >
-            <span aria-hidden="true">+</span>
-          </button>
         </nav>
 
         <div class="topbar-actions">
-          <form class="global-search" role="search" action="/search" method="get" data-global-search>
-            <label class="sr-only" for="global-search-input"><%= label("search.label", "Search") %></label>
-            <span class="search-icon" aria-hidden="true"></span>
-            <input
-              id="global-search-input"
-              name="q"
-              type="search"
-              autocomplete="off"
-              placeholder="<%= label("search.placeholder", "Search tasks, notes, chats") %>"
-              value="<%= value("searchQuery", "") %>"
-            />
+          <form
+              class="global-search"
+              role="search"
+              action="/search"
+              method="GET"
+              data-global-search
+          >
+
+              <label class="sr-only" for="global-search-input">
+                  <%= label("search.label", "Search") %>
+              </label>
+
+              <button
+                  type="submit"
+                  class="search-submit"
+                  aria-label="Search"
+              >
+                  <span class="search-icon" aria-hidden="true"></span>
+              </button>
+
+              <input
+                  id="global-search-input"
+                  name="q"
+                  type="search"
+                  autocomplete="off"
+                  spellcheck="false"
+                  placeholder="Search anything..."
+                  value="<%= value("searchQuery", "") %>"
+              />
+
           </form>
 
           <button
@@ -213,6 +223,116 @@
         </div>
       </header>
 
+      <div class="mini-apps-drawer" data-mini-apps-panel hidden>
+        <div class="mini-app-header">
+          <div>
+            <p class="mini-app-label">Learning tools</p>
+            <p class="mini-app-subtitle">Focus timer, study analytics, and share cards</p>
+          </div>
+          <button class="icon-button mini-app-close" type="button" data-close-mini-apps aria-label="Close learning tools">×</button>
+        </div>
+
+        <div class="mini-app-tabs">
+          <button type="button" class="mini-app-tab mini-app-tab-active" data-tab="focus">Focus on timing</button>
+          <button type="button" class="mini-app-tab" data-tab="stats">Learning Statistics</button>
+          <button type="button" class="mini-app-tab" data-tab="share">Share Card</button>
+        </div>
+
+        <div class="mini-app-panel" data-panel="focus">
+          <div class="focus-timer-panel">
+            <div class="focus-timer-circle">
+              <span class="focus-timer-label">FOCUS TIMER</span>
+              <strong class="focus-timer-time">25:00</strong>
+              <span class="focus-timer-state">Ready to begin</span>
+            </div>
+
+            <div class="focus-timer-actions">
+              <button class="glass-btn focus-timer-play" type="button">Start</button>
+              <button class="glass-btn focus-timer-reset" type="button">Reset</button>
+            </div>
+
+            <div class="focus-timer-presets">
+              <button class="glass-btn glass-btn-secondary" type="button" data-preset="25">25 min</button>
+              <button class="glass-btn glass-btn-secondary" type="button" data-preset="45">45 min</button>
+              <button class="glass-btn glass-btn-secondary" type="button" data-preset="60">60 min</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="mini-app-panel" data-panel="stats" hidden>
+          <div class="learning-stats-panel">
+            <div class="learning-stats-grid">
+              <div class="learning-stat-card stat-success">
+                <span>Completed</span>
+                <strong data-stat-completed>0</strong>
+              </div>
+              <div class="learning-stat-card stat-warning">
+                <span>In progress</span>
+                <strong data-stat-active>0</strong>
+              </div>
+            </div>
+            <div class="learning-stats-grid">
+              <div class="learning-stat-card stat-info">
+                <span>Upcoming</span>
+                <strong data-stat-upcoming>0</strong>
+              </div>
+              <div class="learning-stat-card stat-neutral">
+                <span>Study goal</span>
+                <strong>Keep focus strong</strong>
+              </div>
+            </div>
+            <div class="weekly-trend">
+              <div class="weekly-trend-header">
+                <span>7-day completion trend</span>
+                <strong class="weekly-trend-count" data-weekly-total>0 completed</strong>
+              </div>
+              <div class="weekly-trend-bars" data-weekly-bars></div>
+              <div class="weekly-trend-labels" data-weekly-labels></div>
+              <div class="weekly-trend-note" data-weekly-note></div>
+            </div>
+            <div class="tag-distribution">
+              <div class="tag-distribution-label">Task tag distribution</div>
+              <div class="tag-list" data-tag-list>
+                <span class="tag-empty">No tags yet. Add #tags to tasks to see distribution here.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mini-app-panel" data-panel="share" hidden>
+          <div class="share-card-shell">
+            <div class="share-card-header">
+              <div>
+                <div class="share-card-label">Butler • Study Summary</div>
+                <div class="share-card-date" data-share-date></div>
+              </div>
+              <div class="share-card-badge">B</div>
+            </div>
+            <div class="share-card-summary" data-share-summary>
+              Today I have completed 0 tasks and I’m working on 0 more.
+            </div>
+            <div class="share-card-metrics">
+              <div>
+                <span>Completed</span>
+                <strong data-share-completed>0</strong>
+              </div>
+              <div>
+                <span>In progress</span>
+                <strong data-share-active>0</strong>
+              </div>
+              <div>
+                <span>Upcoming</span>
+                <strong data-share-upcoming>0</strong>
+              </div>
+            </div>
+          </div>
+          <button class="glass-btn share-copy-button" type="button" data-share-copy>Copy share text</button>
+          <textarea class="share-card-text" data-share-text readonly></textarea>
+        </div>
+
+        <p class="mini-app-footer">Progress data is loaded from your current tasks.</p>
+      </div>
+
       <div class="layout-body">
         <button
           class="mobile-drawer-backdrop"
@@ -252,6 +372,7 @@
       </nav>
     </div>
 
+    <script src="/js/api.js" defer></script>
     <script src="/js/shell.js" defer></script>
   </body>
 </html>

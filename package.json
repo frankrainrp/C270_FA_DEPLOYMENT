@@ -5,15 +5,17 @@
   "main": "src/app.js",
   "scripts": {
     "start": "node src/app.js",
-    "test:ci": "node ci-validate.mjs"
+    "test": "node --test",
+    "test:ci": "node ci-validate.mjs && npm test"
   },
   "dependencies": {
-    "cookie-parser": "^1.4.6",
+    "dotenv": "^16.4.5",
     "ejs": "^3.1.10",
     "express": "^4.22.2",
-    "jsonwebtoken": "^9.0.0",
+    "mammoth": "^1.12.0",
     "mongoose": "^7.0.3",
     "multer": "^1.4.5-lts.1",
-    "node": "^26.4.0"
+    "openai": "^4.71.0",
+    "pdf-parse": "^1.1.1"
   }
 }
