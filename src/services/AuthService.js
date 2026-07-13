@@ -31,6 +31,22 @@ function getConfig() {
 }
 
 class AuthService {
+  assertProductionConfig() {
+    const { jwtSecret } = getConfig();
+    if (process.env.NODE_ENV === "production" && (!jwtSecret || jwtSecret === "change-me")) {
+      throw new Error("JWT_SECRET must be set to a strong, non-default value in production.");
+    }
+  }
+
+  issueSessionToken(user) {
+    const { jwtSecret } = getConfig();
+    return jwt.sign(
+      { sub: String(user._id), email: user.email, name: user.name },
+      jwtSecret,
+      { expiresIn: SESSION_TTL }
+    );
+  }
+
   /**
    * Calls the n8n "send-otp" webhook, stores the code it returns
    * server-side (with an expiry), and never forwards the code itself
@@ -112,7 +128,7 @@ class AuthService {
    * On success, promotes/updates the User record and issues a JWT.
    */
   async verifyOtp({ email, code }) {
-    const { maxAttempts, jwtSecret } = getConfig();
+    const { maxAttempts } = getConfig();
     const normalizedEmail = String(email || "").trim().toLowerCase();
     const submittedCode = String(code || "").trim();
 
@@ -159,11 +175,7 @@ class AuthService {
 
     await OtpChallenge.deleteOne({ _id: challenge._id });
 
-    const token = jwt.sign(
-      { sub: String(user._id), email: user.email, name: user.name },
-      jwtSecret,
-      { expiresIn: SESSION_TTL }
-    );
+    const token = this.issueSessionToken(user);
 
     return {
       token,

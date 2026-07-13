@@ -1,4 +1,5 @@
 const ChatSession = require("../models/ChatSession");
+const MAX_SESSION_MESSAGES = 100;
 
 class ChatSessionService {
   /**
@@ -47,6 +48,9 @@ class ChatSessionService {
       attachments: Array.isArray(attachments) && attachments.length ? attachments : undefined,
       timestamp: new Date(),
     });
+    if (session.messages.length > MAX_SESSION_MESSAGES) {
+      session.messages = session.messages.slice(-MAX_SESSION_MESSAGES);
+    }
 
     return await session.save();
   }

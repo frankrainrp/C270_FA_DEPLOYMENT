@@ -12,6 +12,7 @@ const TaskSchema = new mongoose.Schema(
       lowercase: true,
       index: true,
     },
+    idempotencyKey: { type: String, trim: true, default: undefined },
     title: {
       type: String,
       required: [true, "Task title is required"],
@@ -41,5 +42,7 @@ const TaskSchema = new mongoose.Schema(
     timestamps: true, // Adds createdAt and updatedAt
   }
 );
+
+TaskSchema.index({ ownerEmail: 1, idempotencyKey: 1 }, { unique: true, sparse: true });
 
 module.exports = mongoose.model("Task", TaskSchema);

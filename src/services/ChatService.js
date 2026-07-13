@@ -38,6 +38,7 @@ const CONTENT_LIMIT = 12000;
 const HISTORY_CONTENT_LIMIT = 100000;
 const MAX_ATTACHMENTS = 3;
 const ATTACHMENT_TEXT_LIMIT = 60000;
+const PERSISTED_ATTACHMENT_TEXT_LIMIT = 12000;
 
 function clampText(text, max) {
   if (typeof text !== "string") return text;
@@ -45,13 +46,13 @@ function clampText(text, max) {
   return text.slice(0, max);
 }
 
-function clampAttachments(attachments) {
+function clampAttachments(attachments, textLimit = ATTACHMENT_TEXT_LIMIT) {
   if (!Array.isArray(attachments)) return [];
   return attachments.slice(0, MAX_ATTACHMENTS).map((attachment) => ({
     name: clampText(String(attachment.name || "document"), 255),
     mimeType: clampText(String(attachment.mimeType || "application/octet-stream"), 128),
     size: Number.isFinite(Number(attachment.size)) ? Number(attachment.size) : 0,
-    text: clampText(String(attachment.text || ""), ATTACHMENT_TEXT_LIMIT),
+    text: clampText(String(attachment.text || ""), textLimit),
     truncated: Boolean(attachment.truncated),
   })).filter((attachment) => attachment.text);
 }
@@ -134,7 +135,13 @@ async function safeSaveMessage(session, role, content, ownerEmail, attachments) 
   // ChatSession model only allows role "user" | "assistant".
   if (role !== "user" && role !== "assistant") return;
   try {
-    await ChatSessionService.addMessage(session._id, role, content, ownerEmail, clampAttachments(attachments));
+    await ChatSessionService.addMessage(
+      session._id,
+      role,
+      content,
+      ownerEmail,
+      clampAttachments(attachments, PERSISTED_ATTACHMENT_TEXT_LIMIT)
+    );
   } catch (err) {
     console.warn("[ChatService] failed to persist message:", err.message);
   }
@@ -168,6 +175,7 @@ async function streamMock(input, res) {
 
   const words = reply.split(/(\s+)/);
   for (const chunk of words) {
+    if (input.signal && input.signal.aborted) return;
     writeSse(res, { choices: [{ delta: { content: chunk }, finish_reason: null }] });
     await new Promise((resolve) => setTimeout(resolve, 20));
   }
@@ -229,7 +237,7 @@ async function streamReal(input, res) {
       stream: true,
       temperature: 0.4,
       max_tokens: 2048,
-    });
+    }, input.signal ? { signal: input.signal } : undefined);
   } catch (err) {
     beginSse(res);
     writeSse(res, { error: err && err.message ? err.message : "Failed to reach model." });
@@ -251,12 +259,17 @@ async function streamReal(input, res) {
       }
     }
   } catch (err) {
+    if (input.signal && input.signal.aborted) return;
     if (!hasEmitted) {
       writeSse(res, { error: err && err.message ? err.message : "Stream failed." });
     }
   } finally {
-    res.write("data: [DONE]\n\n");
-    res.end();
+    const aborted = Boolean(input.signal && input.signal.aborted);
+    if (!res.destroyed && !res.writableEnded) {
+      res.write("data: [DONE]\n\n");
+      res.end();
+    }
+    if (aborted) return;
 
     // Best-effort persistence.  Only on the first turn of a user
     // message (not on tool follow-up rounds).
@@ -265,7 +278,7 @@ async function streamReal(input, res) {
       const lastUser = extractLastUserMessage(input.messages);
       if (lastUser) await safeSaveMessage(session, "user", lastUser.content, input.ownerEmail, lastUser.attachments);
     }
-    if (session && fullResponse) {
+    if (session && fullResponse && !aborted) {
       await safeSaveMessage(session, "assistant", fullResponse, input.ownerEmail);
     }
   }

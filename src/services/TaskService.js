@@ -4,9 +4,19 @@ class TaskService {
   /**
    * Create a new task, owned by ownerEmail.
    */
-  async create(taskData, ownerEmail) {
-    const task = new Task({ ...taskData, ownerEmail });
-    return await task.save();
+  async create(taskData, ownerEmail, idempotencyKey) {
+    if (idempotencyKey) {
+      const existing = await Task.findOne({ ownerEmail, idempotencyKey });
+      if (existing) return existing;
+    }
+    try {
+      return await new Task({ ...taskData, ownerEmail, idempotencyKey: idempotencyKey || undefined }).save();
+    } catch (err) {
+      if (err && err.code === 11000 && idempotencyKey) {
+        return await Task.findOne({ ownerEmail, idempotencyKey });
+      }
+      throw err;
+    }
   }
 
   /**

@@ -32,6 +32,7 @@
   var documentInput = document.querySelector("[data-document-input]");
   var documentPick = document.querySelector("[data-document-pick]");
   var documentList = document.querySelector("[data-document-list]");
+  var statusEl = document.querySelector("[data-chat-status]");
 
   if (!stream || !form || !input || !sendBtn) return;
 
@@ -57,12 +58,95 @@
   }
 
   // ---------- DOM helpers ----------
-  function scrollToEnd() {
-    stream.scrollTop = stream.scrollHeight;
+  function isNearEnd() {
+    return stream.scrollHeight - stream.scrollTop - stream.clientHeight < 120;
+  }
+
+  function scrollToEnd(force) {
+    if (force || isNearEnd()) stream.scrollTop = stream.scrollHeight;
+  }
+
+  function setStatus(message) {
+    if (statusEl) statusEl.textContent = message || "";
   }
 
   function hideEmptyBlock() {
     if (emptyBlock) emptyBlock.hidden = true;
+  }
+
+  function appendInlineMarkdown(parent, text) {
+    var pattern = /(\*\*[^*]+\*\*|`[^`]+`)/g;
+    var cursor = 0;
+    var match;
+    while ((match = pattern.exec(text)) !== null) {
+      if (match.index > cursor) parent.appendChild(document.createTextNode(text.slice(cursor, match.index)));
+      var token = match[0];
+      var node = token.indexOf("**") === 0
+        ? document.createElement("strong")
+        : document.createElement("code");
+      node.textContent = token.indexOf("**") === 0 ? token.slice(2, -2) : token.slice(1, -1);
+      parent.appendChild(node);
+      cursor = match.index + token.length;
+    }
+    if (cursor < text.length) parent.appendChild(document.createTextNode(text.slice(cursor)));
+  }
+
+  function renderMessageContent(bubble, text) {
+    var lines = String(text || "").replace(/\r\n/g, "\n").split("\n");
+    var fragment = document.createDocumentFragment();
+    var list = null;
+    var codeLines = null;
+
+    function finishList() { list = null; }
+    function finishCode() {
+      if (!codeLines) return;
+      var pre = document.createElement("pre");
+      var code = document.createElement("code");
+      code.textContent = codeLines.join("\n");
+      pre.appendChild(code);
+      fragment.appendChild(pre);
+      codeLines = null;
+    }
+
+    lines.forEach(function (line) {
+      if (/^```/.test(line)) {
+        finishList();
+        if (codeLines) finishCode();
+        else codeLines = [];
+        return;
+      }
+      if (codeLines) {
+        codeLines.push(line);
+        return;
+      }
+      if (!line.trim()) {
+        finishList();
+        return;
+      }
+
+      var listMatch = line.match(/^\s*(-|\*)\s+(.+)$/);
+      var orderedMatch = line.match(/^\s*\d+[.)]\s+(.+)$/);
+      if (listMatch || orderedMatch) {
+        var tag = orderedMatch ? "ol" : "ul";
+        if (!list || list.tagName.toLowerCase() !== tag) {
+          list = document.createElement(tag);
+          fragment.appendChild(list);
+        }
+        var item = document.createElement("li");
+        appendInlineMarkdown(item, (orderedMatch || listMatch)[orderedMatch ? 1 : 2]);
+        list.appendChild(item);
+        return;
+      }
+
+      finishList();
+      var heading = line.match(/^(#{1,3})\s+(.+)$/);
+      var block = document.createElement(heading ? "h" + heading[1].length : "p");
+      appendInlineMarkdown(block, heading ? heading[2] : line);
+      fragment.appendChild(block);
+    });
+    finishCode();
+    bubble.replaceChildren(fragment);
+    bubble.classList.add("chat-markdown");
   }
 
   function appendMessageBubble(role, text) {
@@ -71,13 +155,25 @@
 
     var bubble = document.createElement("div");
     bubble.className = "chat-bubble " + (role === "user" ? "chat-bubble-user" : "chat-bubble-ai");
-    bubble.textContent = text;
+    bubble.setAttribute("data-message-content", "");
+    renderMessageContent(bubble, text);
 
     row.appendChild(bubble);
     stream.appendChild(row);
-    scrollToEnd();
+    scrollToEnd(true);
     return bubble;
   }
+
+  function appendErrorBubble(text) {
+    var bubble = appendMessageBubble("assistant", text);
+    bubble.setAttribute("role", "alert");
+    bubble.classList.add("chat-bubble-error");
+    return bubble;
+  }
+
+  document.querySelectorAll("[data-message-content]").forEach(function (bubble) {
+    renderMessageContent(bubble, bubble.textContent || "");
+  });
 
   function appendToolNotice(text) {
     var row = document.createElement("div");
@@ -91,7 +187,7 @@
 
     row.appendChild(bubble);
     stream.appendChild(row);
-    scrollToEnd();
+    scrollToEnd(true);
   }
 
   function setStreamingState(streaming) {
@@ -99,7 +195,9 @@
     sendBtn.disabled = streaming;
     stopBtn.hidden = !streaming;
     input.disabled = false;
+    form.setAttribute("aria-busy", streaming ? "true" : "false");
     if (documentPick) documentPick.disabled = streaming;
+    promptCards.forEach(function (card) { card.disabled = streaming; });
   }
 
   function autoResize(el) {
@@ -147,12 +245,13 @@
       signal: signal,
       callbacks: {
         onContentDelta: function (delta) {
+          var stickToBottom = isNearEnd();
           if (!localBubble) {
             localBubble = appendMessageBubble("assistant", "");
             pendingBubble = localBubble;
           }
           localBubble.textContent += delta;
-          scrollToEnd();
+          if (stickToBottom) scrollToEnd(true);
         },
         onToolCall: function (call) {
           console.info("[chat] tool call:", call.function && call.function.name);
@@ -161,16 +260,13 @@
           assistantMsg = msg;
         },
         onError: function (err) {
-          if (localBubble) {
-            localBubble.textContent = "Butler could not answer: " + (err && err.message ? err.message : "unknown error");
-          } else {
-            appendMessageBubble("assistant", "Butler could not answer: " + (err && err.message ? err.message : "unknown error"));
-          }
+          console.warn("[chat] stream error:", err && err.message ? err.message : err);
         },
       },
     });
 
     pendingBubble = null;
+    if (localBubble) renderMessageContent(localBubble, assistantMsg && assistantMsg.content ? assistantMsg.content : localBubble.textContent);
     return assistantMsg || { role: "assistant", content: "" };
   }
 
@@ -270,15 +366,14 @@
       var footer = document.createElement("div");
       footer.className = "tool-confirm-footer";
       footer.innerHTML =
-        '<button class="tool-confirm-accept-all" type="button" data-action="accept-all">' +
-          '<span>✓</span> Accept All</button>' +
-        '<button class="tool-confirm-decline-all" type="button" data-action="decline-all">' +
-          '<span>✗</span> Decline All</button>';
+        '<button class="tool-confirm-accept-all" type="button" data-action="accept-all">Accept all</button>' +
+        '<button class="tool-confirm-decline-all" type="button" data-action="decline-all">Decline all</button>';
       card.appendChild(footer);
 
       row.appendChild(card);
       stream.appendChild(row);
-      scrollToEnd();
+      scrollToEnd(true);
+      setStatus("Review the proposed changes before they run.");
 
       function checkDone() {
         var allDecided = items.every(function (it) { return it.accepted !== null; });
@@ -320,6 +415,11 @@
   }
 
   // ---------- Tool execution ----------
+  function requiresConfirmation(call) {
+    var name = call && call.function && call.function.name;
+    return /_(create|update|delete|toggle|toggle_pin)$/.test(name || "");
+  }
+
   async function runToolCalls(toolCalls) {
     if (!window.ButlerToolExecutor) {
       console.warn("[chat] tool executor missing; skipping", toolCalls.length, "tool calls");
@@ -328,33 +428,39 @@
       });
     }
 
-    // Show confirmation card and wait for user decisions
-    var decision = await showConfirmationCard(toolCalls);
+    var writeCalls = toolCalls.filter(requiresConfirmation);
+    var decision = writeCalls.length
+      ? await showConfirmationCard(writeCalls)
+      : { accepted: [], declined: [] };
+    var acceptedIds = new Set(decision.accepted.map(function (call) { return call.id; }));
+    var declinedIds = new Set(decision.declined.map(function (call) { return call.id; }));
 
     var results = [];
 
-    // Execute accepted calls
-    for (var i = 0; i < decision.accepted.length; i += 1) {
-      var call = decision.accepted[i];
+    // Read-only calls run immediately. Write calls only run after approval.
+    for (var i = 0; i < toolCalls.length; i += 1) {
+      var call = toolCalls[i];
+      if (declinedIds.has(call.id)) {
+        results.push({
+          tool_call_id: call.id,
+          content: JSON.stringify({ ok: false, error: "User declined this action." }),
+        });
+        continue;
+      }
+      if (requiresConfirmation(call) && !acceptedIds.has(call.id)) continue;
       var name = call.function && call.function.name;
-      appendToolNotice("Executing " + name + "...");
+      appendToolNotice((requiresConfirmation(call) ? "Applying " : "Reading ") + name + "...");
+      setStatus(requiresConfirmation(call) ? "Applying approved change." : "Reading your workspace.");
       var content = await ButlerToolExecutor.execute(call);
       results.push({ tool_call_id: call.id, content: content });
     }
-
-    // Return decline results for rejected calls
-    decision.declined.forEach(function (call) {
-      results.push({
-        tool_call_id: call.id,
-        content: JSON.stringify({ ok: false, error: "User declined this action." }),
-      });
-    });
 
     return results;
   }
 
   // ---------- Main send flow ----------
   async function sendMessage(text) {
+    if (ButlerState.get().isStreaming) return;
     var trimmed = String(text || "").trim();
     if (!trimmed && selectedDocuments.length === 0) return;
 
@@ -376,6 +482,7 @@
     autoResize(input);
 
     setStreamingState(true);
+    setStatus("Butler is responding.");
     abortController = new AbortController();
 
     try {
@@ -405,10 +512,15 @@
       if (round >= MAX_TOOL_ROUNDS) {
         appendToolNotice("Reached tool-call limit (" + MAX_TOOL_ROUNDS + "). Stopping.");
       }
+      setStatus("Response complete.");
     } catch (err) {
-      if (!(err && (err.name === "AbortError" || err.name === "DOMException"))) {
+      if (err && (err.name === "AbortError" || err.name === "DOMException")) {
+        appendToolNotice("Generation stopped.");
+        setStatus("Generation stopped.");
+      } else {
         console.error("[chat] send failed:", err);
-        appendMessageBubble("assistant", "Butler could not answer: " + (err && err.message ? err.message : "unknown error"));
+        appendErrorBubble("Butler could not answer. " + (err && err.message ? err.message : "Try again."));
+        setStatus("The response failed. You can try again.");
       }
     } finally {
       pendingBubble = null;
@@ -420,6 +532,7 @@
   // ---------- Event wiring ----------
   form.addEventListener("submit", function (event) {
     event.preventDefault();
+    if (ButlerState.get().isStreaming) return;
     sendMessage(input.value);
   });
 
@@ -469,6 +582,7 @@
       var files = Array.from(documentInput.files || []).slice(0, Math.max(0, 3 - selectedDocuments.length));
       documentPick.disabled = true;
       documentPick.textContent = "Decoding...";
+      setStatus("Decoding selected documents.");
       try {
         for (var i = 0; i < files.length; i += 1) {
           selectedDocuments.push(await uploadDocument(files[i]));
@@ -476,6 +590,7 @@
         }
       } catch (err) {
         appendToolNotice("Document upload failed: " + err.message);
+        setStatus("A document could not be decoded. Remove it or try another file.");
       } finally {
         documentInput.value = "";
         documentPick.disabled = false;
@@ -487,6 +602,7 @@
   input.addEventListener("keydown", function (event) {
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
+      if (ButlerState.get().isStreaming) return;
       sendMessage(input.value);
     }
   });
@@ -499,6 +615,7 @@
 
   promptCards.forEach(function (card) {
     card.addEventListener("click", function () {
+      if (ButlerState.get().isStreaming) return;
       var prompt = card.getAttribute("data-prompt") || "";
       input.value = prompt;
       autoResize(input);

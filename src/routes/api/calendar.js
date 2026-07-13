@@ -104,7 +104,7 @@ router.post("/", async (req, res) => {
       color,
       tag,
       allDay,
-    }, req.sessionUser.email);
+    }, req.sessionUser.email, req.get("Idempotency-Key"));
 
     res.status(201).json(makeOk({ event }));
   } catch (err) {

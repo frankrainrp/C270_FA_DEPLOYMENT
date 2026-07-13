@@ -71,7 +71,7 @@ router.post("/", async (req, res) => {
       description,
       dueDate,
       priority,
-    }, req.sessionUser.email);
+    }, req.sessionUser.email, req.get("Idempotency-Key"));
 
     res.status(201).json(makeOk({ task }));
   } catch (err) {

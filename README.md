@@ -112,8 +112,7 @@ Browser
 - `User.js` stores the verified login identity (email, name, last login).
 - `OtpChallenge.js` holds a pending emailed code server-side (with expiry
   and attempt tracking) until it's verified or expires.
-- `UserProfile.js` is the still-shared (not yet per-account) Task 6 demo
-  profile: avatar, plan, and simulated credits.
+- `UserProfile.js` stores each account's avatar, plan, and simulated credits.
 
 ### `src/routes/`
 
@@ -145,7 +144,7 @@ Browser
 - `DocumentDecodeService.js` extracts safe text from supported documents.
 - `TaskService.js`, `NoteService.js`, and `CalendarService.js` own database
   operations for their respective domains, scoped by `ownerEmail`.
-- `UserProfileService.js` manages the shared Task 6 demo profile/billing.
+- `UserProfileService.js` manages account-scoped profile and billing data.
 - `RailService.js` builds real sidebar data from persisted records.
 
 ### `src/public/js/`
@@ -170,17 +169,18 @@ Browser
    current MongoDB snapshot scoped to the caller's account, and creates the
    authoritative system prompt.
 4. DeepSeek returns SSE content and optional tool-call fragments.
-5. The browser reconstructs complete tool calls and displays a confirmation
-   card.
-6. Approved calls go through `tool-executor.js` to the matching REST endpoint,
-   which is only reachable while logged in.
+5. The browser reconstructs complete tool calls. Read-only tools run directly;
+   write tools display a confirmation card.
+6. Approved writes go through `tool-executor.js` with an idempotency key to the
+   matching authenticated REST endpoint.
 7. The REST route calls its service, which reads or writes MongoDB filtered
    by `ownerEmail`.
 8. Tool results are appended as `role: "tool"` messages and sent back to the
    model for a natural-language confirmation.
 9. The loop stops when no tool calls remain or after six tool rounds.
 10. User and assistant messages are saved in the active chat session, owned
-    by the current account.
+    by the current account. Stored history and attachment text are bounded so
+    a single MongoDB session document cannot grow indefinitely.
 
 ## Document decoding flow
 

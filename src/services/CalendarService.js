@@ -4,9 +4,23 @@ class CalendarService {
   /**
    * Create a new calendar event, owned by ownerEmail.
    */
-  async create(eventData, ownerEmail) {
-    const event = new CalendarEvent({ ...eventData, ownerEmail });
-    return await event.save();
+  async create(eventData, ownerEmail, idempotencyKey) {
+    if (idempotencyKey) {
+      const existing = await CalendarEvent.findOne({ ownerEmail, idempotencyKey });
+      if (existing) return existing;
+    }
+    try {
+      return await new CalendarEvent({
+        ...eventData,
+        ownerEmail,
+        idempotencyKey: idempotencyKey || undefined,
+      }).save();
+    } catch (err) {
+      if (err && err.code === 11000 && idempotencyKey) {
+        return await CalendarEvent.findOne({ ownerEmail, idempotencyKey });
+      }
+      throw err;
+    }
   }
 
   /**

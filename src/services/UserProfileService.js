@@ -10,25 +10,33 @@ const MAX_HISTORY = 20;
 
 class UserProfileService {
   /**
-   * There is no multi-user auth yet, so the whole app shares a single
-   * profile document.  Create it with sane defaults on first access.
+   * Load or create the profile that belongs to one authenticated account.
    */
-  async getOrCreate() {
-    let profile = await UserProfile.findOne();
+  async getOrCreate(ownerEmail) {
+    if (!ownerEmail) throw new Error("ownerEmail is required");
+    const normalizedOwner = String(ownerEmail).trim().toLowerCase();
+    let profile = await UserProfile.findOne({ ownerEmail: normalizedOwner });
     if (!profile) {
-      profile = await UserProfile.create({});
+      try {
+        profile = await UserProfile.create({ ownerEmail: normalizedOwner, email: normalizedOwner });
+      } catch (err) {
+        if (err && err.code === 11000) {
+          profile = await UserProfile.findOne({ ownerEmail: normalizedOwner });
+        } else {
+          throw err;
+        }
+      }
     }
     return profile;
   }
 
   /**
-   * Update the editable profile fields (name, email).
+   * Update editable profile fields for one account.
    * Runs full Mongoose validation so bad input never reaches the DB.
    */
-  async updateProfile({ name, email } = {}) {
-    const profile = await this.getOrCreate();
+  async updateProfile(ownerEmail, { name } = {}) {
+    const profile = await this.getOrCreate(ownerEmail);
     if (typeof name !== "undefined") profile.name = String(name).trim();
-    if (typeof email !== "undefined") profile.email = String(email).trim().toLowerCase();
     await profile.save(); // throws ValidationError on bad name/email
     return profile;
   }
@@ -38,8 +46,8 @@ class UserProfileService {
    * File-type / size validation happens in the multer layer before
    * this is ever called (see routes/api/profile.js).
    */
-  async setAvatar(avatarUrl) {
-    const profile = await this.getOrCreate();
+  async setAvatar(ownerEmail, avatarUrl) {
+    const profile = await this.getOrCreate(ownerEmail);
     profile.avatarUrl = avatarUrl;
     await profile.save();
     return profile;
@@ -48,13 +56,13 @@ class UserProfileService {
   /**
    * Simulated credit top-up.  Only accepts whitelisted preset amounts.
    */
-  async addCredits(amount, note) {
+  async addCredits(ownerEmail, amount, note) {
     const numericAmount = Number(amount);
     if (!TOPUP_PRESETS.includes(numericAmount)) {
       throw new Error(`Invalid top-up amount. Choose one of: ${TOPUP_PRESETS.join(", ")}`);
     }
 
-    const profile = await this.getOrCreate();
+    const profile = await this.getOrCreate(ownerEmail);
     profile.credits += numericAmount;
     profile.history.unshift({
       type: "topup",
@@ -69,13 +77,13 @@ class UserProfileService {
   /**
    * Simulated plan change (Free / Pro / Max). No real payment involved.
    */
-  async setPlan(plan) {
+  async setPlan(ownerEmail, plan) {
     const ALLOWED = ["free", "pro", "max"];
     if (!ALLOWED.includes(plan)) {
       throw new Error(`Invalid plan. Must be one of: ${ALLOWED.join(", ")}`);
     }
 
-    const profile = await this.getOrCreate();
+    const profile = await this.getOrCreate(ownerEmail);
     const previousPlan = profile.plan;
     profile.plan = plan;
     profile.history.unshift({

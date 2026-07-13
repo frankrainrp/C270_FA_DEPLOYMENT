@@ -21,6 +21,7 @@ const ChatSessionService = require("../services/ChatSessionService");
 const UserProfileService = require("../services/UserProfileService");
 const AuthService = require("../services/AuthService");
 const { requireAuthPage, getSessionUser } = require("../middleware/requireAuth");
+const { serializeForInlineScript } = require("../lib/safeJson");
 const {
   buildTasksRail,
   buildNotesRail,
@@ -42,9 +43,10 @@ const router = express.Router();
 // -----------------------------------------------------------
 async function loadAuthContext(req) {
   const sessionUser = req.sessionUser || getSessionUser(req);
+  if (!sessionUser) return { isLoggedIn: false };
 
   try {
-    const profile = await UserProfileService.getOrCreate();
+    const profile = await UserProfileService.getOrCreate(sessionUser.email);
     return {
       authProfile: {
         name: (sessionUser && sessionUser.name) || profile.name,
@@ -114,13 +116,17 @@ async function renderChatPage(req, res, session, sessions) {
     }))
     : [];
   const authContext = await loadAuthContext(req);
+  const initialChatStateJson = serializeForInlineScript({
+    messages: initialMessages,
+    activeSessionId,
+  });
 
   renderLayout(res, {
     title: "Chat",
     activeNav: "chat",
     page: "chat",
     rail: { sessions, activeSessionId },
-    pageLocals: { initialMessages, activeSessionId },
+    pageLocals: { initialMessages, activeSessionId, initialChatStateJson },
     ...authContext,
   });
 }
@@ -435,11 +441,11 @@ router.get("/preferences", (_req, res) => {
 // a session it falls back to the original Task 6 shared demo
 // profile, fully editable, so existing local testing still works.
 // -----------------------------------------------------------
-router.get("/settings", async (req, res) => {
-  const sessionUser = getSessionUser(req);
+router.get("/settings", requireAuthPage, async (req, res) => {
+  const sessionUser = req.sessionUser;
   let profile = null;
   try {
-    profile = await UserProfileService.getOrCreate();
+    profile = await UserProfileService.getOrCreate(sessionUser.email);
   } catch (err) {
     console.warn("[pages] /settings profile unavailable:", err.message);
   }
@@ -462,10 +468,10 @@ router.get("/settings", async (req, res) => {
   });
 });
 
-router.get("/billing", async (_req, res) => {
+router.get("/billing", requireAuthPage, async (req, res) => {
   let profile = null;
   try {
-    profile = await UserProfileService.getOrCreate();
+    profile = await UserProfileService.getOrCreate(req.sessionUser.email);
   } catch (err) {
     console.warn("[pages] /billing profile unavailable:", err.message);
   }
@@ -483,10 +489,10 @@ router.get("/billing", async (_req, res) => {
   });
 });
 
-router.get("/pricing", async (_req, res) => {
+router.get("/pricing", requireAuthPage, async (req, res) => {
   let profile = null;
   try {
-    profile = await UserProfileService.getOrCreate();
+    profile = await UserProfileService.getOrCreate(req.sessionUser.email);
   } catch (err) {
     console.warn("[pages] /pricing profile unavailable:", err.message);
   }

@@ -12,9 +12,23 @@ function normalizeNoteInput(data) {
 }
 
 class NoteService {
-  async create(noteData, ownerEmail) {
-    const note = new Note({ ...normalizeNoteInput(noteData), ownerEmail });
-    return await note.save();
+  async create(noteData, ownerEmail, idempotencyKey) {
+    if (idempotencyKey) {
+      const existing = await Note.findOne({ ownerEmail, idempotencyKey });
+      if (existing) return existing;
+    }
+    try {
+      return await new Note({
+        ...normalizeNoteInput(noteData),
+        ownerEmail,
+        idempotencyKey: idempotencyKey || undefined,
+      }).save();
+    } catch (err) {
+      if (err && err.code === 11000 && idempotencyKey) {
+        return await Note.findOne({ ownerEmail, idempotencyKey });
+      }
+      throw err;
+    }
   }
 
   async findAll(filter = "all", ownerEmail) {

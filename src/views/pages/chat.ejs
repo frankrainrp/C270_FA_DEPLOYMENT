@@ -21,7 +21,7 @@
 
 <section class="chat-shell" data-chat-root>
   <!-- Message stream. New messages are appended by chat-ui.js at runtime. -->
-  <div class="message-stream" data-message-stream>
+  <div class="message-stream" data-message-stream aria-label="Conversation">
     <% if (initialMessagesList.length === 0) { %>
       <div class="chat-empty" data-chat-empty>
         <% if (greetLoggedIn && greetName) { %>
@@ -57,7 +57,7 @@
 
     <% initialMessagesList.forEach(function(msg) { %>
       <div class="message-row <%= msg.role === 'user' ? 'user' : 'ai' %>">
-        <div class="chat-bubble <%= msg.role === 'user' ? 'chat-bubble-user' : 'chat-bubble-ai' %>">
+        <div class="chat-bubble <%= msg.role === 'user' ? 'chat-bubble-user' : 'chat-bubble-ai' %>" data-message-content>
           <%= msg.content || "" %>
         </div>
       </div>
@@ -67,7 +67,7 @@
   <!-- Composer: textarea + send button.  chat-ui.js wires up the events. -->
   <div class="chat-composer">
     <form class="composer-box" data-composer autocomplete="off">
-      <div class="composer-attachments" data-document-list hidden></div>
+      <div class="composer-attachments" data-document-list aria-live="polite" hidden></div>
       <textarea
         rows="1"
         name="message"
@@ -100,16 +100,14 @@
       </div>
     </form>
   </div>
+  <div class="sr-only" data-chat-status role="status" aria-live="polite"></div>
 </section>
 
 <script>
   // Hand SSR-rendered chat history to the client so ButlerState is
   // seeded before chat-ui.js sends its first message.  Without this,
   // subsequent turns would forget everything before the reload.
-  window.__BUTLER_INIT__ = {
-    messages: <%- JSON.stringify(initialMessagesList) %>,
-    activeSessionId: <%- JSON.stringify((locals && locals.activeSessionId) || null) %>,
-  };
+  window.__BUTLER_INIT__ = <%- initialChatStateJson %>;
 </script>
 <script src="/js/app-state.js" defer></script>
 <script src="/js/api.js" defer></script>

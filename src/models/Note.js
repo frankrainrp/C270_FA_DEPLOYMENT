@@ -11,6 +11,7 @@ const NoteSchema = new mongoose.Schema(
       lowercase: true,
       index: true,
     },
+    idempotencyKey: { type: String, trim: true, default: undefined },
     title: {
       type: String,
       required: [true, "Note title is required"],
@@ -35,5 +36,7 @@ const NoteSchema = new mongoose.Schema(
     timestamps: true,
   }
 );
+
+NoteSchema.index({ ownerEmail: 1, idempotencyKey: 1 }, { unique: true, sparse: true });
 
 module.exports = mongoose.model("Note", NoteSchema);

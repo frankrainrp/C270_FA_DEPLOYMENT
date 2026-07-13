@@ -68,8 +68,16 @@ router.post("/session", async (req, res) => {
 });
 
 router.post("/", async (req, res, next) => {
+  const controller = new AbortController();
+  res.on("close", () => {
+    if (!res.writableEnded) controller.abort();
+  });
   try {
-    await streamChat({ ...(req.body || {}), ownerEmail: req.sessionUser.email }, res);
+    await streamChat({
+      ...(req.body || {}),
+      ownerEmail: req.sessionUser.email,
+      signal: controller.signal,
+    }, res);
   } catch (err) {
     // If the stream already started, headers are gone and we can only log.
     if (!res.headersSent) {

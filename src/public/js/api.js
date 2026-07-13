@@ -8,11 +8,12 @@
 (function initApi() {
   var API_BASE = "/api";
 
-  async function request(method, path, body) {
+  async function request(method, path, body, options) {
+    var extraHeaders = options && options.headers ? options.headers : {};
     var res = await fetch(API_BASE + path, {
       method: method,
       credentials: "same-origin",
-      headers: { "Content-Type": "application/json" },
+      headers: Object.assign({ "Content-Type": "application/json" }, extraHeaders),
       body: body === undefined ? undefined : JSON.stringify(body),
     });
 
@@ -32,7 +33,7 @@
 
   window.ButlerApi = {
     get:    function (path)       { return request("GET",    path); },
-    post:   function (path, body) { return request("POST",   path, body); },
+    post:   function (path, body, options) { return request("POST", path, body, options); },
     put:    function (path, body) { return request("PUT",    path, body); },
     patch:  function (path, body) { return request("PATCH",  path, body); },
     del:    function (path)       { return request("DELETE", path); },

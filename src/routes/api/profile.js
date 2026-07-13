@@ -23,6 +23,7 @@
 
 const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
 const express = require("express");
 const multer = require("multer");
 
@@ -30,8 +31,10 @@ const UserProfileService = require("../../services/UserProfileService");
 const AuthService = require("../../services/AuthService");
 const User = require("../../models/User");
 const { makeOk, makeFail, runSafe } = require("../../lib/apiResponse");
+const { requireAuthApi } = require("../../middleware/requireAuth");
 
 const router = express.Router();
+router.use(requireAuthApi);
 
 // ------------------------------------------------------------------
 // Upload target: src/public/uploads/avatars.  "uploads/" is gitignored
@@ -42,13 +45,20 @@ const UPLOAD_DIR = path.join(__dirname, "..", "..", "public", "uploads", "avatar
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
 const ALLOWED_MIME = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
+const MIME_EXTENSION = {
+  "image/png": ".png",
+  "image/jpeg": ".jpg",
+  "image/webp": ".webp",
+  "image/gif": ".gif",
+};
 const MAX_AVATAR_BYTES = 2 * 1024 * 1024; // 2 MB
 
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, UPLOAD_DIR),
-  filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase() || ".jpg";
-    cb(null, `avatar-${Date.now()}${ext}`);
+  filename: (req, file, cb) => {
+    const ownerHash = crypto.createHash("sha256").update(req.sessionUser.email).digest("hex").slice(0, 16);
+    const ext = MIME_EXTENSION[file.mimetype] || ".jpg";
+    cb(null, `avatar-${ownerHash}-${crypto.randomUUID()}${ext}`);
   },
 });
 
@@ -64,35 +74,20 @@ const upload = multer({
   },
 });
 
-function getSessionUser(req) {
-  const token = req.cookies ? req.cookies.butler_session : null;
-  return AuthService.verifySessionToken(token);
-}
-
 /**
  * GET /api/profile
  */
 router.get("/", runSafe(async (req, res) => {
-  const sessionUser = getSessionUser(req);
-  const sharedProfile = await UserProfileService.getOrCreate();
-
-  const profile = sessionUser
-    ? {
-        name: sessionUser.name,
-        email: sessionUser.email,
-        avatarUrl: sharedProfile.avatarUrl,
-        plan: sharedProfile.plan,
-        credits: sharedProfile.credits,
-        emailEditable: false,
-      }
-    : {
-        name: sharedProfile.name,
-        email: sharedProfile.email,
-        avatarUrl: sharedProfile.avatarUrl,
-        plan: sharedProfile.plan,
-        credits: sharedProfile.credits,
-        emailEditable: true,
-      };
+  const sessionUser = req.sessionUser;
+  const storedProfile = await UserProfileService.getOrCreate(sessionUser.email);
+  const profile = {
+    name: sessionUser.name,
+    email: sessionUser.email,
+    avatarUrl: storedProfile.avatarUrl,
+    plan: storedProfile.plan,
+    credits: storedProfile.credits,
+    emailEditable: false,
+  };
 
   res.json(makeOk({ profile }));
 }));
@@ -105,34 +100,32 @@ router.get("/", runSafe(async (req, res) => {
  */
 router.put("/", async (req, res) => {
   try {
-    const { name, email } = req.body;
-    const sessionUser = getSessionUser(req);
+    const { name } = req.body;
+    const sessionUser = req.sessionUser;
 
     if (typeof name !== "undefined" && !String(name).trim()) {
       return res.status(400).json(makeFail("Name cannot be empty."));
     }
 
-    if (sessionUser) {
-      const updatedUser = await User.findOneAndUpdate(
-        { email: sessionUser.email },
-        { name: String(name || "").trim() },
-        { new: true, runValidators: true }
-      );
-      return res.json(makeOk({
-        profile: {
-          name: updatedUser.name,
-          email: updatedUser.email,
-          emailEditable: false,
-        },
-      }));
-    }
-
-    if (typeof email !== "undefined" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email).trim())) {
-      return res.status(400).json(makeFail("Enter a valid email address."));
-    }
-
-    const profile = await UserProfileService.updateProfile({ name, email });
-    res.json(makeOk({ profile: { ...profile.toObject(), emailEditable: true } }));
+    const updatedUser = await User.findOneAndUpdate(
+      { email: sessionUser.email },
+      { name: String(name || "").trim() },
+      { new: true, runValidators: true, upsert: true, setDefaultsOnInsert: true }
+    );
+    await UserProfileService.updateProfile(sessionUser.email, { name });
+    res.cookie("butler_session", AuthService.issueSessionToken(updatedUser), {
+      httpOnly: true,
+      sameSite: "lax",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      secure: process.env.NODE_ENV === "production",
+    });
+    return res.json(makeOk({
+      profile: {
+        name: updatedUser.name,
+        email: updatedUser.email,
+        emailEditable: false,
+      },
+    }));
   } catch (err) {
     const message = err.name === "ValidationError"
       ? Object.values(err.errors).map((e) => e.message).join(" ")
@@ -162,7 +155,7 @@ router.post("/avatar", (req, res) => {
 
     try {
       const publicUrl = `/uploads/avatars/${req.file.filename}`;
-      const profile = await UserProfileService.setAvatar(publicUrl);
+      const profile = await UserProfileService.setAvatar(req.sessionUser.email, publicUrl);
       res.status(201).json(makeOk({ profile, avatarUrl: publicUrl }));
     } catch (saveErr) {
       console.error("[api/profile] avatar save error:", saveErr);

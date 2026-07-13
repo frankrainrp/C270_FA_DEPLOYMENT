@@ -36,6 +36,14 @@ const CreditEventSchema = new mongoose.Schema(
 
 const UserProfileSchema = new mongoose.Schema(
   {
+    ownerEmail: {
+      type: String,
+      required: [true, "ownerEmail is required"],
+      trim: true,
+      lowercase: true,
+      unique: true,
+      index: true,
+    },
     name: {
       type: String,
       required: [true, "Name is required"],

@@ -13,14 +13,16 @@
 const express = require("express");
 const UserProfileService = require("../../services/UserProfileService");
 const { makeOk, makeFail, runSafe } = require("../../lib/apiResponse");
+const { requireAuthApi } = require("../../middleware/requireAuth");
 
 const router = express.Router();
+router.use(requireAuthApi);
 
 /**
  * GET /api/billing
  */
-router.get("/", runSafe(async (_req, res) => {
-  const profile = await UserProfileService.getOrCreate();
+router.get("/", runSafe(async (req, res) => {
+  const profile = await UserProfileService.getOrCreate(req.sessionUser.email);
   res.json(makeOk({
     plan: profile.plan,
     credits: profile.credits,
@@ -36,7 +38,7 @@ router.get("/", runSafe(async (_req, res) => {
 router.post("/topup", async (req, res) => {
   try {
     const { amount } = req.body;
-    const profile = await UserProfileService.addCredits(amount);
+    const profile = await UserProfileService.addCredits(req.sessionUser.email, amount);
     res.status(201).json(makeOk({
       credits: profile.credits,
       history: profile.history,
@@ -54,7 +56,7 @@ router.post("/topup", async (req, res) => {
 router.post("/plan", async (req, res) => {
   try {
     const { plan } = req.body;
-    const profile = await UserProfileService.setPlan(plan);
+    const profile = await UserProfileService.setPlan(req.sessionUser.email, plan);
     res.status(201).json(makeOk({
       plan: profile.plan,
       history: profile.history,

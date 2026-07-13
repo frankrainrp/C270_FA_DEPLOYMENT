@@ -30,6 +30,9 @@ try {
 
 const mountRoutes = require("./routes");
 const { makeFail } = require("./lib/apiResponse");
+const AuthService = require("./services/AuthService");
+
+AuthService.assertProductionConfig();
 
 const app = express();
 

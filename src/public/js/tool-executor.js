@@ -41,15 +41,21 @@
   // Map tool_name -> async (args) => any.
   // Each handler returns a JSON-serialisable value which is passed
   // back to the model as the tool result.
+  function idempotencyOptions(call) {
+    return call && call.id
+      ? { headers: { "Idempotency-Key": String(call.id) } }
+      : undefined;
+  }
+
   var HANDLERS = {
     // ---------- TASKS ----------
-    task_create: function (args) {
+    task_create: function (args, call) {
       return ButlerApi.post("/tasks", {
         title:       args.title,
         description: args.description,
         dueDate:     args.dueDate,
         priority:    args.priority,
-      });
+      }, idempotencyOptions(call));
     },
     task_update: function (args) {
       return ButlerApi.put("/tasks/" + args.id, {
@@ -71,13 +77,13 @@
     },
 
     // ---------- NOTES ----------
-    note_create: function (args) {
+    note_create: function (args, call) {
       return ButlerApi.post("/notes", {
         title:   args.title,
         content: args.content,
         tags:    args.tags,
         pinned:  args.pinned,
-      });
+      }, idempotencyOptions(call));
     },
     note_update: function (args) {
       return ButlerApi.put("/notes/" + args.id, {
@@ -98,7 +104,7 @@
     },
 
     // ---------- CALENDAR ----------
-    event_create: function (args) {
+    event_create: function (args, call) {
       return ButlerApi.post("/calendar", {
         title:       args.title,
         date:        args.date,
@@ -106,7 +112,7 @@
         color:       args.color,
         tag:         args.tag,
         allDay:      args.allDay,
-      });
+      }, idempotencyOptions(call));
     },
     event_update: function (args) {
       return ButlerApi.put("/calendar/" + args.id, {
@@ -161,7 +167,7 @@
     var args = parseArgs(call.function && call.function.arguments);
 
     try {
-      var data = await handler(args);
+      var data = await handler(args, call);
       if (WRITE_TOOLS.test(name)) dispatchChanged(name);
       return JSON.stringify({ ok: true, data: data });
     } catch (err) {

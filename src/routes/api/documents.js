@@ -3,8 +3,10 @@ const multer = require("multer");
 
 const { makeOk, makeFail } = require("../../lib/apiResponse");
 const { extractText } = require("../../services/DocumentDecodeService");
+const { requireAuthApi } = require("../../middleware/requireAuth");
 
 const router = express.Router();
+router.use(requireAuthApi);
 
 function maxUploadBytes() {
   const megabytes = Number(process.env.DOCUMENT_MAX_MB);

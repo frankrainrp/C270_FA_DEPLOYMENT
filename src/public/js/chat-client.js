@@ -100,6 +100,7 @@
             if (chunk.error) {
               var chunkErr = new Error(chunk.error);
               if (cb.onError) cb.onError(chunkErr);
+              throw chunkErr;
             } else if (chunk.choices && chunk.choices[0]) {
               var delta = chunk.choices[0].delta || {};
 

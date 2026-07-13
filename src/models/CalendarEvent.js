@@ -11,6 +11,7 @@ const CalendarEventSchema = new mongoose.Schema(
       lowercase: true,
       index: true,
     },
+    idempotencyKey: { type: String, trim: true, default: undefined },
     title: {
       type: String,
       required: [true, "Event title is required"],
@@ -48,5 +49,6 @@ const CalendarEventSchema = new mongoose.Schema(
 
 // Index on date for efficient calendar queries
 CalendarEventSchema.index({ date: 1 });
+CalendarEventSchema.index({ ownerEmail: 1, idempotencyKey: 1 }, { unique: true, sparse: true });
 
 module.exports = mongoose.model("CalendarEvent", CalendarEventSchema);
