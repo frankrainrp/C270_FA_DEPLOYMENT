@@ -19,10 +19,12 @@ function mockChatRail() {
   };
 }
 
-// Tasks rail: view counters and current view.
+// Tasks rail: the /tasks route overrides taskCounts + taskView with real
+// values from tasksStore.  These defaults just keep the sidebar sane if
+// the rail is ever rendered without that route filling them in.
 function mockTasksRail() {
   return {
-    taskCounts: { active: 4, in_progress: 2, upcoming: 3, all: 12, completed: 6 },
+    taskCounts: {},
     taskView: "active",
   };
 }
