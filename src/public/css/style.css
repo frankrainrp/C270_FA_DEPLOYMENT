@@ -513,6 +513,21 @@ html[data-theme="dark"] .pill-nav {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 18%, transparent);
 }
 
+/* Transparent overlay button that holds the magnifying-glass icon.
+   Without this the button renders with default browser chrome and shows
+   as a stray box over the search bar. */
+.search-submit {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: 36px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
 .search-icon {
   position: absolute;
   left: 13px;

@@ -5,7 +5,10 @@
     Note data comes from MongoDB via pages.js.
   */
   const list = Array.isArray(locals.notes) ? locals.notes : [];
-  const active = list[0] || { _id: "", title: "", content: "", updatedAt: null };
+  // Prefer the note picked via /notes/:id (e.g. a sidebar "Pinned Notes"
+  // link); otherwise fall back to the first note, or a blank draft.
+  const active = locals.activeNote || list[0] ||
+    { _id: "", title: "", content: "", updatedAt: null };
 
   function previewOf(n) {
     const body = String((n && n.content) || "").trim();
@@ -45,14 +48,13 @@
           placeholder="Search notes"
           aria-label="Search notes"
         />
-        <button class="glass-btn glass-btn-primary" type="button" data-new-note>New</button>
       </div>
     </header>
 
     <% if (list.length === 0) { %>
       <div style="padding: 20px; color: var(--color-text-muted);">
-        No notes yet.  Click <strong>New</strong>, or ask Butler in
-        <a href="/chat">chat</a>.
+        No notes yet.  Click <strong>New Note</strong> in the sidebar, or ask
+        Butler in <a href="/chat">chat</a>.
       </div>
     <% } %>
 
@@ -60,15 +62,13 @@
       const preview = previewOf(n);
     %>
       <button
-        class="note-list-item <%= i === 0 ? 'active' : '' %>"
+        class="note-list-item <%= String(n._id) === String(active._id) ? 'active' : '' %>"
         type="button"
         data-note-id="<%= n._id %>"
         data-note-title="<%= n.title || '' %>"
         data-note-preview="<%= preview %>"
-        data-note-body="<%= n.content || '' %>"
-        data-note-updated="<%= fmtUpdated(n.updatedAt) %>"
       >
-        <strong><%= n.title || 'Untitled' %><% if (n.pinned) { %> ★<% } %></strong>
+        <strong><%= n.title || 'Untitled' %><% if (n.pinned) { %> ●<% } %></strong>
         <p><%= preview %></p>
       </button>
     <% }) %>
@@ -92,8 +92,23 @@
           data-note-title
         />
       </div>
-      <button id="save-note-btn" class="glass-btn glass-btn-primary" type="button" data-note-save>Save</button>
-      <button class="glass-btn" type="button" data-note-delete>Delete</button>
+      <!-- Actions grouped together and pushed to the right (the toolbar is
+           flex + space-between, so this whole group sits on the right edge).
+           All three reuse the global "pill-nav-item active" class - the exact
+           same dark-green pill used by the nav bar tabs (no new CSS needed). -->
+      <div class="note-editor-actions" style="display: flex; gap: 8px; align-items: center;">
+        <button id="save-note-btn" class="pill-nav-item active" type="button" data-note-save>Save</button>
+
+        <!-- Pin / Unpin this note. Clicking flips the note's `pinned` flag in
+             MongoDB (PATCH /api/notes/:id/toggle). The label + circle show the
+             current state; a pinned note appears under the sidebar "Pinned"
+             filter (● = pinned, ○ = not pinned, matching the sidebar icons). -->
+        <button id="note-pin-btn" class="pill-nav-item active" type="button" data-note-pin>
+          <%= active.pinned ? "● Unpin" : "○ Pin" %>
+        </button>
+
+        <button class="pill-nav-item active" type="button" data-note-delete>Delete</button>
+      </div>
     </div>
     <div class="note-editor-meta">
       <span id="note-updated-label">Updated <%= fmtUpdated(active.updatedAt) %></span>

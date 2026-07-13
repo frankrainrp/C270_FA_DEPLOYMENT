@@ -184,11 +184,6 @@
         <% if (noteCount("pinned") > 0) { %><span class="sidebar-count"><%= noteCount("pinned") %></span><% } %>
       </a>
 
-      <a class="sidebar-item" href="/notes?linked=1">
-        <span class="sidebar-item-icon link-icon" aria-hidden="true"></span>
-        <span class="sidebar-item-label"><%= L("rail.notes.linked", "Linked to tasks") %></span>
-        <% if (noteCount("linked") > 0) { %><span class="sidebar-count"><%= noteCount("linked") %></span><% } %>
-      </a>
     </section>
 
     <section class="sidebar-section" aria-labelledby="sidebar-pinned-notes">

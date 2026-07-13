@@ -233,24 +233,52 @@ router.get("/tasks", async (_req, res, next) => {
 });
 
 // -----------------------------------------------------------
-// Notes: load real notes from MongoDB, populate sidebar too.
+// New Note: create a blank note in MongoDB, then open it in the
+// editor. The sidebar "New Note" button links here. Because notes
+// are sorted newest-first, the fresh note lands at the top and is
+// selected automatically after the redirect.
 // -----------------------------------------------------------
-router.get("/notes", async (_req, res, next) => {
+router.get("/notes/new", async (_req, res, next) => {
   try {
-    const notes = await NoteService.findAll("all");
-    const plain = notes.map((n) => n.toObject());
-    const rail = await buildNotesRail(notes);
-
-    renderLayout(res, {
-      title: "Notes",
-      activeNav: "notes",
-      page: "note",
-      rail,
-      pageLocals: { notes: plain },
-    });
+    await NoteService.create({ title: "Untitled note", content: "" });
+    res.redirect("/notes");
   } catch (err) {
     next(err);
   }
+});
+
+// -----------------------------------------------------------
+// Shared renderer for the Notes page (used by /notes and /notes/:id).
+// The sidebar counts always reflect ALL notes; `onlyPinned` limits the
+// visible list; `activeId` (optional) opens that note in the editor
+// (note.ejs falls back to the first note when it's null).
+// -----------------------------------------------------------
+async function renderNotesPage(res, { onlyPinned = false, activeId = null } = {}) {
+  const allNotes = await NoteService.findAll("all");
+  const notes = (onlyPinned ? allNotes.filter((n) => n.pinned) : allNotes)
+    .map((n) => n.toObject());
+  const activeNote = activeId
+    ? notes.find((n) => String(n._id) === activeId) || notes[0] || null
+    : null;
+
+  renderLayout(res, {
+    title: "Notes",
+    activeNav: "notes",
+    page: "note",
+    rail: await buildNotesRail(allNotes),
+    pageLocals: { notes, activeNote },
+  });
+}
+
+// Notes list. "?pinned=1" (the sidebar "Pinned" filter) shows pinned only.
+router.get("/notes", (req, res, next) => {
+  renderNotesPage(res, { onlyPinned: req.query.pinned === "1" }).catch(next);
+});
+
+// Open one note by id (the sidebar "Pinned Notes" links point here).
+// Defined AFTER "/notes/new" so "new" matches its own route, not :id.
+router.get("/notes/:id", (req, res, next) => {
+  renderNotesPage(res, { activeId: req.params.id }).catch(next);
 });
 
 // -----------------------------------------------------------
