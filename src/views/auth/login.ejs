@@ -1,0 +1,298 @@
+<%
+  /*
+    auth/login.ejs
+    Standalone login/signup page. Does NOT use layout.ejs so we can
+    keep it decoupled from the main app shell.
+
+    Rebuilt as a single self-contained centered card (same pattern as
+    preferences.ejs / billing.ejs / pricing.ejs / achievements.ejs)
+    instead of depending on the shared .auth-paper-* two-column
+    classes in style.css, which weren't rendering correctly.
+
+    Two-step email + OTP flow, backed by /api/auth/request-otp and
+    /api/auth/verify-otp (see src/services/AuthService.js). There is
+    no password: the email step sends a 6-digit code by email via the
+    "send-otp" n8n workflow, and the code step exchanges it for a
+    session cookie.
+
+    Locals:
+    - title   (browser tab title)
+    - theme   (paper | dark | retro)
+    - lang    (en | zh)
+    - nextUrl (where to redirect after a successful login)
+  */
+  const pageTitle = typeof title !== "undefined" ? title : "Sign in — Butler";
+  const themeName = typeof theme !== "undefined" ? theme : "retro";
+  const langCode = typeof lang !== "undefined" ? lang : "en";
+  const redirectTarget = typeof nextUrl !== "undefined" && nextUrl ? nextUrl : "/chat";
+%>
+<!doctype html>
+<html lang="<%= langCode %>" data-theme="<%= themeName %>">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="data:," />
+    <meta name="theme-color" content="#f3eee0" />
+    <title><%= pageTitle %></title>
+    <script>
+      (function () {
+        try {
+          var saved = localStorage.getItem("butler-theme");
+          if (saved === "paper" || saved === "retro" || saved === "dark") {
+            document.documentElement.setAttribute("data-theme", saved);
+          }
+        } catch (_) { /* ignore */ }
+      })();
+    </script>
+    <link rel="stylesheet" href="/css/style.css" />
+    <style>
+      .login-shell {
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 32px 20px;
+        background: var(--color-bg);
+      }
+      .login-card {
+        width: min(420px, 100%);
+        padding: 32px;
+        border: 1px solid var(--glass-border);
+        border-radius: var(--radius-modal);
+        background: var(--glass-bg-strong);
+        backdrop-filter: var(--glass-blur);
+        -webkit-backdrop-filter: var(--glass-blur);
+        box-shadow: var(--shadow-card-hover);
+      }
+      .login-brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 22px;
+        color: var(--color-text);
+        font-family: var(--font-display);
+        font-size: 19px;
+        font-weight: 800;
+      }
+      .login-brand-mark {
+        width: 32px;
+        height: 32px;
+        border-radius: 9px;
+        background: var(--color-primary);
+      }
+      .login-head h1 {
+        margin: 0 0 4px;
+        color: var(--color-text);
+        font-family: var(--font-display);
+        font-size: 26px;
+      }
+      .login-head p {
+        margin: 0 0 20px;
+        color: var(--color-text-muted);
+        font-size: 13px;
+      }
+      .login-google-btn {
+        width: 100%;
+        height: 42px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        border: 1px solid var(--color-border-soft);
+        border-radius: 12px;
+        background: var(--color-surface);
+        color: var(--color-text-muted);
+        font-weight: 700;
+        font-size: 13px;
+        cursor: not-allowed;
+        opacity: 0.7;
+        margin-bottom: 18px;
+      }
+      .login-divider {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 18px;
+        color: var(--color-text-faint);
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.6px;
+      }
+      .login-divider::before,
+      .login-divider::after {
+        content: "";
+        flex: 1;
+        height: 1px;
+        background: var(--color-border-soft);
+      }
+      .login-error {
+        margin: 0 0 14px;
+        padding: 10px 12px;
+        border-radius: 10px;
+        color: var(--color-danger);
+        background: var(--color-danger-soft);
+        font-size: 13px;
+      }
+      .login-form {
+        display: grid;
+        gap: 14px;
+      }
+      .login-field {
+        display: grid;
+        gap: 6px;
+        color: var(--color-text-muted);
+        font-size: 12px;
+        font-weight: 700;
+      }
+      .login-field small {
+        text-transform: none;
+        font-weight: 500;
+        color: var(--color-text-faint);
+      }
+      .login-field input {
+        height: 42px;
+        padding: 0 12px;
+        border: 1px solid var(--color-border-soft);
+        border-radius: 12px;
+        background: var(--color-surface);
+        color: var(--color-text);
+        font-size: 14px;
+      }
+      .login-field input:focus {
+        outline: none;
+        border-color: var(--color-primary);
+      }
+      .otp-code-input {
+        letter-spacing: 6px;
+        font-size: 20px;
+        font-weight: 700;
+        text-align: center;
+      }
+      .login-submit {
+        height: 42px;
+        border: 0;
+        border-radius: 12px;
+        color: #ffffff;
+        background: var(--color-primary);
+        font-weight: 800;
+        font-size: 14px;
+        cursor: pointer;
+      }
+      .login-submit:hover {
+        background: var(--color-primary-hover);
+      }
+      .login-submit:disabled {
+        opacity: 0.68;
+        cursor: not-allowed;
+      }
+      .login-resend-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 12px;
+        color: var(--color-text-muted);
+      }
+      .login-resend-row button {
+        background: none;
+        border: 0;
+        color: var(--color-primary);
+        font-weight: 700;
+        font-size: 12px;
+        cursor: pointer;
+        padding: 0;
+      }
+      .login-resend-row button:disabled {
+        color: var(--color-text-faint);
+        cursor: not-allowed;
+      }
+      .login-note {
+        margin: 18px 0 0;
+        color: var(--color-text-faint);
+        font-size: 11px;
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="login-shell">
+      <section class="login-card">
+        <div class="login-brand">
+          <span class="login-brand-mark" aria-hidden="true"></span>
+          <span>Butler</span>
+        </div>
+
+        <!-- Step 1: enter email (+ name for new accounts), request a code. -->
+        <div data-step="email">
+          <div class="login-head">
+            <h1>Welcome</h1>
+            <p>Sign in or create an account with just your email.</p>
+          </div>
+
+          <button class="login-google-btn" type="button" disabled title="Coming soon">
+            Continue with Google
+          </button>
+
+          <p class="login-divider">or use email</p>
+
+          <p class="login-error" data-email-error hidden></p>
+
+          <form class="login-form" data-email-form>
+            <label class="login-field">
+              <span>Name <small>(only needed the first time)</small></span>
+              <input type="text" name="name" autocomplete="name" placeholder="Your name" />
+            </label>
+
+            <label class="login-field">
+              <span>Email</span>
+              <input type="email" name="email" required autocomplete="email" placeholder="you@example.com" />
+            </label>
+
+            <button class="login-submit" type="submit" data-email-submit>Send code</button>
+          </form>
+        </div>
+
+        <!-- Step 2: enter the 6-digit code emailed by the send-otp workflow. -->
+        <div data-step="code" hidden>
+          <div class="login-head">
+            <h1>Check your email</h1>
+            <p>Enter the 6-digit code we sent to <strong data-code-email>your email</strong>.</p>
+          </div>
+
+          <p class="login-error" data-code-error hidden></p>
+
+          <form class="login-form" data-code-form>
+            <label class="login-field">
+              <span>Verification code</span>
+              <input
+                class="otp-code-input"
+                type="text"
+                name="code"
+                inputmode="numeric"
+                pattern="[0-9]*"
+                maxlength="6"
+                autocomplete="one-time-code"
+                placeholder="000000"
+                required
+              />
+            </label>
+
+            <button class="login-submit" type="submit" data-code-submit>Verify & sign in</button>
+
+            <div class="login-resend-row">
+              <button type="button" data-change-email>Use a different email</button>
+              <button type="button" data-resend-code>Resend code</button>
+            </div>
+          </form>
+        </div>
+
+        <p class="login-note">By continuing you agree this is a coursework demo — no real account data leaves this app.</p>
+      </section>
+    </main>
+
+    <script>
+      window.__BUTLER_LOGIN__ = { nextUrl: <%- JSON.stringify(redirectTarget) %> };
+    </script>
+    <script src="/js/api.js" defer></script>
+    <script src="/js/auth-login.js" defer></script>
+  </body>
+</html>

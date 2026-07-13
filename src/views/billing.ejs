@@ -1,0 +1,254 @@
+<%
+  /*
+    billing.ejs
+    Standalone Billing page. Shows the current simulated plan, credit
+    usage this cycle, and a simulated invoice history from
+    BillingService.js. There is no real payment gateway wired up yet
+    (see comments in that file) — everything here is a mock so the
+    UI/UX can ship ahead of that decision.
+  */
+  const pageTitle = typeof title !== "undefined" ? title : "Billing — Butler";
+  const langCode = typeof lang !== "undefined" ? lang : "en";
+  const acct = typeof account !== "undefined" && account ? account : {};
+  const plan = acct.plan || { id: "free", name: "Free", price: 0, period: "forever", credits: 0 };
+  const creditsUsed = Number(acct.creditsUsed || 0);
+  const creditsLimit = Number(acct.creditsLimit || plan.credits || 0);
+  const creditsPct = creditsLimit > 0 ? Math.min(Math.round((creditsUsed / creditsLimit) * 100), 100) : 0;
+  const history = Array.isArray(acct.history) ? acct.history : [];
+  const didUpgrade = typeof upgraded !== "undefined" && upgraded;
+%>
+<!doctype html>
+<html lang="<%= langCode %>" data-theme="retro">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="data:," />
+    <meta name="theme-color" content="#f3eee0" />
+    <title><%= pageTitle %></title>
+    <script>
+      (function () {
+        try {
+          var saved = localStorage.getItem("butler-theme");
+          if (saved === "paper" || saved === "retro" || saved === "dark") {
+            document.documentElement.setAttribute("data-theme", saved);
+          }
+        } catch (_) { /* ignore */ }
+      })();
+    </script>
+    <link rel="stylesheet" href="/css/style.css" />
+    <style>
+      .pref-shell {
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 32px 20px;
+        background: var(--color-bg);
+      }
+      .pref-card {
+        width: min(880px, 100%);
+        padding: 28px;
+        border: 1px solid var(--glass-border);
+        border-radius: var(--radius-modal);
+        background: var(--glass-bg-strong);
+        backdrop-filter: var(--glass-blur);
+        -webkit-backdrop-filter: var(--glass-blur);
+        box-shadow: var(--shadow-card-hover);
+      }
+      .pref-header {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 6px;
+      }
+      .pref-header h1 {
+        margin: 0;
+        color: var(--color-text);
+        font-family: var(--font-display);
+        font-size: 30px;
+      }
+      .account-subnav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 2px 0 22px;
+      }
+      .account-subnav a {
+        padding: 6px 12px;
+        border-radius: var(--radius-pill);
+        border: 1px solid var(--color-border-soft);
+        color: var(--color-text-muted);
+        font-size: 12px;
+        font-weight: 700;
+        text-decoration: none;
+        background: var(--color-surface);
+      }
+      .account-subnav a.active {
+        color: #ffffff;
+        background: var(--color-primary);
+        border-color: transparent;
+      }
+      .pref-section-title {
+        margin: 6px 0 12px;
+        color: var(--color-text-faint);
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.8px;
+        text-transform: uppercase;
+      }
+      .upgrade-banner {
+        margin: 0 0 18px;
+        padding: 10px 14px;
+        border-radius: 10px;
+        background: var(--color-success-soft);
+        color: var(--color-success-strong);
+        font-size: 13px;
+        font-weight: 700;
+      }
+      .plan-summary {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        padding: 18px;
+        border-radius: var(--radius-card);
+        border: 1px solid var(--color-border-soft);
+        background: var(--color-surface);
+        margin-bottom: 22px;
+      }
+      .plan-summary-name {
+        margin: 0;
+        color: var(--color-text);
+        font-family: var(--font-display);
+        font-size: 24px;
+      }
+      .plan-summary-sub {
+        margin: 4px 0 0;
+        color: var(--color-text-muted);
+        font-size: 13px;
+      }
+      .credits-block {
+        margin-bottom: 24px;
+      }
+      .credits-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 8px;
+        font-size: 13px;
+        color: var(--color-text-muted);
+      }
+      .credits-bar-track {
+        height: 10px;
+        border-radius: 999px;
+        background: var(--color-border-soft);
+        overflow: hidden;
+      }
+      .credits-bar-fill {
+        height: 100%;
+        border-radius: 999px;
+        background: var(--color-primary);
+      }
+      .history-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+      .history-table th {
+        text-align: left;
+        color: var(--color-text-faint);
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+        padding: 8px 10px;
+        border-bottom: 1px solid var(--color-border-soft);
+      }
+      .history-table td {
+        padding: 10px;
+        border-bottom: 1px solid var(--color-border-soft);
+        color: var(--color-text);
+      }
+      .history-empty {
+        padding: 18px;
+        text-align: center;
+        color: var(--color-text-muted);
+        font-size: 13px;
+        border: 1px dashed var(--color-border-soft);
+        border-radius: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="pref-shell">
+      <section class="pref-card">
+        <header class="pref-header">
+          <h1>Billing</h1>
+          <a href="/chat">← Back to Butler</a>
+        </header>
+
+        <nav class="account-subnav" aria-label="Account settings">
+          <a href="/billing" class="active">Billing</a>
+          <a href="/preferences">Preferences</a>
+          <a href="/achievements">Achievements</a>
+          <a href="/pricing">Upgrade</a>
+        </nav>
+
+        <% if (didUpgrade) { %>
+          <p class="upgrade-banner">Plan updated — you're now on <%= plan.name %>. (Simulated, no card charged.)</p>
+        <% } %>
+
+        <div class="plan-summary">
+          <div>
+            <h2 class="plan-summary-name"><%= plan.name %> plan</h2>
+            <p class="plan-summary-sub">
+              <% if (plan.price > 0) { %>
+                $<%= plan.price %> / <%= plan.period %><% if (acct.renewsOn) { %> · renews <%= new Date(acct.renewsOn).toLocaleDateString() %><% } %>
+              <% } else { %>
+                No cost, no renewal date.
+              <% } %>
+            </p>
+          </div>
+          <a class="glass-btn glass-btn-primary" href="/pricing">Change plan</a>
+        </div>
+
+        <div class="credits-block">
+          <h2 class="pref-section-title">AI credits this cycle</h2>
+          <div class="credits-row">
+            <span><%= creditsUsed %> used of <%= creditsLimit %></span>
+            <span><%= creditsPct %>%</span>
+          </div>
+          <div class="credits-bar-track">
+            <div class="credits-bar-fill" style="width: <%= creditsPct %>%"></div>
+          </div>
+        </div>
+
+        <h2 class="pref-section-title">Billing history</h2>
+        <% if (history.length === 0) { %>
+          <div class="history-empty">No billing activity yet. Everything on Butler is currently simulated.</div>
+        <% } else { %>
+          <table class="history-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Description</th>
+                <th>Amount</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% history.forEach((item) => { %>
+                <tr>
+                  <td><%= new Date(item.date).toLocaleDateString() %></td>
+                  <td><%= item.description %></td>
+                  <td><%= item.amount > 0 ? "$" + item.amount : "—" %></td>
+                  <td><%= item.status %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        <% } %>
+      </section>
+    </main>
+  </body>
+</html>

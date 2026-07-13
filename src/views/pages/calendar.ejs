@@ -1,0 +1,144 @@
+<%
+  /*
+    pages/calendar.ejs
+    Calendar workspace with a month grid, event pills, and a detail panel
+    for the selected day.
+    Event data comes from MongoDB via pages.js.
+  */
+  const events = Array.isArray(locals.events) ? locals.events : [];
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = today.getMonth();
+  const monthLabel = today.toLocaleDateString("en", { month: "long", year: "numeric" });
+  
+  // Weekday header labels shown above the grid.
+  const weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstDayJs = new Date(year, month, 1).getDay(); // 0 = Sunday
+  const leading = (firstDayJs + 6) % 7; // shift so Monday is column 0
+
+  const colorVar = {
+    red: "var(--color-danger)",
+    orange: "var(--color-warning)",
+    yellow: "var(--color-warning)",
+    green: "var(--color-success, #3d8b6e)",
+    blue: "var(--color-primary)",
+    purple: "var(--color-accent)",
+    gray: "var(--color-text-muted)",
+  };
+
+  // Group events by ISO date (YYYY-MM-DD) for O(1) lookup per cell.
+  const byDate = {};
+  events.forEach(function(e) {
+    if (!e.date) return;
+    const dt = new Date(e.date);
+    if (isNaN(dt.getTime())) return;
+    const key = dt.getFullYear() + "-" +
+                String(dt.getMonth() + 1).padStart(2, "0") + "-" +
+                String(dt.getDate()).padStart(2, "0");
+    (byDate[key] = byDate[key] || []).push(e);
+  });
+
+  const cells = [];
+  for (let i = 0; i < leading; i += 1) {
+    cells.push({ label: "", muted: true, empty: true, events: [] });
+  }
+  for (let d = 1; d <= daysInMonth; d += 1) {
+    const iso = year + "-" + String(month + 1).padStart(2, "0") + "-" + String(d).padStart(2, "0");
+    cells.push({
+      label: String(d),
+      isToday: d === today.getDate(),
+      iso: iso,
+      events: byDate[iso] || [],
+    });
+  }
+  while (cells.length % 7 !== 0) {
+    cells.push({ label: "", muted: true, empty: true, events: [] });
+  }
+
+  const todayIso = year + "-" + String(month + 1).padStart(2, "0") + "-" + String(today.getDate()).padStart(2, "0");
+  const todayEvents = byDate[todayIso] || [];
+  const selectedDate = todayEvents[0]
+    ? { day: today.getDate(), title: todayEvents[0].title, detail: todayEvents[0].description || "No details yet." }
+    : { day: today.getDate(), title: "No plans", detail: "Open a day to review its plan." };
+%>
+
+<section class="calendar-panel" data-calendar-root>
+  <header class="calendar-toolbar">
+    <strong style="font-family: var(--font-display); font-size: 20px;"><%= monthLabel %></strong>
+    <div style="display: flex; gap: 8px; align-items: center;">
+      <span style="color: var(--color-text-muted);">
+        <%= events.length %> event<%= events.length === 1 ? "" : "s" %>
+      </span>
+      <button class="glass-btn" type="button" data-refresh-calendar>Refresh</button>
+    </div>
+  </header>
+
+  <div class="calendar-summary">
+    <div class="hero-card hero-main">
+      <p class="hero-kicker">Study rhythm</p>
+      <h3>Plan your week around calm study blocks and a few key milestones.</h3>
+    </div>
+    <div class="hero-card">
+      <p class="hero-kicker">Today</p>
+      <div class="chip-list">
+        <% if (todayEvents.length === 0) { %>
+          <span class="calendar-chip">Free day</span>
+        <% } else { %>
+          <% todayEvents.slice(0, 3).forEach(function(ev) { %>
+            <span class="calendar-chip"><%= ev.title %></span>
+          <% }) %>
+        <% } %>
+      </div>
+    </div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); padding: 0 18px; color: var(--color-text-muted); font-size: 12px; font-weight: 700;">
+    <% weekdays.forEach(function(day) { %>
+      <div style="padding: 6px 4px;"><%= day %></div>
+    <% }) %>
+  </div>
+
+  <div class="calendar-grid">
+    <% cells.forEach(function(c) {
+      const first = (c.events && c.events[0]) || null;
+      const detailTitle = first ? first.title : (c.empty ? "" : "Free day");
+      const detailText = first
+        ? (first.description || "No details yet.")
+        : (c.empty ? "" : "Open space for revision and reflection.");
+    %>
+      <button
+        class="calendar-day <%= c.isToday ? 'today' : '' %> <%= c.muted ? 'muted' : '' %>"
+        type="button"
+        data-day="<%= c.label %>"
+        data-title="<%= detailTitle %>"
+        data-detail="<%= detailText %>"
+        <% if (c.empty) { %>disabled<% } %>
+      >
+        <span class="calendar-day-number"><%= c.label %></span>
+        <% if (c.events && c.events.length) { %>
+          <div class="event-list">
+            <% c.events.slice(0, 3).forEach(function(ev) { %>
+              <span class="event-pill" style="--event-color: <%= colorVar[ev.color] || colorVar.blue %>">
+                <% if (ev.isTask) { %><span class="event-pill-badge">Task</span><% } %>
+                <span><%= ev.title %></span>
+              </span>
+            <% }) %>
+          </div>
+        <% } %>
+      </button>
+    <% }) %>
+  </div>
+
+  <div class="calendar-detail-card" id="calendar-detail-card">
+    <div>
+      <p class="hero-kicker">Selected day</p>
+      <h3 id="calendar-detail-title">Day <%= selectedDate.day %></h3>
+      <p id="calendar-detail-detail"><%= selectedDate.detail %></p>
+    </div>
+    <div class="calendar-detail-badge" id="calendar-detail-badge"><%= selectedDate.title %></div>
+  </div>
+</section>
+
+<script src="/js/api.js" defer></script>
+<script src="/js/calendar-ui.js" defer></script>
