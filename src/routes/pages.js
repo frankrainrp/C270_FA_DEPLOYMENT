@@ -305,15 +305,23 @@ router.get("/search", requireAuthPage, async (req, res, next) => {
 // -----------------------------------------------------------
 // Tasks: load the CURRENT USER's real tasks + stats from MongoDB.
 // -----------------------------------------------------------
+// -----------------------------------------------------------
+// Tasks
+// -----------------------------------------------------------
 router.get("/tasks", requireAuthPage, async (req, res, next) => {
   const ownerEmail = req.sessionUser.email;
+
   try {
+    // Read filter from sidebar
+    const view = req.query.view || "all";
+
     const [tasks, stats] = await Promise.all([
-      TaskService.findAll("all", ownerEmail),
+      TaskService.findAll(view, ownerEmail),
       TaskService.getStats(ownerEmail),
     ]);
+
     const [rail, authContext] = await Promise.all([
-      buildTasksRail("all", ownerEmail, stats),
+      buildTasksRail(view, ownerEmail, stats),
       loadAuthContext(req),
     ]);
 
@@ -322,7 +330,10 @@ router.get("/tasks", requireAuthPage, async (req, res, next) => {
       activeNav: "tasks",
       page: "task",
       rail,
-      pageLocals: { tasks: tasks.map((t) => t.toObject()) },
+      pageLocals: {
+        tasks: tasks.map((t) => t.toObject()),
+        currentView: view,
+      },
       ...authContext,
     });
   } catch (err) {

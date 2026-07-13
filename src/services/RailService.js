@@ -17,11 +17,11 @@ async function buildTasksRail(taskView = "active", ownerEmail, existingStats) {
   const stats = existingStats || await TaskService.getStats(ownerEmail);
   return {
     taskCounts: {
-      active: stats.active,
-      in_progress: stats.active,
-      upcoming: stats.upcoming,
-      all: stats.total,
-      completed: stats.completed,
+    active: stats.active,
+    in_progress: stats.in_progress,
+    upcoming: stats.upcoming,
+    all: stats.total,
+    completed: stats.completed,
     },
     taskView,
   };

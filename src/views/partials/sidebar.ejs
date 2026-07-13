@@ -42,9 +42,8 @@
 
         <% recentSessions.forEach((session) => { %>
           <a class="sidebar-item <%= session.id === activeSessionId ? "active" : "" %>"
-            href="/chat/<%= session.id %>"
-            data-session-id="<%= session.id %>"
-          >
+             href="/chat/<%= session.id %>"
+             data-session-id="<%= session.id %>">
             <span class="sidebar-item-icon chat-icon" aria-hidden="true"></span>
             <span class="sidebar-item-label"><%= session.title || L("rail.chat.untitled", "Untitled chat") %></span>
             <button class="sidebar-more" type="button" data-session-menu="<%= session.id %>" aria-label="<%= L("rail.chat.more", "More actions") %>">
@@ -59,10 +58,10 @@
       </div>
     </section>
   <% } else if (active === "tasks" && !customActiveId) { %>
-    <a class="sidebar-primary" href="/tasks/new" data-action="new-task">
+    <button class="sidebar-primary" type="button" data-action="new-task" data-open-new-task>
       <span class="sidebar-primary-icon plus-icon" aria-hidden="true"></span>
       <span><%= L("rail.tasks.new", "New Task") %></span>
-    </a>
+    </button>
 
     <section class="sidebar-section" aria-labelledby="sidebar-task-title">
       <h2 id="sidebar-task-title" class="sidebar-heading"><%= L("rail.tasks.views", "Views") %></h2>
@@ -111,8 +110,7 @@
           <% miniMonth.forEach((day) => { %>
             <a class="mini-calendar-day <%= day.active ? "active" : "" %> <%= day.muted ? "muted" : "" %> <%= day.hasEvents ? "has-events" : "" %>"
                href="/calendar?date=<%= day.date || "" %>"
-               data-date="<%= day.date || "" %>"
-            >
+               data-date="<%= day.date || "" %>">
               <span><%= day.label %></span>
             </a>
           <% }) %>

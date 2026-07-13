@@ -28,6 +28,11 @@ const TaskSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    status: {
+    type: String,
+    enum: ["active", "in_progress", "completed"],
+    default: "active",
+    },
     completed: {
       type: Boolean,
       default: false,

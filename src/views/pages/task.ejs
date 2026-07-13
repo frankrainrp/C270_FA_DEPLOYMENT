@@ -28,8 +28,17 @@
     return dt.toISOString().slice(0, 10);
   }
 
-  const activeTasks = list.filter((t) => !t.completed);
-  const completedTasks = list.filter((t) => t.completed);
+  const activeTasks = list.filter(
+    t => t.status === "active"
+);
+
+  const progressTasks = list.filter(
+    t => t.status === "in_progress"
+);
+
+  const completedTasks = list.filter(
+    t => t.status === "completed"
+);
 %>
 
 <section class="tasks-panel" data-tasks-root>
@@ -51,15 +60,19 @@
       <div class="hero-stats">
         <div>
           <strong><%= activeTasks.length %></strong>
-          <span>active tasks</span>
+          <span>Active</span>
+        </div>
+        <div>
+          <strong><%= progressTasks.length %></strong>
+          <span>In Progress</span>
         </div>
         <div>
           <strong><%= completedTasks.length %></strong>
-          <span>completed</span>
+          <span>Completed</span>
         </div>
         <div>
           <strong><%= list.length %></strong>
-          <span>total</span>
+          <span>Total</span>
         </div>
       </div>
     </div>
@@ -68,7 +81,8 @@
       <p class="hero-kicker">Achievements</p>
       <ul class="chip-list">
         <li><%= completedTasks.length %> completed</li>
-        <li><%= activeTasks.length %> still open</li>
+        <li><%= progressTasks.length %> in progress</li>
+        <li><%= activeTasks.length %> active</li>
         <li>Ask Butler to add more</li>
       </ul>
     </div>
@@ -133,7 +147,72 @@
           </article>
         <% }) %>
       </div>
+        <% } %>
+
+    <!-- =========================
+         In Progress Tasks
+    ========================== -->
+    <% if (progressTasks.length > 0) { %>
+      <div class="task-group">
+        <div class="task-group-title">
+          <span>In Progress</span>
+          <span><%= progressTasks.length %></span>
+        </div>
+
+        <% progressTasks.forEach(function(t) {
+          const dueLabel = fmtDue(t.dueDate);
+          const description = t.description || "";
+        %>
+
+          <article
+            class="task-card"
+            data-task-id="<%= t._id %>"
+            data-title="<%= t.title %>"
+            data-due="<%= dueLabel %>"
+            data-priority="<%= t.priority || 'medium' %>"
+            data-description="<%= description %>"
+            data-notes="<%= description || 'No notes yet.' %>"
+            style="--task-color: <%= priorityColor[t.priority] || priorityColor.medium %>"
+          >
+            <input
+              class="task-checkbox"
+              type="checkbox"
+              <%= t.status === "completed" ? "checked" : "" %>
+              data-task-toggle
+              aria-label="Toggle complete"
+            />
+
+            <div class="task-main">
+              <div class="task-title"><%= t.title %></div>
+
+              <div class="task-meta">
+                <span>Due <%= dueLabel %></span>
+                <span>Priority: <%= t.priority || 'medium' %></span>
+              </div>
+            </div>
+
+            <div class="task-actions">
+              <button class="glass-btn task-detail-trigger" type="button">
+                Details
+              </button>
+
+              <button
+                class="glass-btn"
+                type="button"
+                data-task-delete
+              >
+                Delete
+              </button>
+            </div>
+          </article>
+
+        <% }) %>
+      </div>
     <% } %>
+
+    <!-- =========================
+         Completed Tasks
+    ========================== -->
 
     <% if (completedTasks.length > 0) { %>
       <div class="task-group">
@@ -159,7 +238,7 @@
             <input
               class="task-checkbox"
               type="checkbox"
-              checked
+              <%= t.status === "completed" ? "checked" : "" %>
               data-task-toggle
               aria-label="Toggle complete"
             />
@@ -201,6 +280,41 @@
         <h4>Suggested next step</h4>
         <p>Break this task into one small action and keep the momentum going.</p>
       </div>
+    </div>
+  </div>
+
+  <div class="task-detail-drawer" id="new-task-drawer" aria-hidden="true">
+    <div class="task-drawer-header">
+      <div>
+        <p class="hero-kicker">New task</p>
+        <h3>Create a task</h3>
+      </div>
+      <button class="glass-btn" type="button" data-close-new-task>Close</button>
+    </div>
+    <div class="task-drawer-body">
+      <form id="new-task-form">
+        <div class="drawer-section">
+          <label for="new-task-title">Title</label>
+          <input id="new-task-title" type="text" name="title" required maxlength="200" placeholder="e.g. Finish CA2" />
+        </div>
+        <div class="drawer-section">
+          <label for="new-task-description">Description</label>
+          <textarea id="new-task-description" name="description" rows="3" placeholder="Optional notes"></textarea>
+        </div>
+        <div class="drawer-section">
+          <label for="new-task-due">Due date</label>
+          <input id="new-task-due" type="date" name="dueDate" />
+        </div>
+        <div class="drawer-section">
+          <label for="new-task-priority">Priority</label>
+          <select id="new-task-priority" name="priority">
+            <option value="low">Low</option>
+            <option value="medium" selected>Medium</option>
+            <option value="high">High</option>
+          </select>
+        </div>
+        <button class="glass-btn" type="submit">Create task</button>
+      </form>
     </div>
   </div>
 </section>
