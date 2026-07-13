@@ -10,7 +10,7 @@
     "migrate:owner": "node scripts/migrate-owner-email.js"
   },
   "dependencies": {
-    "cookie-parser": "^1.4.6",
+    "cookie-parser": "^1.4.7",
     "dotenv": "^16.4.5",
     "ejs": "^3.1.10",
     "express": "^4.22.2",

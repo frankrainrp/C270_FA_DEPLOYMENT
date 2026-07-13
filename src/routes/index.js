@@ -1,8 +1,8 @@
 // ============================================================
 // src/routes/index.js
-// Central route aggregator.  app.js calls this once to mount every
-// public route in the app.  Keeping this in one place makes it easy
-// to see the full URL surface at a glance.
+//
+// Mounts all application routes.
+//
 // ============================================================
 
 const pages = require("./pages");
@@ -16,7 +16,17 @@ const apiBilling = require("./api/billing");
 const apiAuth = require("./api/auth");
 const apiDocuments = require("./api/documents");
 
+// =============================
+// Task 5 API Routes
+// =============================
+const panelRoutes = require("./api/panels");
+const connectorRoutes = require("./api/connectors");
+const generatePanelRoutes = require("./api/generatePanel");
+const researchRoutes = require("./api/research");
+const visualizationRoutes = require("./api/visualization");
+
 module.exports = function mountRoutes(app) {
+
   // HTML pages served with the shared layout shell.
   app.use(pages);
 
@@ -33,4 +43,15 @@ module.exports = function mountRoutes(app) {
   app.use("/api/billing", apiBilling);
   app.use("/api/auth", apiAuth);
   app.use("/api/documents", apiDocuments);
+
+
+  // =============================
+  // Task 5 API Routes
+  // =============================
+  app.use("/api/panels", panelRoutes);
+  app.use("/api/connectors", connectorRoutes);
+  app.use("/api/generate-panel", generatePanelRoutes);
+  app.use("/api/research", researchRoutes);
+  app.use("/api/visualization", visualizationRoutes);
+
 };
