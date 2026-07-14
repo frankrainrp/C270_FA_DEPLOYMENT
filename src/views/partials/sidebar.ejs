@@ -1,17 +1,6 @@
 <%
   /*
     Contextual sidebar for chat, tasks, calendar, notes, and custom panels.
-
-    Common rail fields:
-    - sessions: chat rows with id, title, and updatedAt
-    - activeSessionId: selected chat session id
-    - taskCounts: active, in_progress, upcoming, all, and completed totals
-    - taskView: selected task filter
-    - miniMonth: calendar cells with label, date, active, muted, and hasEvents
-    - calendarTags: calendar tag rows with label, count, and color
-    - noteCounts: all, pinned, and linked totals
-    - pinnedNotes: note rows with id and title
-    - customPanel: custom panel metadata
   */
   const railData = typeof rail !== "undefined" && rail ? rail : {};
   const active = typeof activeNav !== "undefined" ? activeNav : "chat";
@@ -52,8 +41,7 @@
         <% } %>
 
         <% recentSessions.forEach((session) => { %>
-          <a
-            class="sidebar-item <%= session.id === activeSessionId ? "active" : "" %>"
+          <a class="sidebar-item <%= session.id === activeSessionId ? "active" : "" %>"
             href="/chat/<%= session.id %>"
             data-session-id="<%= session.id %>"
           >
@@ -121,10 +109,9 @@
       <% if (miniMonth.length > 0) { %>
         <div class="mini-calendar" aria-label="<%= L("rail.calendar.month", "Month overview") %>">
           <% miniMonth.forEach((day) => { %>
-            <a
-              class="mini-calendar-day <%= day.active ? "active" : "" %> <%= day.muted ? "muted" : "" %> <%= day.hasEvents ? "has-events" : "" %>"
-              href="/calendar?date=<%= day.date || "" %>"
-              data-date="<%= day.date || "" %>"
+            <a class="mini-calendar-day <%= day.active ? "active" : "" %> <%= day.muted ? "muted" : "" %> <%= day.hasEvents ? "has-events" : "" %>"
+               href="/calendar?date=<%= day.date || "" %>"
+               data-date="<%= day.date || "" %>"
             >
               <span><%= day.label %></span>
             </a>
@@ -159,10 +146,120 @@
     <section class="sidebar-section" aria-labelledby="sidebar-search-title">
       <h2 id="sidebar-search-title" class="sidebar-heading"><%= L("rail.search.results", "Search") %></h2>
       <p class="sidebar-hint"><%= L("rail.search.hint", "Search across notes, tasks, and chat sessions from the top bar.") %></p>
-      <div class="sidebar-item">
-        <span class="sidebar-item-label"><%= L("rail.search.quickTip", "Tip: try keywords like \"DevOps\" or \"React\".") %></span>
+    </section>
+
+    <section class="sidebar-section" aria-labelledby="sidebar-search-filters">
+      <h2 id="sidebar-search-filters" class="sidebar-heading"><%= L("rail.search.filters", "Quick Filters") %></h2>
+      <div class="sidebar-filter-group" data-search-filters>
+        <button class="sidebar-item sidebar-filter active" type="button" data-filter="all">
+          <span class="sidebar-item-icon list-icon" aria-hidden="true"></span>
+          <span class="sidebar-item-label"><%= L("rail.search.filterAll", "All") %></span>
+        </button>
+        <button class="sidebar-item sidebar-filter" type="button" data-filter="notes">
+          <span class="sidebar-item-icon note-icon" aria-hidden="true"></span>
+          <span class="sidebar-item-label"><%= L("rail.search.filterNotes", "Notes") %></span>
+        </button>
+        <button class="sidebar-item sidebar-filter" type="button" data-filter="tasks">
+          <span class="sidebar-item-icon list-icon" aria-hidden="true"></span>
+          <span class="sidebar-item-label"><%= L("rail.search.filterTasks", "Tasks") %></span>
+        </button>
+        <button class="sidebar-item sidebar-filter" type="button" data-filter="chats">
+          <span class="sidebar-item-icon chat-icon" aria-hidden="true"></span>
+          <span class="sidebar-item-label"><%= L("rail.search.filterChats", "Chats") %></span>
+        </button>
       </div>
     </section>
+
+    <section class="sidebar-section" aria-labelledby="sidebar-recent-searches">
+      <h2 id="sidebar-recent-searches" class="sidebar-heading"><%= L("rail.search.recent", "Recent Searches") %></h2>
+      <div data-recent-searches-list>
+        <div class="sidebar-hint" data-recent-searches-empty>
+          <%= L("rail.search.recentEmpty", "Your recent searches will show up here.") %>
+        </div>
+      </div>
+    </section>
+
+    <script>
+      (function () {
+        var STORAGE_KEY = "butler-recent-searches";
+        var MAX_ITEMS = 8;
+
+        function getSaved() {
+          try {
+            var raw = localStorage.getItem(STORAGE_KEY);
+            var arr = raw ? JSON.parse(raw) : [];
+            return Array.isArray(arr) ? arr : [];
+          } catch (_) {
+            return [];
+          }
+        }
+
+        function save(list) {
+          try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+          } catch (_) { /* storage unavailable */ }
+        }
+
+        function currentQuery() {
+          try {
+            return new URLSearchParams(window.location.search).get("q") || "";
+          } catch (_) {
+            return "";
+          }
+        }
+
+        function recordCurrentQuery() {
+          var q = currentQuery().trim();
+          if (!q) return;
+          var list = getSaved().filter(function (item) { return item.toLowerCase() !== q.toLowerCase(); });
+          list.unshift(q);
+          save(list.slice(0, MAX_ITEMS));
+        }
+
+        function renderRecent() {
+          var container = document.querySelector("[data-recent-searches-list]");
+          if (!container) return;
+          var list = getSaved();
+
+          if (list.length === 0) {
+            container.innerHTML =
+              '<div class="sidebar-hint" data-recent-searches-empty><%= L("rail.search.recentEmpty", "Your recent searches will show up here.") %></div>';
+            return;
+          }
+
+          container.innerHTML = list
+            .map(function (term) {
+              var safe = term.replace(/[&<>"']/g, function (c) {
+                return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+              });
+              return (
+                '<a class="sidebar-item compact" href="/search?q=' +
+                encodeURIComponent(term) +
+                '" style="display:flex;align-items:center;gap:10px;">' +
+                '<span aria-hidden="true" style="flex:0 0 auto;width:6px;height:6px;border-radius:50%;background:var(--color-text-muted,#8a8370);"></span>' +
+                '<span class="sidebar-item-label" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + safe + "</span></a>"
+              );
+            })
+            .join("");
+        }
+
+        function applyFilter(type) {
+          document.body.setAttribute("data-search-filter", type);
+          document.querySelectorAll("[data-search-filters] .sidebar-filter").forEach(function (btn) {
+            btn.classList.toggle("active", btn.getAttribute("data-filter") === type);
+          });
+        }
+
+        document.querySelectorAll("[data-search-filters] .sidebar-filter").forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            applyFilter(btn.getAttribute("data-filter"));
+          });
+        });
+
+        recordCurrentQuery();
+        renderRecent();
+      })();
+    </script>
   <% } else if (active === "notes" && !customActiveId) { %>
     <a class="sidebar-primary" href="/notes/new" data-action="new-note">
       <span class="sidebar-primary-icon plus-icon" aria-hidden="true"></span>
