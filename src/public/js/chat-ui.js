@@ -17,6 +17,7 @@
 //   ButlerToolExecutor  (tool-executor.js)
 // ============================================================
 
+/** Initializes the chat composer, streaming renderer, tool loop, and document controls. */
 (function initChatUi() {
   if (!window.ButlerChatClient || !window.ButlerState) return;
 
@@ -58,22 +59,27 @@
   }
 
   // ---------- DOM helpers ----------
+  /** Reports whether the message viewport is close enough to keep auto-scrolling. */
   function isNearEnd() {
     return stream.scrollHeight - stream.scrollTop - stream.clientHeight < 120;
   }
 
+  /** Scrolls to the newest message when forced or when the user is already near the end. */
   function scrollToEnd(force) {
     if (force || isNearEnd()) stream.scrollTop = stream.scrollHeight;
   }
 
+  /** Updates the screen-reader status message for the current chat operation. */
   function setStatus(message) {
     if (statusEl) statusEl.textContent = message || "";
   }
 
+  /** Hides the initial empty-state prompt once a conversation begins. */
   function hideEmptyBlock() {
     if (emptyBlock) emptyBlock.hidden = true;
   }
 
+  /** Appends a safe subset of inline markdown without inserting untrusted raw HTML. */
   function appendInlineMarkdown(parent, text) {
     var pattern = /(\*\*[^*]+\*\*|`[^`]+`)/g;
     var cursor = 0;
@@ -91,13 +97,16 @@
     if (cursor < text.length) parent.appendChild(document.createTextNode(text.slice(cursor)));
   }
 
+  /** Renders a safe subset of block markdown into an assistant message bubble. */
   function renderMessageContent(bubble, text) {
     var lines = String(text || "").replace(/\r\n/g, "\n").split("\n");
     var fragment = document.createDocumentFragment();
     var list = null;
     var codeLines = null;
 
+    /** Ends the current list block before rendering a different block type. */
     function finishList() { list = null; }
+    /** Flushes the accumulated fenced code block into a preformatted element. */
     function finishCode() {
       if (!codeLines) return;
       var pre = document.createElement("pre");
@@ -149,6 +158,7 @@
     bubble.classList.add("chat-markdown");
   }
 
+  /** Creates and appends a user or assistant message bubble to the conversation. */
   function appendMessageBubble(role, text) {
     var row = document.createElement("div");
     row.className = "message-row " + (role === "user" ? "user" : "ai");
@@ -164,6 +174,7 @@
     return bubble;
   }
 
+  /** Appends an accessible error bubble for a failed chat operation. */
   function appendErrorBubble(text) {
     var bubble = appendMessageBubble("assistant", text);
     bubble.setAttribute("role", "alert");
@@ -175,6 +186,7 @@
     renderMessageContent(bubble, bubble.textContent || "");
   });
 
+  /** Appends a compact status notice describing agent tool activity. */
   function appendToolNotice(text) {
     var row = document.createElement("div");
     row.className = "message-row ai tool-notice";
@@ -190,6 +202,7 @@
     scrollToEnd(true);
   }
 
+  /** Toggles composer controls and browser state while a response is streaming. */
   function setStreamingState(streaming) {
     ButlerState.set({ isStreaming: streaming });
     sendBtn.disabled = streaming;
@@ -200,6 +213,7 @@
     promptCards.forEach(function (card) { card.disabled = streaming; });
   }
 
+  /** Resizes the composer textarea up to its maximum visual height. */
   function autoResize(el) {
     el.style.height = "auto";
     el.style.height = Math.min(el.scrollHeight, 160) + "px";
@@ -209,6 +223,7 @@
   // Convert ButlerState messages -> OpenAI-compatible wire format.
   // MUST preserve tool_calls (on assistant messages) and tool_call_id
   // (on tool messages) so the tool loop actually works.
+  /** Converts browser state messages into the OpenAI-compatible request payload. */
   function toWireMessages(list) {
     return list.map(function (m) {
       var out = { role: m.role, content: m.content == null ? "" : m.content };
@@ -226,12 +241,14 @@
   }
 
   // Push into ButlerState so the message survives across the loop.
+  /** Adds a uniquely identified message to the active browser conversation. */
   function record(msg) {
     ButlerState.addMessage(Object.assign({ id: "m-" + Date.now() + "-" + Math.random().toString(36).slice(2, 6) }, msg));
   }
 
   // ---------- Single streaming round ----------
   // Returns the assistant message from that round.
+  /** Runs one streaming model round and returns its text and reconstructed tool calls. */
   async function runOneRound(signal) {
     var messages = toWireMessages(ButlerState.get().messages);
     var localBubble = null;
@@ -276,12 +293,14 @@
     toggle: "Toggle", toggle_pin: "Pin/Unpin", list: "List",
   };
 
+  /** Escapes text through the DOM before placing it in confirmation-card markup. */
   function escHtml(str) {
     var d = document.createElement("div");
     d.textContent = str || "";
     return d.innerHTML;
   }
 
+  /** Produces a user-readable action summary from a raw model tool call. */
   function getToolLabel(call) {
     var name = (call.function && call.function.name) || "unknown";
     var args = {};
@@ -319,6 +338,7 @@
     };
   }
 
+  /** Displays approval controls and resolves with accepted and declined write calls. */
   function showConfirmationCard(toolCalls) {
     return new Promise(function (resolve) {
       var row = document.createElement("div");
@@ -375,6 +395,7 @@
       scrollToEnd(true);
       setStatus("Review the proposed changes before they run.");
 
+      /** Resolves the confirmation promise after every proposed write has a decision. */
       function checkDone() {
         var allDecided = items.every(function (it) { return it.accepted !== null; });
         if (!allDecided) return;
@@ -387,6 +408,7 @@
         resolve({ accepted: accepted, declined: declined });
       }
 
+      /** Records and renders one approval decision while preventing duplicate clicks. */
       function markItem(idx, accepted) {
         var it = items[idx];
         if (!it || it.accepted !== null) return;
@@ -415,11 +437,13 @@
   }
 
   // ---------- Tool execution ----------
+  /** Classifies mutating tools that require explicit user approval. */
   function requiresConfirmation(call) {
     var name = call && call.function && call.function.name;
     return /_(create|update|delete|toggle|toggle_pin)$/.test(name || "");
   }
 
+  /** Executes approved writes and automatic reads, returning tool results for the model. */
   async function runToolCalls(toolCalls) {
     if (!window.ButlerToolExecutor) {
       console.warn("[chat] tool executor missing; skipping", toolCalls.length, "tool calls");
@@ -459,6 +483,7 @@
   }
 
   // ---------- Main send flow ----------
+  /** Continues the bounded model-tool loop until it reaches a final assistant reply. */
   async function sendMessage(text) {
     if (ButlerState.get().isStreaming) return;
     var trimmed = String(text || "").trim();
@@ -538,6 +563,7 @@
 
   input.addEventListener("input", function () { autoResize(input); });
 
+  /** Renders removable attachment chips for documents awaiting the next message. */
   function renderSelectedDocuments() {
     if (!documentList) return;
     documentList.innerHTML = "";
@@ -561,6 +587,7 @@
     });
   }
 
+  /** Uploads one document for in-memory text extraction and returns normalized metadata. */
   async function uploadDocument(file) {
     var body = new FormData();
     body.append("document", file);

@@ -2,11 +2,9 @@
 // src/models/User.js
 // Real login identity (email + OTP verified via n8n).
 //
-// Kept deliberately separate from models/UserProfile.js: UserProfile
-// is the single-tenant demo "Settings" document used by the Task 6
-// Billing/Preferences pages before real multi-user auth existed.
-// User is the actual account record created the moment someone
-// verifies an emailed OTP for the first time.
+// Kept deliberately separate from models/UserProfile.js: User stores
+// login identity and verification state, while UserProfile stores the
+// account-scoped settings, plan, credits, and billing presentation data.
 // ============================================================
 
 const mongoose = require("mongoose");

@@ -10,11 +10,13 @@ const TEXT_EXTENSIONS = new Set([
 const SUPPORTED_EXTENSIONS = new Set([...TEXT_EXTENSIONS, ".pdf", ".docx"]);
 const DEFAULT_TEXT_LIMIT = 60000;
 
+/** Resolves the maximum extracted-text length from environment configuration. */
 function getTextLimit() {
   const configured = Number(process.env.DOCUMENT_TEXT_LIMIT);
   return Number.isFinite(configured) && configured > 0 ? configured : DEFAULT_TEXT_LIMIT;
 }
 
+/** Decodes UTF-8, UTF-16LE, or UTF-16BE plain-text buffers and removes byte-order marks. */
 function decodePlainText(buffer) {
   if (buffer.length >= 2 && buffer[0] === 0xff && buffer[1] === 0xfe) {
     return buffer.subarray(2).toString("utf16le");
@@ -35,6 +37,7 @@ function decodePlainText(buffer) {
   return withoutBom.toString("utf8");
 }
 
+/** Extracts normalized, bounded text and metadata from a supported in-memory upload. */
 async function extractText(file) {
   const extension = path.extname(file.originalname || "").toLowerCase();
   if (!SUPPORTED_EXTENSIONS.has(extension)) {

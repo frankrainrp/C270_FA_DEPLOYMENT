@@ -3,7 +3,7 @@
 // Chat streaming + session endpoints.
 //
 // POST /api/chat
-//   Body: { messages, contextSummary?, userName?, model?, personality?,
+//   Body: { messages, model?, personality?,
 //           includeTools?, sessionId? }
 //   Response: text/event-stream (SSE)
 //
@@ -30,6 +30,7 @@ const router = express.Router();
 
 router.use(requireAuthApi);
 
+/** Converts a Mongoose chat session into the safe account API response shape. */
 function serializeSession(session) {
   return {
     id: String(session._id),
@@ -49,6 +50,7 @@ function serializeSession(session) {
   };
 }
 
+// Loads the latest account-owned session for browser state recovery.
 router.get("/session/latest", async (req, res) => {
   try {
     const session = await ChatSessionService.getLatestSession(req.sessionUser.email);
@@ -58,6 +60,7 @@ router.get("/session/latest", async (req, res) => {
   }
 });
 
+// Creates a new empty chat session for the authenticated account.
 router.post("/session", async (req, res) => {
   try {
     const session = await ChatSessionService.create(req.sessionUser.email);
@@ -67,6 +70,7 @@ router.post("/session", async (req, res) => {
   }
 });
 
+// Streams one model round and cancels the upstream request if the browser disconnects.
 router.post("/", async (req, res, next) => {
   const controller = new AbortController();
   res.on("close", () => {
@@ -76,6 +80,7 @@ router.post("/", async (req, res, next) => {
     await streamChat({
       ...(req.body || {}),
       ownerEmail: req.sessionUser.email,
+      userName: req.sessionUser.name,
       signal: controller.signal,
     }, res);
   } catch (err) {

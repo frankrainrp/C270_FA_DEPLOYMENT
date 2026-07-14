@@ -8,6 +8,7 @@ const { requireAuthApi } = require("../../middleware/requireAuth");
 const router = express.Router();
 router.use(requireAuthApi);
 
+/** Converts the configured upload limit in megabytes into a safe byte count. */
 function maxUploadBytes() {
   const megabytes = Number(process.env.DOCUMENT_MAX_MB);
   const safeMegabytes = Number.isFinite(megabytes) && megabytes > 0 ? megabytes : 10;
@@ -19,6 +20,7 @@ const upload = multer({
   limits: { files: 1, fileSize: maxUploadBytes() },
 });
 
+// Decodes one authenticated in-memory upload and returns normalized extracted text.
 router.post("/decode", (req, res) => {
   upload.single("document")(req, res, async (uploadError) => {
     if (uploadError) {

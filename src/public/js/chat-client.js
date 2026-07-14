@@ -7,6 +7,7 @@
 // complete tool calls to chat-ui.js, which delegates them to tool-executor.js.
 // ============================================================
 
+/** Initializes the browser transport used to consume the chat SSE endpoint. */
 (function initChatClient() {
   var ENDPOINT = "/api/chat";
 
@@ -17,8 +18,6 @@
    * @param {Array}  opts.messages     - Prior messages in OpenAI format.
    * @param {string=} opts.model        - UI model id (deepseek-v4-flash, ...).
    * @param {string=} opts.personality  - gentle | standard | sassy.
-   * @param {string=} opts.contextSummary
-   * @param {string=} opts.userName
    * @param {AbortSignal=} opts.signal
    * @param {Object} opts.callbacks
    * @param {Function=} opts.callbacks.onContentDelta - (text) => void
@@ -40,8 +39,6 @@
           messages: opts.messages,
           model: opts.model,
           personality: opts.personality,
-          contextSummary: opts.contextSummary,
-          userName: opts.userName,
           includeTools: opts.includeTools !== false,
           sessionId: opts.sessionId || null,
         }),

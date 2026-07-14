@@ -14,12 +14,14 @@ const PERSONALITY = {
   sassy:    "Tone: lightly teasing but still useful and actionable.",
 };
 
+/** Bounds prompt-controlled text so client preferences cannot grow the system prompt indefinitely. */
 function clampText(text, max) {
   if (typeof text !== "string") return "";
   if (text.length <= max) return text;
   return text.slice(0, max);
 }
 
+/** Builds the authoritative system prompt with tone, safety rules, tool guidance, and live context. */
 function buildSystemPrompt(input) {
   const todayIso = new Date().toISOString().slice(0, 10);
   const userName = clampText(input.userName || "Student", 64);

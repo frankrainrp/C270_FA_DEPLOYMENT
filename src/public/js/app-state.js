@@ -9,6 +9,7 @@
 // Task, note, and calendar state stays in their focused UI modules.
 // ============================================================
 
+/** Initializes the shared browser-side chat state and its subscription API. */
 (function initAppState() {
   var listeners = [];
 
@@ -40,33 +41,40 @@
     isStreaming: false,
   };
 
+  /** Registers a state listener and returns a function that removes it. */
   function subscribe(fn) {
     listeners.push(fn);
+    /** Removes the associated listener from future state notifications. */
     return function unsubscribe() {
       listeners = listeners.filter(function (l) { return l !== fn; });
     };
   }
 
+  /** Notifies every current subscriber with the latest mutable state object. */
   function emit() {
     for (var i = 0; i < listeners.length; i += 1) {
       try { listeners[i](state); } catch (err) { console.error(err); }
     }
   }
 
+  /** Merges a partial update into state and notifies subscribers. */
   function set(patch) {
     Object.assign(state, patch);
     emit();
   }
 
+  /** Returns the current chat state object. */
   function get() {
     return state;
   }
 
+  /** Appends one message to the active in-memory conversation. */
   function addMessage(msg) {
     state.messages.push(msg);
     emit();
   }
 
+  /** Replaces the active conversation after loading a persisted chat session. */
   function replaceMessages(messages, activeSessionId) {
     state.messages = Array.isArray(messages) ? messages.map(function (message, index) {
       return Object.assign({ id: "loaded-" + index }, message);

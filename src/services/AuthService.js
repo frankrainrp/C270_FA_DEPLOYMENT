@@ -21,6 +21,7 @@ const CODE_RE = /^\d{4,8}$/;
 const RESEND_COOLDOWN_MS = 30 * 1000; // 30s between OTP requests per email
 const SESSION_TTL = "7d";
 
+/** Reads authentication settings from the process environment with safe local defaults. */
 function getConfig() {
   return {
     webhookUrl: process.env.N8N_OTP_WEBHOOK_URL || "",
@@ -31,13 +32,20 @@ function getConfig() {
 }
 
 class AuthService {
+  /** Fails fast when production authentication secrets or delivery settings are missing. */
   assertProductionConfig() {
-    const { jwtSecret } = getConfig();
-    if (process.env.NODE_ENV === "production" && (!jwtSecret || jwtSecret === "change-me")) {
+    if (process.env.NODE_ENV !== "production") return;
+
+    const { jwtSecret, webhookUrl } = getConfig();
+    if (!jwtSecret || jwtSecret === "change-me") {
       throw new Error("JWT_SECRET must be set to a strong, non-default value in production.");
+    }
+    if (!webhookUrl) {
+      throw new Error("N8N_OTP_WEBHOOK_URL must be configured in production.");
     }
   }
 
+  /** Signs the minimal authenticated user identity into a time-limited session JWT. */
   issueSessionToken(user) {
     const { jwtSecret } = getConfig();
     return jwt.sign(

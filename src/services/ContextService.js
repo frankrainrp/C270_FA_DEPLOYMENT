@@ -18,6 +18,7 @@ const MAX_TASKS = 20;
 const MAX_NOTES = 10;
 const MAX_EVENTS = 15;
 
+/** Formats a date-like value as YYYY-MM-DD or returns an empty string when unavailable. */
 function fmtDate(d) {
   if (!d) return "";
   try {
@@ -27,6 +28,7 @@ function fmtDate(d) {
   }
 }
 
+/** Builds a compact account-scoped snapshot of tasks, notes, and events for the model prompt. */
 async function buildSnapshot(ownerEmail) {
   const lines = [];
 

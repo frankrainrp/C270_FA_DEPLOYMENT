@@ -57,11 +57,24 @@ test("create tools carry idempotency keys into the API layer", () => {
   assert.match(taskModel, /ownerEmail: 1, idempotencyKey: 1/);
 });
 
+test("chat identity and data context remain server-authoritative", () => {
+  const service = read("src/services/ChatService.js");
+  const route = read("src/routes/api/chat.js");
+  const client = read("src/public/js/chat-client.js");
+
+  assert.doesNotMatch(service, /contextSummary\s*=\s*input\.contextSummary/);
+  assert.match(service, /contextSummary\s*=\s*await buildSnapshot\(input\.ownerEmail\)/);
+  assert.match(route, /userName:\s*req\.sessionUser\.name/);
+  assert.doesNotMatch(client, /contextSummary:\s*opts\.contextSummary/);
+});
+
 test("production refuses the default JWT secret", () => {
   const previousMode = process.env.NODE_ENV;
   const previousSecret = process.env.JWT_SECRET;
+  const previousWebhook = process.env.N8N_OTP_WEBHOOK_URL;
   process.env.NODE_ENV = "production";
   process.env.JWT_SECRET = "change-me";
+  process.env.N8N_OTP_WEBHOOK_URL = "https://example.test/send-otp";
   try {
     assert.throws(
       () => AuthService.assertProductionConfig(),
@@ -72,5 +85,29 @@ test("production refuses the default JWT secret", () => {
     else process.env.NODE_ENV = previousMode;
     if (previousSecret === undefined) delete process.env.JWT_SECRET;
     else process.env.JWT_SECRET = previousSecret;
+    if (previousWebhook === undefined) delete process.env.N8N_OTP_WEBHOOK_URL;
+    else process.env.N8N_OTP_WEBHOOK_URL = previousWebhook;
+  }
+});
+
+test("production requires an OTP delivery webhook", () => {
+  const previousMode = process.env.NODE_ENV;
+  const previousSecret = process.env.JWT_SECRET;
+  const previousWebhook = process.env.N8N_OTP_WEBHOOK_URL;
+  process.env.NODE_ENV = "production";
+  process.env.JWT_SECRET = "a-test-secret-that-is-not-the-default";
+  delete process.env.N8N_OTP_WEBHOOK_URL;
+  try {
+    assert.throws(
+      () => AuthService.assertProductionConfig(),
+      /N8N_OTP_WEBHOOK_URL must be configured/
+    );
+  } finally {
+    if (previousMode === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = previousMode;
+    if (previousSecret === undefined) delete process.env.JWT_SECRET;
+    else process.env.JWT_SECRET = previousSecret;
+    if (previousWebhook === undefined) delete process.env.N8N_OTP_WEBHOOK_URL;
+    else process.env.N8N_OTP_WEBHOOK_URL = previousWebhook;
   }
 });

@@ -40,12 +40,14 @@ const MAX_ATTACHMENTS = 3;
 const ATTACHMENT_TEXT_LIMIT = 60000;
 const PERSISTED_ATTACHMENT_TEXT_LIMIT = 12000;
 
+/** Truncates string input to a fixed character limit without coercing non-strings. */
 function clampText(text, max) {
   if (typeof text !== "string") return text;
   if (text.length <= max) return text;
   return text.slice(0, max);
 }
 
+/** Normalizes, limits, and removes empty document attachments before model use or persistence. */
 function clampAttachments(attachments, textLimit = ATTACHMENT_TEXT_LIMIT) {
   if (!Array.isArray(attachments)) return [];
   return attachments.slice(0, MAX_ATTACHMENTS).map((attachment) => ({
@@ -57,6 +59,7 @@ function clampAttachments(attachments, textLimit = ATTACHMENT_TEXT_LIMIT) {
   })).filter((attachment) => attachment.text);
 }
 
+/** Expands a chat message into plain text with clearly delimited uploaded document content. */
 function contentWithAttachments(content, attachments) {
   const base = typeof content === "string" ? clampText(content, CONTENT_LIMIT) : "";
   const documents = clampAttachments(attachments);
@@ -70,6 +73,7 @@ function contentWithAttachments(content, attachments) {
 }
 
 // Preserve tool_calls / tool_call_id so multi-round tool loops work.
+/** Converts recent browser messages into a bounded OpenAI-compatible history. */
 function clampMessages(messages) {
   const list = Array.isArray(messages) ? messages : [];
   let remaining = HISTORY_CONTENT_LIMIT;
@@ -95,10 +99,12 @@ function clampMessages(messages) {
   return result;
 }
 
+/** Writes one JSON payload as a Server-Sent Events data frame. */
 function writeSse(res, payload) {
   res.write(`data: ${JSON.stringify(payload)}\n\n`);
 }
 
+/** Initializes the Express response headers required for an SSE stream. */
 function beginSse(res) {
   res.status(200);
   res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
@@ -117,6 +123,7 @@ function beginSse(res) {
 // their history this way. If sessionId is missing, invalid, or
 // belongs to someone else, we fall back to the latest session for
 // THIS account (creating one if none exists).
+/** Resolves an account-owned chat session without allowing persistence failures to break chat. */
 async function safeGetSession(sessionId, ownerEmail) {
   try {
     if (sessionId) {
@@ -130,6 +137,7 @@ async function safeGetSession(sessionId, ownerEmail) {
   }
 }
 
+/** Persists one bounded user or assistant message while treating database errors as non-fatal. */
 async function safeSaveMessage(session, role, content, ownerEmail, attachments) {
   if (!session || !content) return;
   // ChatSession model only allows role "user" | "assistant".
@@ -148,6 +156,7 @@ async function safeSaveMessage(session, role, content, ownerEmail, attachments) 
 }
 
 // Only persist the LAST user turn (not the entire history every time).
+/** Finds the most recent user message in an OpenAI-compatible message list. */
 function extractLastUserMessage(messages) {
   const list = Array.isArray(messages) ? messages : [];
   for (let i = list.length - 1; i >= 0; i -= 1) {
@@ -160,12 +169,14 @@ function extractLastUserMessage(messages) {
 
 // Determine whether this request is the first turn of a user message
 // (worth persisting) or a follow-up tool round (already persisted).
+/** Detects whether the current request follows a tool result in the multi-round agent loop. */
 function isFollowUpToolRound(messages) {
   const list = Array.isArray(messages) ? messages : [];
   if (list.length === 0) return false;
   return list[list.length - 1].role === "tool";
 }
 
+/** Emits a deterministic local SSE response when the real model path is disabled. */
 async function streamMock(input, res) {
   beginSse(res);
 
@@ -190,6 +201,7 @@ async function streamMock(input, res) {
   }
 }
 
+/** Streams a DeepSeek completion, including optional tool calls, through the OpenAI client. */
 async function streamReal(input, res) {
   let OpenAI;
   try {
@@ -205,11 +217,11 @@ async function streamReal(input, res) {
   const modelChoice = MODEL_MAP[input.model] || MODEL_MAP[DEFAULT_MODEL_ID];
   const useTools = input.includeTools !== false && modelChoice.supportsTools;
 
-  // Auto-inject the MongoDB snapshot (scoped to this account) on the
-  // FIRST turn only (not on follow-up tool rounds, where the snapshot
-  // would be stale anyway and the model already knows what it just did).
-  let contextSummary = input.contextSummary;
-  if (!isFollowUpToolRound(input.messages) && !contextSummary) {
+  // Always build the account snapshot on the server for the first round.
+  // Client-provided context is intentionally ignored because it must not
+  // be able to replace trusted MongoDB ids or cross the account boundary.
+  let contextSummary = "";
+  if (!isFollowUpToolRound(input.messages)) {
     try {
       contextSummary = await buildSnapshot(input.ownerEmail);
     } catch (err) {
@@ -284,6 +296,7 @@ async function streamReal(input, res) {
   }
 }
 
+/** Validates a chat request and selects either the real or deterministic mock streaming path. */
 async function streamChat(input, res) {
   if (!Array.isArray(input.messages)) {
     res.status(400).json({ ok: false, error: "messages must be an array." });

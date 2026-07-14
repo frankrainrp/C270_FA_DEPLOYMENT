@@ -1,9 +1,8 @@
 // ============================================================
 // src/models/UserProfile.js
-// Single-tenant demo profile (Task 6: Platform / Billing / QA).
-// There is no multi-user auth yet (see Task 2 / routes/auth), so
-// the whole app operates on one "current user" document — the
-// same simplification Task/Note/CalendarEvent already use.
+// Account-scoped profile used by the Platform / Billing / QA pages.
+// Each document is keyed by ownerEmail so profile, plan, credits,
+// and billing history stay isolated between authenticated users.
 //
 // Also stores the simulated billing/credits state: plan tier,
 // credit balance, and a short append-only history of simulated

@@ -17,9 +17,11 @@
 //     message content field.
 // ============================================================
 
+/** Initializes the browser-side mapping from model tool calls to authenticated REST APIs. */
 (function initToolExecutor() {
   if (!window.ButlerApi) return;
 
+  /** Parses a tool's JSON argument string into an object without throwing. */
   function parseArgs(raw) {
     if (!raw) return {};
     if (typeof raw === "object") return raw;
@@ -28,6 +30,7 @@
 
   // Encode a bag of key/value pairs into a URL query string, skipping
   // empty values.  Used only by the *_list tools.
+  /** Serializes non-empty tool arguments into an encoded URL query string. */
   function toQuery(params) {
     var parts = [];
     Object.keys(params || {}).forEach(function (k) {
@@ -41,6 +44,7 @@
   // Map tool_name -> async (args) => any.
   // Each handler returns a JSON-serialisable value which is passed
   // back to the model as the tool result.
+  /** Uses the model tool-call id as an idempotency key for create requests. */
   function idempotencyOptions(call) {
     return call && call.id
       ? { headers: { "Idempotency-Key": String(call.id) } }
@@ -49,6 +53,7 @@
 
   var HANDLERS = {
     // ---------- TASKS ----------
+    // Creates an account-scoped task and forwards the tool-call id for idempotency.
     task_create: function (args, call) {
       return ButlerApi.post("/tasks", {
         title:       args.title,
@@ -57,6 +62,7 @@
         priority:    args.priority,
       }, idempotencyOptions(call));
     },
+    // Updates the editable fields of an existing task.
     task_update: function (args) {
       return ButlerApi.put("/tasks/" + args.id, {
         title:       args.title,
@@ -66,17 +72,21 @@
         completed:   args.completed,
       });
     },
+    // Deletes an existing task by its MongoDB id.
     task_delete: function (args) {
       return ButlerApi.del("/tasks/" + args.id);
     },
+    // Toggles the completed state of an existing task.
     task_toggle: function (args) {
       return ButlerApi.patch("/tasks/" + args.id + "/toggle");
     },
+    // Reads tasks using the requested task view filter.
     task_list: function (args) {
       return ButlerApi.get("/tasks" + toQuery({ view: args.view || "all" }));
     },
 
     // ---------- NOTES ----------
+    // Creates an account-scoped note and forwards the tool-call id for idempotency.
     note_create: function (args, call) {
       return ButlerApi.post("/notes", {
         title:   args.title,
@@ -85,6 +95,7 @@
         pinned:  args.pinned,
       }, idempotencyOptions(call));
     },
+    // Updates the editable fields of an existing note.
     note_update: function (args) {
       return ButlerApi.put("/notes/" + args.id, {
         title:   args.title,
@@ -93,17 +104,21 @@
         pinned:  args.pinned,
       });
     },
+    // Deletes an existing note by its MongoDB id.
     note_delete: function (args) {
       return ButlerApi.del("/notes/" + args.id);
     },
+    // Toggles the pinned state of an existing note.
     note_toggle_pin: function (args) {
       return ButlerApi.patch("/notes/" + args.id + "/toggle");
     },
+    // Reads notes using the requested pinned-state filter.
     note_list: function (args) {
       return ButlerApi.get("/notes" + toQuery({ filter: args.filter || "all" }));
     },
 
     // ---------- CALENDAR ----------
+    // Creates an account-scoped event and forwards the tool-call id for idempotency.
     event_create: function (args, call) {
       return ButlerApi.post("/calendar", {
         title:       args.title,
@@ -114,6 +129,7 @@
         allDay:      args.allDay,
       }, idempotencyOptions(call));
     },
+    // Updates the editable fields of an existing calendar event.
     event_update: function (args) {
       return ButlerApi.put("/calendar/" + args.id, {
         title:       args.title,
@@ -124,9 +140,11 @@
         allDay:      args.allDay,
       });
     },
+    // Deletes an existing calendar event by its MongoDB id.
     event_delete: function (args) {
       return ButlerApi.del("/calendar/" + args.id);
     },
+    // Reads all events or the upcoming event window requested by the model.
     event_list: function (args) {
       if (args.scope === "upcoming") return ButlerApi.get("/calendar/upcoming");
       return ButlerApi.get("/calendar");
@@ -139,6 +157,7 @@
   var channel = null;
   try { channel = new BroadcastChannel("butler-data"); } catch (_) {}
 
+  /** Notifies the current page and other tabs after a successful agent write. */
   function dispatchChanged(toolName) {
     try {
       window.dispatchEvent(new CustomEvent("butler:data-changed", {
