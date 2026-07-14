@@ -153,7 +153,6 @@
         <% }) %>
       </div>
         <% } %>
-    <% } %>
 
     <!-- =========================
          In Progress Tasks
@@ -201,14 +200,6 @@
 
             <div class="task-actions">
               <button class="glass-btn task-edit-trigger" type="button" data-task-edit>Edit</button>
-
-              <button
-                class="glass-btn"
-                type="button"
-                data-task-delete
-              >
-                Delete
-              </button>
               <button class="glass-btn" type="button" data-task-delete>Delete</button>
             </div>
           </article>
@@ -303,7 +294,6 @@
             <div class="task-main">
               <div class="task-title"><%= t.title %></div>
               <div class="task-meta">
-                <span><%= dueLabel %></span>
                 <span>Due <%= dueLabel %></span>
                 <span>Priority: <%= t.priority || 'medium' %></span>
               </div>
