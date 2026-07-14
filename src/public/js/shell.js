@@ -271,22 +271,24 @@
   }
 
   async function loadLearningTools() {
-    if (!window.ButlerApi || !miniAppsPanel) return;
+  if (!window.ButlerApi || !miniAppsPanel) return;
 
-    try {
-      var stats = await window.ButlerApi.get("/tasks/stats");
-      var allTasks = await window.ButlerApi.get("/tasks?view=all");
-      var completedTasks = Array.isArray(allTasks.tasks) ? allTasks.tasks.filter(function (task) { return task.completed; }) : [];
-      miniAppsPanel.querySelector("[data-stat-completed]").textContent = stats.completed;
-      miniAppsPanel.querySelector("[data-stat-active]").textContent = stats.active;
-      miniAppsPanel.querySelector("[data-stat-upcoming]").textContent = stats.upcoming;
-      renderWeeklyTrend(completedTasks);
-      renderTagDistribution(Array.isArray(allTasks.tasks) ? allTasks.tasks : []);
-      updateShareCard(stats);
-    } catch (err) {
-      console.error("Learning tools load failed:", err);
-    }
+  try {
+    var statsResponse = await window.ButlerApi.get("/tasks/stats");
+    var stats = statsResponse.stats; // unwrap, matches makeOk({ stats }) shape
+
+    var allTasks = await window.ButlerApi.get("/tasks?view=all");
+    var completedTasks = Array.isArray(allTasks.tasks) ? allTasks.tasks.filter(function (task) { return task.completed; }) : [];
+    miniAppsPanel.querySelector("[data-stat-completed]").textContent = stats.completed;
+    miniAppsPanel.querySelector("[data-stat-active]").textContent = stats.active;
+    miniAppsPanel.querySelector("[data-stat-upcoming]").textContent = stats.upcoming;
+    renderWeeklyTrend(completedTasks);
+    renderTagDistribution(Array.isArray(allTasks.tasks) ? allTasks.tasks : []);
+    updateShareCard(stats);
+  } catch (err) {
+    console.error("Learning tools load failed:", err);
   }
+}
 
   function copyShareText() {
     var shareText = miniAppsPanel.querySelector("[data-share-text]");

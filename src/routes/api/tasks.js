@@ -25,6 +25,20 @@ router.post("/", runSafe(async (req, res) => {
 }));
 
 /**
+ * GET /api/tasks/stats
+ * Get task statistics for the current user.
+ *
+ * IMPORTANT: this must be declared BEFORE GET /:id. Express matches
+ * routes in registration order, and "/:id" would otherwise swallow
+ * requests to "/stats" (treating "stats" as the :id param), which is
+ * exactly what was breaking the 7-day completion trend widget.
+ */
+router.get("/stats", runSafe(async (req, res) => {
+  const stats = await TaskService.getStats(req.sessionUser.email);
+  res.json(makeOk({ stats }));
+}));
+
+/**
  * GET /api/tasks/:id
  * Get a single task by ID.
  */
@@ -87,15 +101,6 @@ router.patch("/:id/toggle", runSafe(async (req, res) => {
     return res.status(404).json(makeFail("Task not found."));
   }
   res.json(makeOk({ task }));
-}));
-
-/**
- * GET /api/tasks/stats
- * Get task statistics for the current user.
- */
-router.get("/stats", runSafe(async (req, res) => {
-  const stats = await TaskService.getStats(req.sessionUser.email);
-  res.json(makeOk({ stats }));
 }));
 
 module.exports = router;
