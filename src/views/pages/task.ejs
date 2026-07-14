@@ -311,3 +311,29 @@
 
 <script src="/js/api.js" defer></script>
 <script src="/js/tasks-ui.js" defer></script>
+
+<script>
+  // Coming from a search-result link (/tasks/:id -> /tasks?view=all&highlight=<id>):
+  // scroll to the matching card and flash it so it's obvious which task
+  // was clicked, since there's no standalone task detail page.
+  //
+  // Deferred (not inline-immediate) so it runs AFTER tasks-ui.js's
+  // syncViewUi() has finished hiding/showing cards for the current view —
+  // otherwise this could highlight a card that gets hidden a moment later.
+  document.addEventListener("DOMContentLoaded", function () {
+    const params = new URLSearchParams(window.location.search);
+    const highlightId = params.get("highlight");
+    if (!highlightId) return;
+
+    const card = document.querySelector('[data-task-id="' + highlightId + '"]');
+    if (!card || card.hidden) return;
+
+    card.scrollIntoView({ behavior: "smooth", block: "center" });
+    card.style.outline = "2px solid var(--accent, #6fbf73)";
+    card.style.outlineOffset = "2px";
+    setTimeout(() => {
+      card.style.outline = "";
+      card.style.outlineOffset = "";
+    }, 2000);
+  });
+</script>

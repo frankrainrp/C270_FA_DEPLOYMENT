@@ -346,6 +346,32 @@ router.get("/tasks", requireAuthPage, async (req, res, next) => {
 });
 
 // -----------------------------------------------------------
+// Task detail: there's no standalone detail page for tasks (unlike
+// Notes, which has an activeNote side panel) — the task workspace is
+// a single list with an inline edit drawer. So /tasks/:id looks the
+// task up (scoped to this account, same as everywhere else), then
+// redirects into the list view with ?highlight=<id> so task.ejs's
+// client script can scroll to and flash the right card. Bad/missing
+// IDs (including malformed ObjectIds) just fall back to the plain
+// list instead of a 404 or 500.
+// -----------------------------------------------------------
+router.get("/tasks/:id", requireAuthPage, async (req, res, _next) => {
+  const ownerEmail = req.sessionUser.email;
+  try {
+    const task = await TaskService.findById(req.params.id, ownerEmail);
+    if (!task) return res.redirect("/tasks");
+    // view=all so syncViewUi() in tasks-ui.js doesn't hide the card we're
+    // about to highlight — its default view ("active") hides completed
+    // tasks, which is why completed-task links looked like they "worked"
+    // (redirected fine) but never actually scrolled to/highlighted anything.
+    res.redirect(`/tasks?view=all&highlight=${task._id}`);
+  } catch (err) {
+    // Malformed ObjectId etc. — treat as not found rather than 500.
+    res.redirect("/tasks");
+  }
+});
+
+// -----------------------------------------------------------
 // Notes: render only the current account's notes while supporting
 // pinned filtering and direct links to a selected note.
 // -----------------------------------------------------------
