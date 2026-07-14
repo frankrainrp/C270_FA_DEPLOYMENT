@@ -43,18 +43,18 @@ async function buildNotesRail(ownerEmail, existingNotes) {
   };
 }
 
-async function buildCalendarRail(ownerEmail, existingEvents) {
+async function buildCalendarRail(ownerEmail, existingEvents, year, month) {
   const today = new Date();
-  const year = today.getFullYear();
-  const month = today.getMonth();
-  const events = existingEvents || await CalendarService.findByMonth(year, month, ownerEmail);
-  const cells = buildMonthGrid(year, month, events);
+  const activeYear = Number.isInteger(year) ? year : today.getFullYear();
+  const activeMonth = Number.isInteger(month) ? month : today.getMonth();
+  const events = existingEvents || await CalendarService.findByMonth(activeYear, activeMonth, ownerEmail);
+  const cells = buildMonthGrid(activeYear, activeMonth, events);
 
   const miniMonth = cells.map((cell, index) => {
     const dayNum = parseInt(cell.label, 10);
     const date =
       cell.label && !Number.isNaN(dayNum)
-        ? `${year}-${String(month + 1).padStart(2, "0")}-${String(dayNum).padStart(2, "0")}`
+        ? `${activeYear}-${String(activeMonth + 1).padStart(2, "0")}-${String(dayNum).padStart(2, "0")}`
         : "";
     return {
       label: cell.label,

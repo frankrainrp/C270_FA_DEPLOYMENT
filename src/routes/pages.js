@@ -308,12 +308,19 @@ router.get("/search", requireAuthPage, async (req, res, next) => {
 router.get("/tasks", requireAuthPage, async (req, res, next) => {
   const ownerEmail = req.sessionUser.email;
   try {
+    const requestedView = (() => {
+      const raw = String(req.query.view || "active").toLowerCase();
+      if (raw === "active" || raw === "in_progress" || raw === "completed" || raw === "upcoming" || raw === "all") return raw;
+      return "active";
+    })();
+    const filterView = requestedView === "in_progress" ? "active" : requestedView;
+
     const [tasks, stats] = await Promise.all([
-      TaskService.findAll("all", ownerEmail),
+      TaskService.findAll(filterView, ownerEmail),
       TaskService.getStats(ownerEmail),
     ]);
     const [rail, authContext] = await Promise.all([
-      buildTasksRail("all", ownerEmail, stats),
+      buildTasksRail(requestedView, ownerEmail, stats),
       loadAuthContext(req),
     ]);
 
@@ -322,7 +329,7 @@ router.get("/tasks", requireAuthPage, async (req, res, next) => {
       activeNav: "tasks",
       page: "task",
       rail,
-      pageLocals: { tasks: tasks.map((t) => t.toObject()) },
+      pageLocals: { tasks: tasks.map((t) => t.toObject()), taskView: requestedView },
       ...authContext,
     });
   } catch (err) {
@@ -384,12 +391,22 @@ router.get("/notes/:id", requireAuthPage, (req, res, next) => {
 router.get("/calendar", requireAuthPage, async (req, res, next) => {
   const ownerEmail = req.sessionUser.email;
   try {
+    const now = new Date();
+    const requestedYear = Number.parseInt(req.query.year, 10);
+    const requestedMonth = Number.parseInt(req.query.month, 10);
+    const calendarYear = Number.isInteger(requestedYear) ? requestedYear : now.getFullYear();
+    const calendarMonth = Number.isInteger(requestedMonth) ? requestedMonth : now.getMonth();
+
+    if (!Number.isInteger(requestedYear) && !Number.isInteger(requestedMonth) && !req.query.date) {
+      return res.redirect(`/calendar?year=${calendarYear}&month=${calendarMonth}`);
+    }
+
     const [events, tasks] = await Promise.all([
       CalendarService.findAll(ownerEmail),
       TaskService.findAll("all", ownerEmail),
     ]);
     const [rail, authContext] = await Promise.all([
-      buildCalendarRail(ownerEmail, events),
+      buildCalendarRail(ownerEmail, events, calendarYear, calendarMonth),
       loadAuthContext(req),
     ]);
 
@@ -419,7 +436,11 @@ router.get("/calendar", requireAuthPage, async (req, res, next) => {
       activeNav: "calendar",
       page: "calendar",
       rail,
-      pageLocals: { events: combined },
+      pageLocals: {
+        events: combined,
+        calendarYear,
+        calendarMonth,
+      },
       ...authContext,
     });
   } catch (err) {

@@ -30,6 +30,14 @@
 
   const activeTasks = list.filter((t) => !t.completed);
   const completedTasks = list.filter((t) => t.completed);
+  const taskView = typeof locals.taskView === "string" ? locals.taskView : "active";
+  const taskViewLabel = {
+    active: "Active",
+    in_progress: "In Progress",
+    upcoming: "Upcoming",
+    all: "All Tasks",
+    completed: "Completed"
+  }[taskView] || "Active";
 %>
 
 <section class="tasks-panel" data-tasks-root>
@@ -40,6 +48,7 @@
     <div>
       <strong style="font-family: var(--font-display); font-size: 20px;">Tasks</strong>
       <span style="color: var(--color-text-muted); margin-left: 8px;">Study productivity workspace</span>
+      <span data-task-view-label style="color: var(--color-text-muted); margin-left: 8px; padding: 4px 10px; border: 1px solid var(--color-border-soft); border-radius: 999px; font-size: 12px;">Viewing <%= taskViewLabel %></span>
     </div>
     <button class="glass-btn" type="button" data-refresh-tasks>Refresh</button>
   </header>
@@ -106,6 +115,8 @@
           <article
             class="task-card"
             data-task-id="<%= t._id %>"
+            data-task-completed="false"
+            data-task-due-date="<%= t.dueDate ? new Date(t.dueDate).toISOString() : '' %>"
             data-title="<%= t.title %>"
             data-due="<%= dueLabel %>"
             data-priority="<%= t.priority || 'medium' %>"
@@ -127,7 +138,7 @@
               </div>
             </div>
             <div class="task-actions">
-              <button class="glass-btn task-detail-trigger" type="button">Details</button>
+              <button class="glass-btn task-edit-trigger" type="button" data-task-edit>Edit</button>
               <button class="glass-btn" type="button" data-task-delete>Delete</button>
             </div>
           </article>
@@ -149,6 +160,8 @@
           <article
             class="task-card completed"
             data-task-id="<%= t._id %>"
+            data-task-completed="true"
+            data-task-due-date="<%= t.dueDate ? new Date(t.dueDate).toISOString() : '' %>"
             data-title="<%= t.title %>"
             data-due="<%= dueLabel %>"
             data-priority="<%= t.priority || 'medium' %>"
@@ -170,7 +183,7 @@
               </div>
             </div>
             <div class="task-actions">
-              <button class="glass-btn task-detail-trigger" type="button">Details</button>
+              <button class="glass-btn task-edit-trigger" type="button" data-task-edit>Edit</button>
               <button class="glass-btn" type="button" data-task-delete>Delete</button>
             </div>
           </article>
