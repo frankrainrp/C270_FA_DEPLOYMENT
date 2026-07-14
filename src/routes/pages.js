@@ -12,6 +12,7 @@
 // ============================================================
 
 const express = require("express");
+const crypto = require("crypto");
 
 const { renderLayout } = require("../lib/renderLayout");
 const TaskService = require("../services/TaskService");
@@ -379,7 +380,9 @@ router.get("/notes/new", requireAuthPage, async (req, res, next) => {
   try {
     const note = await NoteService.create(
       { title: "Untitled note", content: "" },
-      req.sessionUser.email
+      req.sessionUser.email,
+      // User-initiated create, not from a tool call, so we generate a fresh key.
+      crypto.randomUUID()
     );
     res.redirect(`/notes/${note._id}`);
   } catch (err) {

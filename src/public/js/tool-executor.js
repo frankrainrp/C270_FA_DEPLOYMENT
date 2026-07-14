@@ -98,7 +98,7 @@
         content: args.content,
         tags:    args.tags,
         pinned:  args.pinned,
-      }, idempotencyOptions(call));
+      }, { headers: { "Idempotency-Key": (call && call.id) ? String(call.id) : generateUuid() } });
     },
     // Updates the editable fields of an existing note.
     note_update: function (args) {
@@ -132,7 +132,7 @@
         color:       args.color,
         tag:         args.tag,
         allDay:      args.allDay,
-      }, idempotencyOptions(call));
+      }, { headers: { "Idempotency-Key": (call && call.id) ? String(call.id) : generateUuid() } });
     },
     // Updates the editable fields of an existing calendar event.
     event_update: function (args) {
