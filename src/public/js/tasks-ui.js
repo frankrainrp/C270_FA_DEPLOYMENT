@@ -147,7 +147,16 @@
       '        </select>',
       '      </label>',
       '    </div>',
-      '  </div>',
+      '    <label class="task-create-field">',
+      '      <span>Status</span>',
+      '      <select data-task-modal-status>',
+      '        <option value="active">Active</option>',
+      '        <option value="in_progress">In Progress</option>',
+      '        <option value="upcoming">Upcoming</option>',
+      '        <option value="completed">Completed</option>',
+      '      </select>',
+      '    </label>',
+      '    </div>',
       '  <div class="task-create-modal-footer">',
       '    <p class="task-create-note">Create and edit use the same modal. The sidebar stays the only view selector.</p>',
       '    <div class="task-create-actions">',
@@ -155,7 +164,7 @@
       '      <button type="button" class="glass-btn" data-task-modal-submit>Create task</button>',
       '    </div>',
       '  </div>',
-      '</div>'
+      '</div>',
     ].join("");
 
     body.appendChild(modal);
@@ -170,6 +179,7 @@
     var descriptionInput = modal.querySelector("[data-task-modal-description]");
     var dueInput = modal.querySelector("[data-task-modal-due]");
     var priorityInput = modal.querySelector("[data-task-modal-priority]");
+    var statusInput = modal.querySelector("[data-task-modal-status]");
     var submitBtn = modal.querySelector("[data-task-modal-submit]");
     var cancelBtn = modal.querySelector("[data-task-modal-cancel]");
     var closeBtn = modal.querySelector("[data-task-modal-close]");
@@ -182,6 +192,7 @@
     descriptionInput.value = task && task.description ? task.description : "";
     dueInput.value = task && task.dueDate ? String(task.dueDate).slice(0, 10) : "";
     priorityInput.value = task && task.priority ? task.priority : "medium";
+    statusInput.value = task && task.status ? task.status : "active";
 
     function closeModal() {
       modal.hidden = true;
@@ -210,6 +221,7 @@
         description: descriptionInput.value.trim(),
         dueDate: dueInput.value || undefined,
         priority: priorityInput.value,
+        status: statusInput.value,
       };
 
       submitBtn.disabled = true;

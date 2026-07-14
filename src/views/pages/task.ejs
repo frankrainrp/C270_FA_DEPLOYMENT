@@ -45,7 +45,7 @@
       <span data-task-view-label style="color: var(--color-text-muted); margin-left: 8px; padding: 4px 10px; border: 1px solid var(--color-border-soft); border-radius: 999px; font-size: 12px;">Viewing <%= taskViewLabel %></span>
     </div>
     <div>
-      <button class="glass-btn" type="button" data-open-new-task>New Task</button>
+      <button class="glass-btn" type="button" data-action="new-task">New Task</button>
       <button class="glass-btn" type="button" data-refresh-tasks>Refresh</button>
     </div>
   </header>
@@ -306,66 +306,6 @@
         <% }) %>
       </div>
     <% } %>
-  </div>
-
-  <div class="task-detail-drawer" id="task-detail-drawer" aria-hidden="true">
-    <div class="task-drawer-header">
-      <div>
-        <p class="hero-kicker">Task detail</p>
-        <h3 id="task-detail-title">Select a task</h3>
-      </div>
-      <button class="glass-btn" type="button" data-close-drawer>Close</button>
-    </div>
-    <div class="task-drawer-body">
-      <div class="drawer-meta-row">
-        <span class="drawer-pill" id="task-detail-priority">Priority</span>
-        <span class="drawer-pill" id="task-detail-due">Due</span>
-      </div>
-      <p id="task-detail-description" class="drawer-description">Pick a task card to open its detail view.</p>
-      <div class="drawer-section">
-        <h4>Study notes</h4>
-        <p id="task-detail-notes">No notes yet.</p>
-      </div>
-      <div class="drawer-section">
-        <h4>Suggested next step</h4>
-        <p>Break this task into one small action and keep the momentum going.</p>
-      </div>
-    </div>
-  </div>
-
-  <div class="task-detail-drawer" id="new-task-drawer" aria-hidden="true">
-    <div class="task-drawer-header">
-      <div>
-        <p class="hero-kicker">New task</p>
-        <h3>Create a task</h3>
-      </div>
-      <button class="glass-btn" type="button" data-close-new-task>Close</button>
-    </div>
-    <div class="task-drawer-body">
-      <form id="new-task-form">
-        <div class="drawer-section">
-          <label for="new-task-title">Title</label>
-          <input id="new-task-title" type="text" name="title" required maxlength="200" placeholder="e.g. Finish CA2" />
-        </div>
-        <div class="drawer-section">
-          <label for="new-task-description">Description</label>
-          <textarea id="new-task-description" name="description" rows="3" placeholder="Optional notes"></textarea>
-        </div>
-        <div class="drawer-section">
-          <label for="new-task-due">Due date</label>
-          <input id="new-task-due" type="date" name="dueDate" />
-        </div>
-        <div class="drawer-section">
-          <label for="new-task-priority">Priority</label>
-          <select id="new-task-priority" name="priority">
-            <option value="low">Low</option>
-            <option value="medium" selected>Medium</option>
-            <option value="high">High</option>
-          </select>
-        </div>
-        <button class="glass-btn" type="submit">Create task</button>
-      </form>
-    </div>
   </div>
 </section>
 
