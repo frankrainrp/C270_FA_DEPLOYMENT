@@ -4,12 +4,13 @@ class TaskService {
   /**
    * Create a new task, owned by ownerEmail.
    */
-  async create(taskData, ownerEmail) {
+  async create(taskData, ownerEmail, idempotencyKey) {
     const task = new Task({
       ...taskData,
       ownerEmail,
       status: taskData.status || "active",
       completed: taskData.completed || false,
+      idempotencyKey: idempotencyKey,
     });
 
     return await task.save();

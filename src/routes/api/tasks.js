@@ -1,148 +1,101 @@
 const express = require("express");
-const router = express.Router();
 const TaskService = require("../../services/TaskService");
-const { makeOk, makeFail } = require("../../lib/apiResponse");
+const { makeOk, makeFail, runSafe } = require("../../lib/apiResponse");
 const { requireAuthApi } = require("../../middleware/requireAuth");
 
-// Every route below requires a logged-in session and is scoped to
-// req.sessionUser.email so one account never sees another's tasks.
+const router = express.Router();
 router.use(requireAuthApi);
 
 /**
- * GET /api/tasks
- * Get the current user's tasks, optionally filtered by view (all, active, completed, upcoming)
+ * POST /api/tasks
+ * Create a new task.
  */
-router.get("/", async (req, res) => {
-  try {
-    const view = req.query.view || "all";
-    const tasks = await TaskService.findAll(view, req.sessionUser.email);
-    res.json(makeOk({ tasks }));
-  } catch (err) {
-    console.error("[api/tasks] GET error:", err);
-    res.status(500).json(makeFail(err.message));
-  }
-});
+router.post("/", runSafe(async (req, res) => {
+  const { title, description, dueDate, priority, status } = req.body;
+  const ownerEmail = req.sessionUser.email;
+  const idempotencyKey = req.get("Idempotency-Key"); // Extract from header
 
-/**
- * GET /api/tasks/stats
- * Get the current user's task statistics (total, completed, active, upcoming counts)
- */
-router.get("/stats", async (req, res) => {
-  try {
-    const stats = await TaskService.getStats(req.sessionUser.email);
-    res.json(makeOk(stats));
-  } catch (err) {
-    console.error("[api/tasks] GET /stats error:", err);
-    res.status(500).json(makeFail(err.message));
+  if (!title || !title.trim()) {
+    return res.status(400).json(makeFail("Title is required."));
   }
-});
+
+  const taskData = { title, description, dueDate, priority, status };
+  const task = await TaskService.create(taskData, ownerEmail, idempotencyKey);
+  res.status(201).json(makeOk({ task }));
+}));
 
 /**
  * GET /api/tasks/:id
- * Get a single task by ID (must belong to the current user)
+ * Get a single task by ID.
  */
-router.get("/:id", async (req, res) => {
-  try {
-    const task = await TaskService.findById(req.params.id, req.sessionUser.email);
-    if (!task) {
-      return res.status(404).json(makeFail("Task not found"));
-    }
-    res.json(makeOk({ task }));
-  } catch (err) {
-    console.error("[api/tasks] GET /:id error:", err);
-    res.status(500).json(makeFail(err.message));
+router.get("/:id", runSafe(async (req, res) => {
+  const task = await TaskService.findById(req.params.id, req.sessionUser.email);
+  if (!task) {
+    return res.status(404).json(makeFail("Task not found."));
   }
-});
+  res.json(makeOk({ task }));
+}));
 
 /**
- * POST /api/tasks
- * Create a new task, owned by the current user
+ * GET /api/tasks
+ * Get all tasks for the current user, with optional filtering by view.
  */
-router.post("/", async (req, res) => {
-  try {
-    const { title, description, dueDate, priority } = req.body;
-
-    if (!title) {
-      return res.status(400).json(makeFail("Title is required"));
-    }
-
-    const task = await TaskService.create({
-      title,
-      description,
-      dueDate,
-      priority,
-    }, req.sessionUser.email, req.get("Idempotency-Key"));
-
-    res.status(201).json(makeOk({ task }));
-  } catch (err) {
-    console.error("[api/tasks] POST error:", err);
-    res.status(500).json(makeFail(err.message));
-  }
-});
+router.get("/", runSafe(async (req, res) => {
+  const view = req.query.view || "all";
+  const tasks = await TaskService.findAll(view, req.sessionUser.email);
+  res.json(makeOk({ tasks }));
+}));
 
 /**
  * PUT /api/tasks/:id
- * Update a task (must belong to the current user)
+ * Update an existing task.
  */
-router.put("/:id", async (req, res) => {
-  try {
-    const { title, description, dueDate, priority, completed } = req.body;
+router.put("/:id", runSafe(async (req, res) => {
+  const { title, description, dueDate, priority, status, completed } = req.body;
+  const updateData = { title, description, dueDate, priority, status, completed };
 
-    const task = await TaskService.update(req.params.id, {
-      title,
-      description,
-      dueDate,
-      priority,
-      completed,
-    }, req.sessionUser.email);
-
-    if (!task) {
-      return res.status(404).json(makeFail("Task not found"));
-    }
-
-    res.json(makeOk({ task }));
-  } catch (err) {
-    console.error("[api/tasks] PUT error:", err);
-    res.status(500).json(makeFail(err.message));
+  if (!title || !title.trim()) {
+    return res.status(400).json(makeFail("Title is required."));
   }
-});
+
+  const task = await TaskService.update(req.params.id, updateData, req.sessionUser.email);
+  if (!task) {
+    return res.status(404).json(makeFail("Task not found."));
+  }
+  res.json(makeOk({ task }));
+}));
 
 /**
  * DELETE /api/tasks/:id
- * Delete a task (must belong to the current user)
+ * Delete a task.
  */
-router.delete("/:id", async (req, res) => {
-  try {
-    const task = await TaskService.delete(req.params.id, req.sessionUser.email);
-
-    if (!task) {
-      return res.status(404).json(makeFail("Task not found"));
-    }
-
-    res.json(makeOk({}));
-  } catch (err) {
-    console.error("[api/tasks] DELETE error:", err);
-    res.status(500).json(makeFail(err.message));
+router.delete("/:id", runSafe(async (req, res) => {
+  const task = await TaskService.delete(req.params.id, req.sessionUser.email);
+  if (!task) {
+    return res.status(404).json(makeFail("Task not found."));
   }
-});
+  res.json(makeOk({ task }));
+}));
 
 /**
  * PATCH /api/tasks/:id/toggle
- * Toggle task completion status (must belong to the current user)
+ * Toggle the completed status of a task.
  */
-router.patch("/:id/toggle", async (req, res) => {
-  try {
-    const task = await TaskService.toggleComplete(req.params.id, req.sessionUser.email);
-
-    if (!task) {
-      return res.status(404).json(makeFail("Task not found"));
-    }
-
-    res.json(makeOk({ task }));
-  } catch (err) {
-    console.error("[api/tasks] PATCH /toggle error:", err);
-    res.status(500).json(makeFail(err.message));
+router.patch("/:id/toggle", runSafe(async (req, res) => {
+  const task = await TaskService.toggleComplete(req.params.id, req.sessionUser.email);
+  if (!task) {
+    return res.status(404).json(makeFail("Task not found."));
   }
-});
+  res.json(makeOk({ task }));
+}));
+
+/**
+ * GET /api/tasks/stats
+ * Get task statistics for the current user.
+ */
+router.get("/stats", runSafe(async (req, res) => {
+  const stats = await TaskService.getStats(req.sessionUser.email);
+  res.json(makeOk({ stats }));
+}));
 
 module.exports = router;

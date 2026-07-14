@@ -51,6 +51,11 @@
       : undefined;
   }
 
+  function generateUuid() {
+    if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID();
+    return "tool-" + Date.now() + "-" + Math.random().toString(16).slice(2);
+  }
+
   var HANDLERS = {
     // ---------- TASKS ----------
     // Creates an account-scoped task and forwards the tool-call id for idempotency.
@@ -60,7 +65,7 @@
         description: args.description,
         dueDate:     args.dueDate,
         priority:    args.priority,
-      }, idempotencyOptions(call));
+      }, { headers: { "Idempotency-Key": (call && call.id) ? String(call.id) : generateUuid() } });
     },
     // Updates the editable fields of an existing task.
     task_update: function (args) {
