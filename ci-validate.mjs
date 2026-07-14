@@ -37,10 +37,13 @@ requireFile('src/services/AchievementService.js', 'AchievementService');
 requireFile('src/views/achievements.ejs', 'Achievements view');
 
 // --- Login / signup via emailed OTP (n8n-backed): required files ---
-requireFile('src/models/User.js', 'User model');
-requireFile('src/models/OtpChallenge.js', 'OtpChallenge model');
+requireFile('src/models/PendingOtp.js', 'PendingOtp model');
+requireFile('src/models/Session.js', 'Session model');
 requireFile('src/services/AuthService.js', 'AuthService');
 requireFile('src/routes/api/auth.js', 'Auth API route');
+requireFile('src/lib/cookies.js', 'session cookie helpers');
+requireFile('src/lib/authGuard.js', 'global auth guard');
+requireFile('src/lib/db.js', 'database connector');
 requireFile('src/views/auth/login.ejs', 'Login view');
 requireFile('src/public/js/auth-login.js', 'Login client script');
 
@@ -48,16 +51,15 @@ requireFile('src/public/js/auth-login.js', 'Login client script');
 requireFile('src/middleware/requireAuth.js', 'requireAuth middleware');
 requireFile('scripts/migrate-owner-email.js', 'ownerEmail migration script');
 
-// --- Regression guard: cookie-parser is a declared dependency and must
-// actually be wired into app.js, or the login session cookie can never
-// be read back on subsequent requests. ---
-const appJsPath = 'src/app.js';
-if (fs.existsSync(appJsPath)) {
-  const source = fs.readFileSync(appJsPath, 'utf8');
-  const requiresCookieParser = /require\(["']cookie-parser["']\)/.test(source);
-  const usesCookieParser = /app\.use\(\s*cookieParser\s*\(/.test(source);
-  if (!requiresCookieParser || !usesCookieParser) {
-    console.error('Validation Failed: cookie-parser is not wired into app.js (required to read the login session cookie).');
+// --- Regression guard: the active remote-style auth flow must resolve
+// opaque cookies through MongoDB Session records before routes run. ---
+const routesIndexAuthPath = 'src/routes/index.js';
+if (fs.existsSync(routesIndexAuthPath)) {
+  const source = fs.readFileSync(routesIndexAuthPath, 'utf8');
+  const importsAuthGuard = /require\(["']\.\.\/lib\/authGuard["']\)/.test(source);
+  const usesAuthGuard = /app\.use\(\s*authGuard\s*\)/.test(source);
+  if (!importsAuthGuard || !usesAuthGuard) {
+    console.error('Validation Failed: authGuard is not mounted before application routes.');
     failed = true;
   }
 }

@@ -5,7 +5,7 @@
 // Responsibilities (this file only):
 //   - Load environment variables
 //   - Create the Express app
-//   - Register global middleware (body parsers, static assets, cookies)
+//   - Register global middleware (body parsers and static assets)
 //   - Configure EJS view engine
 //   - Mount every route through routes/index.js
 //   - Register 404 and error handlers
@@ -17,10 +17,6 @@
 
 const express = require("express");
 const path = require("path");
-const mongoose = require("mongoose");
-const cookieParser = require("cookie-parser");
-
-mongoose.set("bufferCommands", false);
 
 // Optional .env loader.  Wrapped in try/catch so the app still boots
 // if `dotenv` is not installed yet — useful during the very first run.
@@ -30,6 +26,7 @@ try {
 
 const mountRoutes = require("./routes");
 const { makeFail } = require("./lib/apiResponse");
+const { connectDb } = require("./lib/db");
 const AuthService = require("./services/AuthService");
 
 AuthService.assertProductionConfig();
@@ -41,11 +38,6 @@ const app = express();
 // ------------------------------------------------------------------
 app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 app.use(express.json({ limit: "5mb" }));
-// cookie-parser reads the login session cookie set by /api/auth/verify-otp,
-// and is what every requireAuth check (tasks/notes/calendar/chat/search)
-// relies on to identify the current account.
-app.use(cookieParser());
-
 // Static assets served from src/public.
 // Requests like /css/style.css or /js/shell.js resolve to files here.
 app.use(express.static(path.join(__dirname, "public")));
@@ -88,29 +80,20 @@ app.use((err, req, res, _next) => {
 // ------------------------------------------------------------------
 // Database connection (MongoDB via Mongoose)
 // ------------------------------------------------------------------
-const connectDB = async () => {
+async function startDatabase() {
   try {
-    const mongoUri = process.env.MONGO_URI || "mongodb://localhost:27017/butler";
-    const configuredTimeout = Number(process.env.MONGO_CONNECT_TIMEOUT_MS);
-    const serverSelectionTimeoutMS = Number.isFinite(configuredTimeout) && configuredTimeout > 0
-      ? configuredTimeout
-      : 5000;
-    await mongoose.connect(mongoUri, { serverSelectionTimeoutMS });
-    const safeMongoUri = mongoUri.replace(/(mongodb(?:\+srv)?:\/\/)([^@/]+)@/i, "$1***:***@");
-    console.log("[db] Connected to MongoDB:", safeMongoUri);
+    await connectDb();
   } catch (err) {
     console.error("[db] MongoDB connection failed:", err.message);
-    // Don't exit — allow app to run without DB (useful for dev/testing)
-    // In production, you'd want to exit here
   }
-};
+}
 
 // ------------------------------------------------------------------
 // Server bootstrap
 // ------------------------------------------------------------------
 const PORT = process.env.PORT || 3000;
 
-connectDB();
+startDatabase();
 
 app.listen(PORT, () => {
   console.log(`Butler is running at http://localhost:${PORT}`);

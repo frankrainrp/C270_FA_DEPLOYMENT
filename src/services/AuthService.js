@@ -1,206 +1,196 @@
 // ============================================================
 // src/services/AuthService.js
-// Login/signup via emailed OTP, generated & delivered by an n8n
-// workflow (n8n owns: code generation, SMTP delivery, "have we seen
-// this email before" lookup in its own Data Table). Butler owns:
-// holding the code server-side and verifying it, and the real User
-// record / session once verification succeeds.
-//
-// IMPORTANT: the n8n webhook's response includes the raw code. This
-// service is the ONLY thing allowed to call that webhook — never call
-// N8N_OTP_WEBHOOK_URL from client-side JS, or the code (and therefore
-// the whole point of emailing it) leaks straight to the browser.
+// Implements the remote branch's email OTP flow. n8n generates and
+// emails the code; Butler stores PendingOtp and opaque Session records
+// in MongoDB and never returns the raw code to the browser.
 // ============================================================
 
-const jwt = require("jsonwebtoken");
-const User = require("../models/User");
-const OtpChallenge = require("../models/OtpChallenge");
+const crypto = require("crypto");
+const mongoose = require("mongoose");
+const PendingOtp = require("../models/PendingOtp");
+const Session = require("../models/Session");
 
+const OTP_TTL_MINUTES = Number(process.env.OTP_TTL_MINUTES) > 0
+  ? Number(process.env.OTP_TTL_MINUTES)
+  : 5;
+const SESSION_TTL_DAYS = Number(process.env.SESSION_TTL_DAYS) > 0
+  ? Number(process.env.SESSION_TTL_DAYS)
+  : 30;
+const MAX_VERIFY_ATTEMPTS = Number(process.env.OTP_MAX_ATTEMPTS) > 0
+  ? Number(process.env.OTP_MAX_ATTEMPTS)
+  : 5;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const CODE_RE = /^\d{4,8}$/;
-const RESEND_COOLDOWN_MS = 30 * 1000; // 30s between OTP requests per email
-const SESSION_TTL = "7d";
+const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
+const RATE_LIMIT_MAX_REQUESTS = 5;
+const requestLog = new Map();
 
-/** Reads authentication settings from the process environment with safe local defaults. */
-function getConfig() {
+/** Fails fast when production cannot reach the configured OTP delivery workflow. */
+function assertProductionConfig() {
+  if (process.env.NODE_ENV === "production" && !process.env.N8N_OTP_WEBHOOK_URL) {
+    throw new Error("N8N_OTP_WEBHOOK_URL must be configured in production.");
+  }
+}
+
+/** Creates an Error carrying the HTTP status expected by the auth routes. */
+function httpError(message, status) {
+  const error = new Error(message);
+  error.status = status;
+  return error;
+}
+
+/** Rejects authentication operations until the MongoDB connection is ready. */
+function assertDatabaseReady() {
+  if (mongoose.connection.readyState !== 1) {
+    throw httpError("The database isn't ready yet. Please wait a moment and try again.", 503);
+  }
+}
+
+/** Records one OTP request and reports whether the email exceeded the rolling limit. */
+function isRateLimited(email) {
+  const now = Date.now();
+  const recent = (requestLog.get(email) || []).filter(
+    (timestamp) => now - timestamp < RATE_LIMIT_WINDOW_MS
+  );
+  recent.push(now);
+  requestLog.set(email, recent);
+  return recent.length > RATE_LIMIT_MAX_REQUESTS;
+}
+
+/** Calls n8n, stores the returned OTP server-side, and returns only safe metadata. */
+async function requestOtp(email, name) {
+  assertDatabaseReady();
+
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  const normalizedName = String(name || "").trim();
+  if (!normalizedEmail || !EMAIL_RE.test(normalizedEmail)) {
+    throw httpError("Enter a valid email address.", 400);
+  }
+  if (isRateLimited(normalizedEmail)) {
+    throw httpError("Too many code requests for this email. Try again in a few minutes.", 429);
+  }
+
+  const webhookUrl = process.env.N8N_OTP_WEBHOOK_URL || "";
+  if (!webhookUrl) {
+    throw httpError("OTP delivery is not configured yet. Set N8N_OTP_WEBHOOK_URL in .env.", 503);
+  }
+
+  let payload;
+  try {
+    const response = await fetch(webhookUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: normalizedEmail, name: normalizedName }),
+    });
+    if (!response.ok) {
+      throw new Error(`n8n webhook responded with HTTP ${response.status}`);
+    }
+    payload = await response.json();
+  } catch (err) {
+    console.error("[AuthService] n8n OTP request failed:", err.message);
+    throw httpError("Could not send the verification code right now. Please try again.", 502);
+  }
+
+  const code = String(payload && payload.code || "").trim();
+  if (!CODE_RE.test(code)) {
+    throw httpError("The code delivery service did not return a valid code.", 502);
+  }
+
+  const resolvedName = String(payload && payload.name || normalizedName).trim();
+  const isNewUser = Boolean(payload && payload.isNew);
+  const expiresAt = new Date(Date.now() + OTP_TTL_MINUTES * 60 * 1000);
+
+  await PendingOtp.deleteMany({ email: normalizedEmail });
+  await PendingOtp.create({
+    email: normalizedEmail,
+    code,
+    name: resolvedName,
+    isNewUser,
+    attempts: 0,
+    expiresAt,
+  });
+
   return {
-    webhookUrl: process.env.N8N_OTP_WEBHOOK_URL || "",
-    expiryMinutes: Number(process.env.OTP_EXPIRY_MINUTES) || 5,
-    maxAttempts: Number(process.env.OTP_MAX_ATTEMPTS) || 5,
-    jwtSecret: process.env.JWT_SECRET || "change-me",
+    isNew: isNewUser,
+    name: resolvedName,
+    expiresInSeconds: OTP_TTL_MINUTES * 60,
   };
 }
 
-class AuthService {
-  /** Fails fast when production authentication secrets or delivery settings are missing. */
-  assertProductionConfig() {
-    if (process.env.NODE_ENV !== "production") return;
+/** Verifies and consumes an OTP, then creates a server-side login Session. */
+async function verifyOtp(email, code) {
+  assertDatabaseReady();
 
-    const { jwtSecret, webhookUrl } = getConfig();
-    if (!jwtSecret || jwtSecret === "change-me") {
-      throw new Error("JWT_SECRET must be set to a strong, non-default value in production.");
-    }
-    if (!webhookUrl) {
-      throw new Error("N8N_OTP_WEBHOOK_URL must be configured in production.");
-    }
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  const submittedCode = String(code || "").trim();
+  if (!normalizedEmail || !submittedCode) {
+    throw httpError("Email and code are required.", 400);
   }
 
-  /** Signs the minimal authenticated user identity into a time-limited session JWT. */
-  issueSessionToken(user) {
-    const { jwtSecret } = getConfig();
-    return jwt.sign(
-      { sub: String(user._id), email: user.email, name: user.name },
-      jwtSecret,
-      { expiresIn: SESSION_TTL }
-    );
+  const pending = await PendingOtp.findOne({ email: normalizedEmail });
+  if (!pending || pending.expiresAt.getTime() <= Date.now()) {
+    if (pending) await PendingOtp.deleteOne({ _id: pending._id });
+    throw httpError("That code expired or was never requested. Request a new one.", 400);
+  }
+  if (pending.attempts >= MAX_VERIFY_ATTEMPTS) {
+    await PendingOtp.deleteOne({ _id: pending._id });
+    throw httpError("Too many incorrect attempts. Request a new code.", 429);
+  }
+  if (pending.code !== submittedCode) {
+    pending.attempts += 1;
+    await pending.save();
+    throw httpError("Incorrect code.", 400);
   }
 
-  /**
-   * Calls the n8n "send-otp" webhook, stores the code it returns
-   * server-side (with an expiry), and never forwards the code itself
-   * to whoever called this function.
-   */
-  async requestOtp({ email, name }) {
-    const { webhookUrl, expiryMinutes } = getConfig();
-    const normalizedEmail = String(email || "").trim().toLowerCase();
+  await PendingOtp.deleteOne({ _id: pending._id });
 
-    if (!EMAIL_RE.test(normalizedEmail)) {
-      throw new Error("Enter a valid email address.");
-    }
-    if (!webhookUrl) {
-      throw new Error("OTP delivery is not configured (missing N8N_OTP_WEBHOOK_URL).");
-    }
+  const token = crypto.randomBytes(32).toString("hex");
+  const expiresAt = new Date(Date.now() + SESSION_TTL_DAYS * 24 * 60 * 60 * 1000);
+  await Session.create({
+    token,
+    email: normalizedEmail,
+    name: pending.name || "",
+    expiresAt,
+  });
 
-    // Simple resend cooldown so a user (or a script) can't hammer the
-    // email/n8n webhook by repeatedly requesting codes.
-    const existing = await OtpChallenge.findOne({ email: normalizedEmail });
-    if (existing) {
-      const elapsed = Date.now() - existing.updatedAt.getTime();
-      if (elapsed < RESEND_COOLDOWN_MS) {
-        const waitSeconds = Math.ceil((RESEND_COOLDOWN_MS - elapsed) / 1000);
-        throw new Error(`Please wait ${waitSeconds}s before requesting another code.`);
-      }
-    }
-
-    let response;
-    try {
-      response = await fetch(webhookUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: normalizedEmail, name: String(name || "").trim() }),
-      });
-    } catch (err) {
-      throw new Error(`Could not reach the OTP service: ${err.message}`);
-    }
-
-    if (!response.ok) {
-      throw new Error(`OTP service returned HTTP ${response.status}.`);
-    }
-
-    let payload;
-    try {
-      payload = await response.json();
-    } catch (_) {
-      throw new Error("OTP service returned an unexpected (non-JSON) response.");
-    }
-
-    if (!payload || !payload.ok || !payload.code) {
-      throw new Error("OTP service did not return a code.");
-    }
-
-    const expiresAt = new Date(Date.now() + expiryMinutes * 60 * 1000);
-
-    await OtpChallenge.findOneAndUpdate(
-      { email: normalizedEmail },
-      {
-        email: normalizedEmail,
-        code: String(payload.code),
-        name: payload.name || name || "",
-        isNewUser: Boolean(payload.isNew),
-        attempts: 0,
-        expiresAt,
-      },
-      { upsert: true, new: true, setDefaultsOnInsert: true }
-    );
-
-    // Deliberately excludes the code — only the emailed message should have it.
-    return {
-      isNew: Boolean(payload.isNew),
-      name: payload.name || "",
-      expiresInMinutes: expiryMinutes,
-    };
-  }
-
-  /**
-   * Compares a user-submitted code against the stored challenge.
-   * On success, promotes/updates the User record and issues a JWT.
-   */
-  async verifyOtp({ email, code }) {
-    const { maxAttempts } = getConfig();
-    const normalizedEmail = String(email || "").trim().toLowerCase();
-    const submittedCode = String(code || "").trim();
-
-    if (!EMAIL_RE.test(normalizedEmail)) {
-      throw new Error("Enter a valid email address.");
-    }
-    if (!CODE_RE.test(submittedCode)) {
-      throw new Error("Enter the code from your email.");
-    }
-
-    const challenge = await OtpChallenge.findOne({ email: normalizedEmail });
-    if (!challenge) {
-      throw new Error("No pending code for this email. Request a new one.");
-    }
-    if (challenge.expiresAt.getTime() < Date.now()) {
-      await OtpChallenge.deleteOne({ _id: challenge._id });
-      throw new Error("This code has expired. Request a new one.");
-    }
-    if (challenge.attempts >= maxAttempts) {
-      await OtpChallenge.deleteOne({ _id: challenge._id });
-      throw new Error("Too many incorrect attempts. Request a new code.");
-    }
-
-    if (challenge.code !== submittedCode) {
-      challenge.attempts += 1;
-      await challenge.save();
-      const remaining = maxAttempts - challenge.attempts;
-      throw new Error(`Incorrect code. ${remaining} attempt${remaining === 1 ? "" : "s"} left.`);
-    }
-
-    const wasNewUser = challenge.isNewUser;
-    const resolvedName = challenge.name || "";
-
-    const user = await User.findOneAndUpdate(
-      { email: normalizedEmail },
-      {
-        email: normalizedEmail,
-        name: resolvedName,
-        verified: true,
-        lastLoginAt: new Date(),
-      },
-      { upsert: true, new: true, setDefaultsOnInsert: true }
-    );
-
-    await OtpChallenge.deleteOne({ _id: challenge._id });
-
-    const token = this.issueSessionToken(user);
-
-    return {
-      token,
-      user: { email: user.email, name: user.name },
-      isNew: wasNewUser,
-    };
-  }
-
-  /** Verifies a session cookie's JWT, returning its payload or null. */
-  verifySessionToken(token) {
-    if (!token) return null;
-    try {
-      return jwt.verify(token, getConfig().jwtSecret);
-    } catch (_) {
-      return null;
-    }
-  }
+  return {
+    token,
+    email: normalizedEmail,
+    name: pending.name || "",
+    isNew: pending.isNewUser,
+    expiresAt,
+    sessionTtlDays: SESSION_TTL_DAYS,
+  };
 }
 
-module.exports = new AuthService();
+/** Resolves an unexpired server-side Session by its opaque token. */
+async function getSessionByToken(token) {
+  if (!token) return null;
+  return Session.findOne({ token, expiresAt: { $gt: new Date() } });
+}
+
+/** Updates the display name stored with the active Session. */
+async function updateSessionName(token, name) {
+  if (!token) return null;
+  return Session.findOneAndUpdate(
+    { token, expiresAt: { $gt: new Date() } },
+    { name: String(name || "").trim() },
+    { new: true }
+  );
+}
+
+/** Permanently destroys one server-side Session token. */
+async function destroySession(token) {
+  if (!token) return;
+  await Session.deleteOne({ token });
+}
+
+module.exports = {
+  requestOtp,
+  verifyOtp,
+  getSessionByToken,
+  updateSessionName,
+  destroySession,
+  assertDatabaseReady,
+  assertProductionConfig,
+};

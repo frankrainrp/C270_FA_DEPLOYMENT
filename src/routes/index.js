@@ -15,8 +15,12 @@ const apiProfile = require("./api/profile");
 const apiBilling = require("./api/billing");
 const apiAuth = require("./api/auth");
 const apiDocuments = require("./api/documents");
+const { authGuard } = require("../lib/authGuard");
 
 module.exports = function mountRoutes(app) {
+  // Resolve the remote-style server-side Session before any page or API route.
+  app.use(authGuard);
+
   // HTML pages served with the shared layout shell.
   app.use(pages);
 

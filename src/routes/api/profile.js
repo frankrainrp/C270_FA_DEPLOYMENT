@@ -29,7 +29,6 @@ const multer = require("multer");
 
 const UserProfileService = require("../../services/UserProfileService");
 const AuthService = require("../../services/AuthService");
-const User = require("../../models/User");
 const { makeOk, makeFail, runSafe } = require("../../lib/apiResponse");
 const { requireAuthApi } = require("../../middleware/requireAuth");
 
@@ -107,22 +106,16 @@ router.put("/", async (req, res) => {
       return res.status(400).json(makeFail("Name cannot be empty."));
     }
 
-    const updatedUser = await User.findOneAndUpdate(
-      { email: sessionUser.email },
-      { name: String(name || "").trim() },
-      { new: true, runValidators: true, upsert: true, setDefaultsOnInsert: true }
-    );
-    await UserProfileService.updateProfile(sessionUser.email, { name });
-    res.cookie("butler_session", AuthService.issueSessionToken(updatedUser), {
-      httpOnly: true,
-      sameSite: "lax",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-      secure: process.env.NODE_ENV === "production",
-    });
+    const normalizedName = String(name || "").trim();
+    await UserProfileService.updateProfile(sessionUser.email, { name: normalizedName });
+    const updatedSession = await AuthService.updateSessionName(req.sessionToken, normalizedName);
+    if (!updatedSession) {
+      return res.status(401).json(makeFail("Your session expired. Please sign in again."));
+    }
     return res.json(makeOk({
       profile: {
-        name: updatedUser.name,
-        email: updatedUser.email,
+        name: updatedSession.name,
+        email: updatedSession.email,
         emailEditable: false,
       },
     }));

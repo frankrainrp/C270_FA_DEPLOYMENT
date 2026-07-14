@@ -79,23 +79,16 @@ test("merged note and achievement features remain account-scoped", () => {
   assert.match(achievements, /\{ \$match: \{ ownerEmail \} \}/);
 });
 
-test("production refuses the default JWT secret", () => {
+test("MongoDB sessions do not depend on a JWT secret", () => {
   const previousMode = process.env.NODE_ENV;
-  const previousSecret = process.env.JWT_SECRET;
   const previousWebhook = process.env.N8N_OTP_WEBHOOK_URL;
   process.env.NODE_ENV = "production";
-  process.env.JWT_SECRET = "change-me";
   process.env.N8N_OTP_WEBHOOK_URL = "https://example.test/send-otp";
   try {
-    assert.throws(
-      () => AuthService.assertProductionConfig(),
-      /JWT_SECRET must be set/
-    );
+    assert.doesNotThrow(() => AuthService.assertProductionConfig());
   } finally {
     if (previousMode === undefined) delete process.env.NODE_ENV;
     else process.env.NODE_ENV = previousMode;
-    if (previousSecret === undefined) delete process.env.JWT_SECRET;
-    else process.env.JWT_SECRET = previousSecret;
     if (previousWebhook === undefined) delete process.env.N8N_OTP_WEBHOOK_URL;
     else process.env.N8N_OTP_WEBHOOK_URL = previousWebhook;
   }
@@ -103,10 +96,8 @@ test("production refuses the default JWT secret", () => {
 
 test("production requires an OTP delivery webhook", () => {
   const previousMode = process.env.NODE_ENV;
-  const previousSecret = process.env.JWT_SECRET;
   const previousWebhook = process.env.N8N_OTP_WEBHOOK_URL;
   process.env.NODE_ENV = "production";
-  process.env.JWT_SECRET = "a-test-secret-that-is-not-the-default";
   delete process.env.N8N_OTP_WEBHOOK_URL;
   try {
     assert.throws(
@@ -116,8 +107,6 @@ test("production requires an OTP delivery webhook", () => {
   } finally {
     if (previousMode === undefined) delete process.env.NODE_ENV;
     else process.env.NODE_ENV = previousMode;
-    if (previousSecret === undefined) delete process.env.JWT_SECRET;
-    else process.env.JWT_SECRET = previousSecret;
     if (previousWebhook === undefined) delete process.env.N8N_OTP_WEBHOOK_URL;
     else process.env.N8N_OTP_WEBHOOK_URL = previousWebhook;
   }

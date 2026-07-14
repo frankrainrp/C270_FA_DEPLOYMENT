@@ -98,10 +98,13 @@ Browser
 - `panelHelpers.js` contains date, note-preview, and calendar-grid helpers.
 - `renderLayout.js` supplies consistent locals to the shared EJS layout,
   including the logged-in user's name/email and login state.
+- `cookies.js` reads and writes the opaque `butler_session` cookie.
+- `authGuard.js` resolves the MongoDB Session before routes run.
+- `db.js` owns the application's Mongoose connection.
 
 ### `src/middleware/`
 
-- `requireAuth.js` reads the `butler_session` cookie via `AuthService`.
+- `requireAuth.js` resolves the `butler_session` token via `AuthService`.
   `requireAuthPage` redirects unauthenticated page requests to
   `/auth/login?next=...`; `requireAuthApi` returns a 401 JSON response for
   unauthenticated API requests. Both attach `req.sessionUser`.
@@ -111,9 +114,12 @@ Browser
 - `Task.js`, `Note.js`, `CalendarEvent.js`, `ChatSession.js` each carry an
   `ownerEmail` field and store their respective domain data, scoped per
   account.
-- `User.js` stores the verified login identity (email, name, last login).
-- `OtpChallenge.js` holds a pending emailed code server-side (with expiry
-  and attempt tracking) until it's verified or expires.
+- `PendingOtp.js` holds a pending emailed code server-side, including expiry
+  and wrong-attempt tracking.
+- `Session.js` stores opaque login tokens and their server-side identity with
+  a MongoDB TTL expiry. The browser cookie contains only the random token.
+- `User.js` and `OtpChallenge.js` are retained for data compatibility with the
+  earlier JWT implementation but are not used by the active login flow.
 - `UserProfile.js` stores each account's avatar, plan, and simulated credits.
 
 ### `src/routes/`
@@ -132,8 +138,8 @@ Browser
 
 ### `src/services/`
 
-- `AuthService.js` calls the n8n OTP webhook, stores/verifies the code
-  server-side, and issues the session JWT.
+- `AuthService.js` calls the n8n OTP webhook, stores/verifies `PendingOtp`,
+  and creates or destroys server-side MongoDB `Session` records.
 - `ChatService.js` validates history, injects an account-scoped context
   snapshot, streams model output, limits tool rounds, and persists
   completed messages against the caller's `ownerEmail`.
@@ -257,10 +263,12 @@ MongoDB data is stored in the named `butler_data` volume. Do not use
 | `CHAT_MOCK_MODE` | Forces deterministic offline chat |
 | `DOCUMENT_MAX_MB` | Maximum uploaded file size |
 | `DOCUMENT_TEXT_LIMIT` | Maximum extracted characters per document |
-| `JWT_SECRET` | Signs the login session cookie — change for any real deployment |
 | `N8N_OTP_WEBHOOK_URL` | n8n workflow that emails the login code |
-| `OTP_EXPIRY_MINUTES` | How long an emailed code stays valid |
+| `OTP_TTL_MINUTES` | How long an emailed code stays valid |
 | `OTP_MAX_ATTEMPTS` | Wrong-attempt limit before a code is invalidated |
+| `SESSION_TTL_DAYS` | Lifetime of a server-side MongoDB session |
+| `SESSION_COOKIE_NAME` | Name of the httpOnly opaque-token cookie |
+| `AUTH_REQUIRED` | Enables the global login gate; defaults to `true` |
 
 ## Validation
 

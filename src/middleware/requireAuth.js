@@ -1,47 +1,52 @@
 // ============================================================
 // src/middleware/requireAuth.js
-// Shared login gate for the per-account data features (tasks, notes,
-// calendar, chat, search). Reads the same butler_session cookie used
-// everywhere else and resolves it via AuthService.verifySessionToken.
-//
-// Two flavors:
-//   requireAuthPage — for HTML page routes (pages.js). Redirects an
-//     unauthenticated visitor to /auth/login?next=<original url> so
-//     they land back where they were headed after signing in.
-//   requireAuthApi  — for JSON API routes (routes/api/*). Responds
-//     401 instead of redirecting, since these are called by fetch().
-//
-// On success, both attach req.sessionUser = { sub, email, name } so
-// downstream handlers never need to re-decode the cookie themselves.
+// Provides route-level page and API guards backed by MongoDB Session
+// records. The global authGuard normally preloads req.sessionUser;
+// these guards remain a defensive boundary on account-owned routes.
 // ============================================================
 
 const AuthService = require("../services/AuthService");
+const { readSessionCookie } = require("../lib/cookies");
 const { makeFail } = require("../lib/apiResponse");
 
-const SESSION_COOKIE = "butler_session";
+/** Resolves and caches the current request's authenticated Session identity. */
+async function getSessionUser(req) {
+  if (req.sessionUser) return req.sessionUser;
 
-function getSessionUser(req) {
-  const token = req && req.cookies ? req.cookies[SESSION_COOKIE] : null;
-  return AuthService.verifySessionToken(token);
+  const token = req.sessionToken || readSessionCookie(req);
+  const session = token ? await AuthService.getSessionByToken(token) : null;
+  if (!session) return null;
+
+  req.sessionToken = token;
+  req.sessionUser = { email: session.email, name: session.name };
+  return req.sessionUser;
 }
 
-function requireAuthPage(req, res, next) {
-  const sessionUser = getSessionUser(req);
-  if (!sessionUser) {
-    const next_ = encodeURIComponent(req.originalUrl || "/");
-    return res.redirect(`/auth/login?next=${next_}`);
+/** Redirects signed-out HTML requests to login and preserves the target URL. */
+async function requireAuthPage(req, res, next) {
+  try {
+    const sessionUser = await getSessionUser(req);
+    if (!sessionUser) {
+      const nextUrl = encodeURIComponent(req.originalUrl || "/");
+      return res.redirect(`/auth/login?next=${nextUrl}`);
+    }
+    return next();
+  } catch (err) {
+    return next(err);
   }
-  req.sessionUser = sessionUser;
-  next();
 }
 
-function requireAuthApi(req, res, next) {
-  const sessionUser = getSessionUser(req);
-  if (!sessionUser) {
-    return res.status(401).json(makeFail("Please sign in to continue."));
+/** Returns HTTP 401 for signed-out JSON API requests. */
+async function requireAuthApi(req, res, next) {
+  try {
+    const sessionUser = await getSessionUser(req);
+    if (!sessionUser) {
+      return res.status(401).json(makeFail("Please sign in to continue."));
+    }
+    return next();
+  } catch (err) {
+    return next(err);
   }
-  req.sessionUser = sessionUser;
-  next();
 }
 
 module.exports = { requireAuthPage, requireAuthApi, getSessionUser };

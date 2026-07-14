@@ -21,7 +21,8 @@ const ChatSessionService = require("../services/ChatSessionService");
 const UserProfileService = require("../services/UserProfileService");
 const AchievementService = require("../services/AchievementService");
 const AuthService = require("../services/AuthService");
-const { requireAuthPage, getSessionUser } = require("../middleware/requireAuth");
+const { requireAuthPage } = require("../middleware/requireAuth");
+const { readSessionCookie, clearSessionCookie } = require("../lib/cookies");
 const { serializeForInlineScript } = require("../lib/safeJson");
 const {
   buildTasksRail,
@@ -43,7 +44,7 @@ const router = express.Router();
 // unreachable so pages still render during local dev without a DB.
 // -----------------------------------------------------------
 async function loadAuthContext(req) {
-  const sessionUser = req.sessionUser || getSessionUser(req);
+  const sessionUser = req.sessionUser;
   if (!sessionUser) return { isLoggedIn: false };
 
   try {
@@ -435,11 +436,14 @@ router.get("/study/dashboard", (_req, res) => res.redirect("/tasks"));
 // -----------------------------------------------------------
 // Standalone auth / preferences pages (no layout shell).
 // -----------------------------------------------------------
-router.get("/auth/login", (_req, res) => {
+router.get("/auth/login", (req, res) => {
+  if (res.locals.isLoggedIn) return res.redirect("/chat");
+
   res.render("auth/login", {
     title: "Sign in — Butler",
     lang: "en",
     theme: "retro",
+    nextUrl: typeof req.query.next === "string" ? req.query.next : "/chat",
   });
 });
 
@@ -541,12 +545,17 @@ router.get("/achievements", requireAuthPage, async (req, res, next) => {
 });
 
 // -----------------------------------------------------------
-// Logout. Clears the real session cookie set by /api/auth/verify-otp
-// and sends the user back to the login screen.
+// Logout. Destroys the MongoDB Session before clearing its opaque cookie.
 // -----------------------------------------------------------
-router.post("/logout", (req, res) => {
-  res.clearCookie("butler_session");
-  res.redirect("/auth/login");
+router.post("/logout", async (req, res, next) => {
+  try {
+    const token = req.sessionToken || readSessionCookie(req);
+    await AuthService.destroySession(token);
+    clearSessionCookie(res);
+    res.redirect("/auth/login");
+  } catch (err) {
+    next(err);
+  }
 });
 
 module.exports = router;
