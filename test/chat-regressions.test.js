@@ -68,6 +68,17 @@ test("chat identity and data context remain server-authoritative", () => {
   assert.doesNotMatch(client, /contextSummary:\s*opts\.contextSummary/);
 });
 
+test("merged note and achievement features remain account-scoped", () => {
+  const pages = read("src/routes/pages.js");
+  const achievements = read("src/services/AchievementService.js");
+
+  assert.match(pages, /router\.get\("\/notes\/new", requireAuthPage/);
+  assert.match(pages, /router\.get\("\/notes\/:id", requireAuthPage/);
+  assert.match(pages, /AchievementService\.getBadges\(req\.sessionUser\.email\)/);
+  assert.match(achievements, /Task\.countDocuments\(\{ ownerEmail \}\)/);
+  assert.match(achievements, /\{ \$match: \{ ownerEmail \} \}/);
+});
+
 test("production refuses the default JWT secret", () => {
   const previousMode = process.env.NODE_ENV;
   const previousSecret = process.env.JWT_SECRET;

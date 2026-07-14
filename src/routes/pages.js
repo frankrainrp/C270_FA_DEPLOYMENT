@@ -19,6 +19,7 @@ const NoteService = require("../services/NoteService");
 const CalendarService = require("../services/CalendarService");
 const ChatSessionService = require("../services/ChatSessionService");
 const UserProfileService = require("../services/UserProfileService");
+const AchievementService = require("../services/AchievementService");
 const AuthService = require("../services/AuthService");
 const { requireAuthPage, getSessionUser } = require("../middleware/requireAuth");
 const { serializeForInlineScript } = require("../lib/safeJson");
@@ -329,30 +330,50 @@ router.get("/tasks", requireAuthPage, async (req, res, next) => {
 });
 
 // -----------------------------------------------------------
-// Notes: load the CURRENT USER's real notes from MongoDB, populate
-// sidebar too.
+// Notes: render only the current account's notes while supporting
+// pinned filtering and direct links to a selected note.
 // -----------------------------------------------------------
-router.get("/notes", requireAuthPage, async (req, res, next) => {
+async function renderNotesPage(req, res, { onlyPinned = false, activeId = null } = {}) {
   const ownerEmail = req.sessionUser.email;
-  try {
-    const notes = await NoteService.findAll("all", ownerEmail);
-    const plain = notes.map((n) => n.toObject());
-    const [rail, authContext] = await Promise.all([
-      buildNotesRail(ownerEmail, notes),
-      loadAuthContext(req),
-    ]);
+  const allNotes = await NoteService.findAll("all", ownerEmail);
+  const visibleNotes = onlyPinned ? allNotes.filter((note) => note.pinned) : allNotes;
+  const plain = visibleNotes.map((note) => note.toObject());
+  const activeNote = activeId
+    ? plain.find((note) => String(note._id) === String(activeId)) || plain[0] || null
+    : plain[0] || null;
+  const [rail, authContext] = await Promise.all([
+    buildNotesRail(ownerEmail, allNotes),
+    loadAuthContext(req),
+  ]);
 
-    renderLayout(res, {
-      title: "Notes",
-      activeNav: "notes",
-      page: "note",
-      rail,
-      pageLocals: { notes: plain },
-      ...authContext,
-    });
+  renderLayout(res, {
+    title: "Notes",
+    activeNav: "notes",
+    page: "note",
+    rail,
+    pageLocals: { notes: plain, activeNote },
+    ...authContext,
+  });
+}
+
+router.get("/notes", requireAuthPage, (req, res, next) => {
+  renderNotesPage(req, res, { onlyPinned: req.query.pinned === "1" }).catch(next);
+});
+
+router.get("/notes/new", requireAuthPage, async (req, res, next) => {
+  try {
+    const note = await NoteService.create(
+      { title: "Untitled note", content: "" },
+      req.sessionUser.email
+    );
+    res.redirect(`/notes/${note._id}`);
   } catch (err) {
     next(err);
   }
+});
+
+router.get("/notes/:id", requireAuthPage, (req, res, next) => {
+  renderNotesPage(req, res, { activeId: req.params.id }).catch(next);
 });
 
 // -----------------------------------------------------------
@@ -503,6 +524,20 @@ router.get("/pricing", requireAuthPage, async (req, res) => {
     currentPlan: profile ? profile.plan : "free",
     dbUnavailable: !profile,
   });
+});
+
+// Account-scoped achievement progress derived from persisted workspace data.
+router.get("/achievements", requireAuthPage, async (req, res, next) => {
+  try {
+    const summary = await AchievementService.getBadges(req.sessionUser.email);
+    res.render("achievements", {
+      title: "Achievements — Butler",
+      lang: "en",
+      summary,
+    });
+  } catch (err) {
+    next(err);
+  }
 });
 
 // -----------------------------------------------------------

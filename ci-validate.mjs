@@ -33,6 +33,8 @@ requireFile('src/views/pricing.ejs', 'Pricing view');
 requireFile('src/public/js/settings.js', 'Settings client script');
 requireFile('src/public/js/billing.js', 'Billing client script');
 requireFile('src/public/js/pricing.js', 'Pricing client script');
+requireFile('src/services/AchievementService.js', 'AchievementService');
+requireFile('src/views/achievements.ejs', 'Achievements view');
 
 // --- Login / signup via emailed OTP (n8n-backed): required files ---
 requireFile('src/models/User.js', 'User model');
@@ -141,7 +143,17 @@ const pagesPath = 'src/routes/pages.js';
 if (fs.existsSync(pagesPath)) {
   const source = fs.readFileSync(pagesPath, 'utf8');
   const importsGuard = /requireAuthPage/.test(source) && /require\(["'].*middleware\/requireAuth["']\)/.test(source);
-  const guardedPaths = ['/chat', '/chat/:id', '/search', '/tasks', '/notes', '/calendar'];
+  const guardedPaths = [
+    '/chat',
+    '/chat/:id',
+    '/search',
+    '/tasks',
+    '/notes',
+    '/notes/new',
+    '/notes/:id',
+    '/calendar',
+    '/achievements',
+  ];
   const missing = guardedPaths.filter((path) => {
     const re = new RegExp(`router\\.get\\(\\s*["']${path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}["']\\s*,\\s*requireAuthPage`);
     return !re.test(source);

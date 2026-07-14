@@ -1,0 +1,192 @@
+<%
+  /*
+    achievements.ejs
+    Standalone Achievements page. Badges come from AchievementService,
+    which computes them live from real Task/Note/CalendarEvent/
+    ChatSession counts in MongoDB — there is no separate achievements
+    collection or fake demo data.
+  */
+  const pageTitle = typeof title !== "undefined" ? title : "Achievements — Butler";
+  const langCode = typeof lang !== "undefined" ? lang : "en";
+  const data = typeof summary !== "undefined" && summary ? summary : { available: false, badges: [], unlockedCount: 0, totalCount: 0 };
+  const badges = Array.isArray(data.badges) ? data.badges : [];
+%>
+<!doctype html>
+<html lang="<%= langCode %>" data-theme="retro">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="data:," />
+    <meta name="theme-color" content="#f3eee0" />
+    <title><%= pageTitle %></title>
+    <script>
+      (function () {
+        try {
+          var saved = localStorage.getItem("butler-theme");
+          if (saved === "paper" || saved === "retro" || saved === "dark") {
+            document.documentElement.setAttribute("data-theme", saved);
+          }
+        } catch (_) { /* ignore */ }
+      })();
+    </script>
+    <link rel="stylesheet" href="/css/style.css" />
+    <style>
+      .pref-shell {
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 32px 20px;
+        background: var(--color-bg);
+      }
+      .pref-card {
+        width: min(980px, 100%);
+        padding: 28px;
+        border: 1px solid var(--glass-border);
+        border-radius: var(--radius-modal);
+        background: var(--glass-bg-strong);
+        backdrop-filter: var(--glass-blur);
+        -webkit-backdrop-filter: var(--glass-blur);
+        box-shadow: var(--shadow-card-hover);
+      }
+      .pref-header {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 6px;
+      }
+      .pref-header h1 {
+        margin: 0;
+        color: var(--color-text);
+        font-family: var(--font-display);
+        font-size: 30px;
+      }
+      .account-subnav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 2px 0 10px;
+      }
+      .account-subnav a {
+        padding: 6px 12px;
+        border-radius: var(--radius-pill);
+        border: 1px solid var(--color-border-soft);
+        color: var(--color-text-muted);
+        font-size: 12px;
+        font-weight: 700;
+        text-decoration: none;
+        background: var(--color-surface);
+      }
+      .account-subnav a.active {
+        color: #ffffff;
+        background: var(--color-primary);
+        border-color: transparent;
+      }
+      .pref-sub {
+        margin: 0 0 22px;
+        color: var(--color-text-muted);
+        font-size: 14px;
+      }
+      .offline-note {
+        margin: 0 0 18px;
+        padding: 10px 14px;
+        border-radius: 10px;
+        background: var(--color-warning-soft);
+        color: #8a5400;
+        font-size: 13px;
+        font-weight: 700;
+      }
+      .badge-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+        gap: 14px;
+      }
+      .badge-card {
+        display: grid;
+        gap: 10px;
+        padding: 16px;
+        border: 2px solid var(--color-border-soft);
+        border-radius: var(--radius-card);
+        background: var(--color-surface);
+        opacity: 0.55;
+        filter: grayscale(0.6);
+      }
+      .badge-card.unlocked {
+        opacity: 1;
+        filter: none;
+        border-color: var(--color-primary);
+      }
+      .badge-icon {
+        font-size: 28px;
+        line-height: 1;
+      }
+      .badge-name {
+        margin: 0;
+        color: var(--color-text);
+        font-family: var(--font-display);
+        font-size: 17px;
+        font-weight: 700;
+      }
+      .badge-desc {
+        margin: 0;
+        color: var(--color-text-muted);
+        font-size: 12px;
+      }
+      .badge-progress-track {
+        height: 6px;
+        border-radius: 999px;
+        background: var(--color-border-soft);
+        overflow: hidden;
+      }
+      .badge-progress-fill {
+        height: 100%;
+        border-radius: 999px;
+        background: var(--color-primary);
+      }
+      .badge-progress-label {
+        font-size: 11px;
+        color: var(--color-text-faint);
+      }
+    </style>
+  </head>
+  <body>
+    <main class="pref-shell">
+      <section class="pref-card">
+        <header class="pref-header">
+          <h1>Achievements</h1>
+          <a href="/chat">← Back to Butler</a>
+        </header>
+
+        <nav class="account-subnav" aria-label="Account settings">
+          <a href="/billing">Billing</a>
+          <a href="/preferences">Preferences</a>
+          <a href="/achievements" class="active">Achievements</a>
+          <a href="/pricing">Upgrade</a>
+        </nav>
+
+        <p class="pref-sub">
+          <%= data.unlockedCount %> of <%= data.totalCount %> unlocked — computed live from your real tasks,
+          notes, calendar events, and chat activity.
+        </p>
+
+        <% if (!data.available) { %>
+          <p class="offline-note">Achievements need a database connection to compute real progress. Start MongoDB and reload this page.</p>
+        <% } %>
+
+        <div class="badge-grid">
+          <% badges.forEach((badge) => { %>
+            <div class="badge-card <%= badge.unlocked ? "unlocked" : "" %>">
+              <span class="badge-icon" aria-hidden="true"><%= badge.icon %></span>
+              <h2 class="badge-name"><%= badge.label %></h2>
+              <p class="badge-desc"><%= badge.description %></p>
+              <div class="badge-progress-track">
+                <div class="badge-progress-fill" style="width: <%= Math.round(badge.progress * 100) %>%"></div>
+              </div>
+              <span class="badge-progress-label"><%= badge.value %> / <%= badge.target %></span>
+            </div>
+          <% }) %>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

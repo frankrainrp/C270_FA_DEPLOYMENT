@@ -73,7 +73,7 @@
   --color-warning-soft: #fff0db;
   --color-danger-soft: #ffe3e1;
 
-  --font-base: 14px;
+  --font-base: 20px;
   --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", "Noto Sans SC", "Segoe UI", system-ui, sans-serif;
   --font-body: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Noto Sans SC", "Segoe UI", system-ui, sans-serif;
 
@@ -515,6 +515,21 @@ html[data-theme="dark"] .pill-nav {
   border-color: var(--color-primary);
   background: var(--color-surface-strong);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 18%, transparent);
+}
+
+/* Transparent overlay button that holds the magnifying-glass icon.
+   Without this the button renders with default browser chrome and shows
+   as a stray box over the search bar. */
+.search-submit {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: 36px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
 }
 
 .search-icon {
@@ -1122,7 +1137,6 @@ html[data-theme="dark"] .sidebar-item:hover {
 .database-icon,
 .card-icon,
 .settings-icon,
-.trophy-icon,
 .crown-icon,
 .logout-icon,
 .pin-icon,
@@ -1370,10 +1384,6 @@ html[data-theme="dark"] .sidebar-item:hover {
   top: 4px;
   height: 2px;
   background: currentColor;
-}
-
-.trophy-icon {
-  border-radius: 2px 2px 6px 6px;
 }
 
 .crown-icon {
@@ -1919,7 +1929,6 @@ html[data-theme="dark"] .sidebar-item:hover {
   gap: 6px;
 }
 
-.productivity-hero,
 .calendar-summary {
   display: grid;
   grid-template-columns: minmax(0, 1.3fr) minmax(220px, 0.8fr) minmax(220px, 0.8fr);
@@ -1954,36 +1963,14 @@ html[data-theme="dark"] .sidebar-item:hover {
   font-size: 16px;
 }
 
-.hero-stats {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.hero-stats div {
-  display: grid;
-  gap: 2px;
-}
-
-.hero-stats strong {
-  font-size: 15px;
-}
-
-.hero-stats span {
-  color: var(--color-text-muted);
-  font-size: 12px;
-}
-
-.chip-list,
-.focus-tools {
+.chip-list {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
 
 .chip-list li,
-.calendar-chip,
-.focus-tools span {
+.calendar-chip {
   display: inline-flex;
   align-items: center;
   padding: 6px 10px;
@@ -2075,6 +2062,12 @@ html[data-theme="dark"] .sidebar-item:hover {
 .task-detail-drawer.is-open {
   display: flex;
   transform: translateX(0);
+}
+
+/* Respect the [hidden] attribute the drawer toggles in JS — without
+   this, display:flex above keeps the drawer permanently visible. */
+.task-detail-drawer[hidden] {
+  display: none;
 }
 
 /* ============================================================
@@ -2330,6 +2323,18 @@ html[data-theme="dark"] .sidebar-item:hover {
   padding: 8px 14px 0;
   color: var(--color-text-muted);
   font-size: 12px;
+}
+
+.note-editor-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.notes-empty,
+.tasks-empty {
+  padding: 24px 14px;
+  color: var(--color-text-muted);
+  font-size: 13px;
 }
 
 .note-title-input {

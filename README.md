@@ -23,6 +23,8 @@ one user's data is never visible to another.
 - MongoDB-backed chat history and workspace data
 - In-memory document decoding for text files, PDF, and DOCX
 - Search across the current account's persisted notes, tasks, and chat messages
+- Account-scoped achievement badges derived from real workspace activity
+- Direct note links, pinned-note filtering, and in-editor pin controls
 - Responsive EJS interface with paper, glass, and dark themes
 - Simulated billing/credits and profile settings (Task 6)
 - Docker configurations for either MongoDB alone or the complete stack
@@ -145,6 +147,8 @@ Browser
 - `TaskService.js`, `NoteService.js`, and `CalendarService.js` own database
   operations for their respective domains, scoped by `ownerEmail`.
 - `UserProfileService.js` manages account-scoped profile and billing data.
+- `AchievementService.js` derives per-account badge progress from persisted
+  tasks, notes, calendar events, and chat messages.
 - `RailService.js` builds real sidebar data from persisted records.
 
 ### `src/public/js/`
