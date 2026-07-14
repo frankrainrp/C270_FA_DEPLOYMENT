@@ -115,10 +115,44 @@
           <span><%= activeTasks.length %></span>
         </div>
 
-        <% activeTasks.forEach(function(t) { %>
-          <%- include('../partials/_task-card', { t: t }) %>
+        <% activeTasks.forEach(function(t) {
+          const dueLabel = fmtDue(t.dueDate);
+          const description = t.description || "";
+          %>
+          <article
+            class="task-card"
+            data-task-id="<%= t._id %>"
+            data-task-completed="false"
+            data-task-due-date="<%= t.dueDate ? new Date(t.dueDate).toISOString() : '' %>"
+            data-title="<%= t.title %>"
+            data-due="<%= dueLabel %>"
+            data-priority="<%= t.priority || 'medium' %>"
+            data-description="<%= description %>"
+            data-notes="<%= description || 'No notes yet.' %>"
+            style="--task-color: <%= priorityColor[t.priority] || priorityColor.medium %>"
+          >
+            <input
+              class="task-checkbox"
+              type="checkbox"
+              <%= t.status === "completed" ? "checked" : "" %>
+              data-task-toggle
+              aria-label="Toggle complete"
+            />
+            <div class="task-main">
+              <div class="task-title"><%= t.title %></div>
+              <div class="task-meta">
+                <span>Due <%= dueLabel %></span>
+                <span>Priority: <%= t.priority || 'medium' %></span>
+              </div>
+            </div>
+            <div class="task-actions">
+              <button class="glass-btn task-edit-trigger" type="button" data-task-edit>Edit</button>
+              <button class="glass-btn" type="button" data-task-delete>Delete</button>
+            </div>
+          </article>
         <% }) %>
       </div>
+        <% } %>
     <% } %>
 
     <!-- =========================
@@ -131,8 +165,54 @@
           <span><%= progressTasks.length %></span>
         </div>
 
-        <% progressTasks.forEach(function(t) { %>
-          <%- include('../partials/_task-card', { t: t }) %>
+        <% progressTasks.forEach(function(t) {
+          const dueLabel = fmtDue(t.dueDate);
+          const description = t.description || "";
+          %>
+
+          <article
+            class="task-card"
+            data-task-id="<%= t._id %>"
+            data-task-completed="false"
+            data-task-due-date="<%= t.dueDate ? new Date(t.dueDate).toISOString() : '' %>"
+            data-title="<%= t.title %>"
+            data-due="<%= dueLabel %>"
+            data-priority="<%= t.priority || 'medium' %>"
+            data-description="<%= description %>"
+            data-notes="<%= description || 'No notes yet.' %>"
+            style="--task-color: <%= priorityColor[t.priority] || priorityColor.medium %>"
+          >
+            <input
+              class="task-checkbox"
+              type="checkbox"
+              <%= t.status === "completed" ? "checked" : "" %>
+              data-task-toggle
+              aria-label="Toggle complete"
+            />
+
+            <div class="task-main">
+              <div class="task-title"><%= t.title %></div>
+
+              <div class="task-meta">
+                <span>Due <%= dueLabel %></span>
+                <span>Priority: <%= t.priority || 'medium' %></span>
+              </div>
+            </div>
+
+            <div class="task-actions">
+              <button class="glass-btn task-edit-trigger" type="button" data-task-edit>Edit</button>
+
+              <button
+                class="glass-btn"
+                type="button"
+                data-task-delete
+              >
+                Delete
+              </button>
+              <button class="glass-btn" type="button" data-task-delete>Delete</button>
+            </div>
+          </article>
+
         <% }) %>
       </div>
     <% } %>
@@ -147,8 +227,41 @@
           <span><%= upcomingTasks.length %></span>
         </div>
 
-        <% upcomingTasks.forEach(function(t) { %>
-          <%- include('../partials/_task-card', { t: t }) %>
+        <% upcomingTasks.forEach(function(t) {
+          const dueLabel = fmtDue(t.dueDate);
+          const description = t.description || "";
+          %>
+          <article
+            class="task-card"
+            data-task-id="<%= t._id %>"
+            data-task-completed="false"
+            data-task-due-date="<%= t.dueDate ? new Date(t.dueDate).toISOString() : '' %>"
+            data-title="<%= t.title %>"
+            data-due="<%= dueLabel %>"
+            data-priority="<%= t.priority || 'medium' %>"
+            data-description="<%= description %>"
+            data-notes="<%= description || 'No notes yet.' %>"
+            style="--task-color: <%= priorityColor[t.priority] || priorityColor.medium %>"
+          >
+            <input
+              class="task-checkbox"
+              type="checkbox"
+              <%= t.status === "completed" ? "checked" : "" %>
+              data-task-toggle
+              aria-label="Toggle complete"
+            />
+            <div class="task-main">
+              <div class="task-title"><%= t.title %></div>
+              <div class="task-meta">
+                <span>Due <%= dueLabel %></span>
+                <span>Priority: <%= t.priority || 'medium' %></span>
+              </div>
+            </div>
+            <div class="task-actions">
+              <button class="glass-btn task-edit-trigger" type="button" data-task-edit>Edit</button>
+              <button class="glass-btn" type="button" data-task-delete>Delete</button>
+            </div>
+          </article>
         <% }) %>
       </div>
     <% } %>
@@ -164,8 +277,42 @@
           <span><%= completedTasks.length %></span>
         </div>
 
-        <% completedTasks.forEach(function(t) { %>
-          <%- include('../partials/_task-card', { t: t }) %>
+        <% completedTasks.forEach(function(t) {
+          const dueLabel = fmtDue(t.dueDate);
+          const description = t.description || "";
+          %>
+          <article
+            class="task-card completed"
+            data-task-id="<%= t._id %>"
+            data-task-completed="true"
+            data-task-due-date="<%= t.dueDate ? new Date(t.dueDate).toISOString() : '' %>"
+            data-title="<%= t.title %>"
+            data-due="<%= dueLabel %>"
+            data-priority="<%= t.priority || 'medium' %>"
+            data-description="<%= description %>"
+            data-notes="<%= description || 'No notes yet.' %>"
+            style="--task-color: <%= priorityColor[t.priority] || priorityColor.medium %>"
+          >
+            <input
+              class="task-checkbox"
+              type="checkbox"
+              <%= t.status === "completed" ? "checked" : "" %>
+              data-task-toggle
+              aria-label="Toggle complete"
+            />
+            <div class="task-main">
+              <div class="task-title"><%= t.title %></div>
+              <div class="task-meta">
+                <span><%= dueLabel %></span>
+                <span>Due <%= dueLabel %></span>
+                <span>Priority: <%= t.priority || 'medium' %></span>
+              </div>
+            </div>
+            <div class="task-actions">
+              <button class="glass-btn task-edit-trigger" type="button" data-task-edit>Edit</button>
+              <button class="glass-btn" type="button" data-task-delete>Delete</button>
+            </div>
+          </article>
         <% }) %>
       </div>
     <% } %>
