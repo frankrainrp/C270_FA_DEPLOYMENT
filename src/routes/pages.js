@@ -312,9 +312,7 @@ router.get("/tasks", requireAuthPage, async (req, res, next) => {
   const ownerEmail = req.sessionUser.email;
 
   try {
-    // Read filter from sidebar
     const view = req.query.view || "all";
-
     const [tasks, stats] = await Promise.all([
       TaskService.findAll(view, ownerEmail),
       TaskService.getStats(ownerEmail),
@@ -325,15 +323,20 @@ router.get("/tasks", requireAuthPage, async (req, res, next) => {
       loadAuthContext(req),
     ]);
 
+    const taskViewLabel = {
+      all: "All tasks",
+      active: "Active tasks",
+      in_progress: "In Progress tasks",
+      upcoming: "Upcoming tasks",
+      completed: "Completed tasks",
+    }[view] || "All tasks";
+
     renderLayout(res, {
       title: "Tasks",
       activeNav: "tasks",
       page: "task",
       rail,
-      pageLocals: {
-        tasks: tasks.map((t) => t.toObject()),
-        currentView: view,
-      },
+      pageLocals: { tasks: tasks.map((t) => t.toObject()), taskViewLabel },
       ...authContext,
     });
   } catch (err) {
@@ -395,12 +398,22 @@ router.get("/notes/:id", requireAuthPage, (req, res, next) => {
 router.get("/calendar", requireAuthPage, async (req, res, next) => {
   const ownerEmail = req.sessionUser.email;
   try {
+    const now = new Date();
+    const requestedYear = Number.parseInt(req.query.year, 10);
+    const requestedMonth = Number.parseInt(req.query.month, 10);
+    const calendarYear = Number.isInteger(requestedYear) ? requestedYear : now.getFullYear();
+    const calendarMonth = Number.isInteger(requestedMonth) ? requestedMonth : now.getMonth();
+
+    if (!Number.isInteger(requestedYear) && !Number.isInteger(requestedMonth) && !req.query.date) {
+      return res.redirect(`/calendar?year=${calendarYear}&month=${calendarMonth}`);
+    }
+
     const [events, tasks] = await Promise.all([
       CalendarService.findAll(ownerEmail),
       TaskService.findAll("all", ownerEmail),
     ]);
     const [rail, authContext] = await Promise.all([
-      buildCalendarRail(ownerEmail, events),
+      buildCalendarRail(ownerEmail, events, calendarYear, calendarMonth),
       loadAuthContext(req),
     ]);
 
@@ -430,7 +443,11 @@ router.get("/calendar", requireAuthPage, async (req, res, next) => {
       activeNav: "calendar",
       page: "calendar",
       rail,
-      pageLocals: { events: combined },
+      pageLocals: {
+        events: combined,
+        calendarYear,
+        calendarMonth,
+      },
       ...authContext,
     });
   } catch (err) {
@@ -478,29 +495,24 @@ router.get("/preferences", (_req, res) => {
 // profile, fully editable, so existing local testing still works.
 // -----------------------------------------------------------
 router.get("/settings", requireAuthPage, async (req, res) => {
-  const sessionUser = req.sessionUser;
-  let profile = null;
+  const { sessionUser } = req;
+  let storedProfile = null;
   try {
-    profile = await UserProfileService.getOrCreate(sessionUser.email);
+    storedProfile = await UserProfileService.getOrCreate(sessionUser.email);
   } catch (err) {
     console.warn("[pages] /settings profile unavailable:", err.message);
   }
 
-  const fallbackProfile = {
-    name: "Student User",
-    email: "student@example.com",
-    avatarUrl: "",
-  };
-  const baseProfile = profile ? profile.toObject() : fallbackProfile;
-
   res.render("settings", {
     title: "Settings — Butler",
     lang: "en",
-    profile: sessionUser
-      ? { name: sessionUser.name, email: sessionUser.email, avatarUrl: baseProfile.avatarUrl }
-      : baseProfile,
-    dbUnavailable: !profile,
-    loggedIn: Boolean(sessionUser),
+    profile: {
+      name: sessionUser.name,
+      email: sessionUser.email,
+      avatarUrl: storedProfile ? storedProfile.avatarUrl : "",
+    },
+    dbUnavailable: !storedProfile,
+    loggedIn: true,
   });
 });
 
