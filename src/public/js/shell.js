@@ -103,6 +103,19 @@
     activePreset: 25,
   };
 
+  // ---------- Custom duration ----------
+  var CUSTOM_MIN = 1;
+  var CUSTOM_MAX = 180;
+
+  function setCustomFocusTimerDuration(rawValue) {
+    var parsed = parseInt(rawValue, 10);
+    if (Number.isNaN(parsed)) return;
+    var clamped = Math.min(Math.max(parsed, CUSTOM_MIN), CUSTOM_MAX);
+    var input = miniAppsPanel.querySelector("[data-custom-duration]");
+    if (input) input.value = clamped;
+    setFocusTimerDuration(clamped);
+  }
+
   function updateFocusTimerDisplay() {
     var timeEl = miniAppsPanel.querySelector(".focus-timer-time");
     var stateEl = miniAppsPanel.querySelector(".focus-timer-state");
@@ -332,6 +345,12 @@
         return;
       }
 
+      if (event.target.matches("[data-custom-set]")) {
+        var customInput = miniAppsPanel.querySelector("[data-custom-duration]");
+        if (customInput) setCustomFocusTimerDuration(customInput.value);
+        return;
+      }
+
       if (event.target.matches(".focus-timer-play")) {
         startFocusTimer();
         return;
@@ -345,6 +364,12 @@
       if (event.target.matches("[data-share-copy]")) {
         copyShareText();
         return;
+      }
+    });
+
+    miniAppsPanel.addEventListener("keydown", function (event) {
+      if (event.key === "Enter" && event.target.matches("[data-custom-duration]")) {
+        setCustomFocusTimerDuration(event.target.value);
       }
     });
   }

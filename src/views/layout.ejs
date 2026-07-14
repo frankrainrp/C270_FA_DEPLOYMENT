@@ -1,7 +1,7 @@
 <%
   /*
     layout.ejs
-    Master page shell.  Mirrors the C270_FA React composition:
+    Master page shell. Mirrors the C270_FA React composition:
     WallpaperLayer + TopBar + LeftRail + main panel + MobileTabBar.
 
     Locals accepted (populated by lib/renderLayout.js):
@@ -63,9 +63,6 @@
     <meta name="theme-color" content="#f3eee0" />
     <title><%= pageTitle %></title>
     <script>
-      // Applies the user's saved theme BEFORE stylesheet loads, so
-      // there is no flash of the wrong theme.  Must stay inline and
-      // must precede the CSS <link>.
       (function () {
         try {
           var saved = localStorage.getItem("butler-theme");
@@ -125,11 +122,9 @@
               method="GET"
               data-global-search
           >
-
               <label class="sr-only" for="global-search-input">
                   <%= label("search.label", "Search") %>
               </label>
-
               <button
                   type="submit"
                   class="search-submit"
@@ -137,7 +132,6 @@
               >
                   <span class="search-icon" aria-hidden="true"></span>
               </button>
-
               <input
                   id="global-search-input"
                   name="q"
@@ -147,7 +141,6 @@
                   placeholder="Search anything..."
                   value="<%= value("searchQuery", "") %>"
               />
-
           </form>
 
           <button
@@ -260,16 +253,28 @@
               <strong class="focus-timer-time">25:00</strong>
               <span class="focus-timer-state">Ready to begin</span>
             </div>
-
             <div class="focus-timer-actions">
               <button class="glass-btn focus-timer-play" type="button">Start</button>
               <button class="glass-btn focus-timer-reset" type="button">Reset</button>
             </div>
-
             <div class="focus-timer-presets">
               <button class="glass-btn glass-btn-secondary" type="button" data-preset="25">25 min</button>
               <button class="glass-btn glass-btn-secondary" type="button" data-preset="45">45 min</button>
               <button class="glass-btn glass-btn-secondary" type="button" data-preset="60">60 min</button>
+            </div>
+            <div class="focus-timer-custom">
+              <span class="focus-timer-custom-label">Custom</span>
+              <input
+                type="number"
+                class="focus-timer-custom-input"
+                data-custom-duration
+                min="1"
+                max="180"
+                placeholder="30"
+                aria-label="Custom focus duration in minutes"
+              />
+              <span class="focus-timer-custom-hint">min (max 180)</span>
+              <button class="glass-btn glass-btn-secondary" type="button" data-custom-set>Set</button>
             </div>
           </div>
         </div>
