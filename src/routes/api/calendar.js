@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const CalendarService = require("../../services/CalendarService");
+const Task = require("../../models/Task"); // Imported Task model for the merge logic
 const { makeOk, makeFail } = require("../../lib/apiResponse");
 const { requireAuthApi } = require("../../middleware/requireAuth");
 
@@ -10,12 +11,31 @@ router.use(requireAuthApi);
 
 /**
  * GET /api/calendar
- * Get the current user's calendar events
+ * Get the current user's calendar events AND tasks with due dates
  */
 router.get("/", async (req, res) => {
   try {
-    const events = await CalendarService.findAll(req.sessionUser.email);
-    res.json(makeOk({ events }));
+    const ownerEmail = req.sessionUser.email;
+
+    // Fetch both Events and Tasks concurrently
+    const [events, tasks] = await Promise.all([
+      CalendarService.findAll(ownerEmail),
+      Task.find({ ownerEmail, dueDate: { $exists: true, $ne: null } })
+    ]);
+
+    // Transform Tasks into "Event-like" objects
+    const taskEvents = tasks.map(task => ({
+      _id: task._id,
+      title: `[Task] ${task.title}`,
+      date: task.dueDate,
+      color: task.status === 'completed' ? 'gray' : 'green',
+      isTask: true,
+      status: task.status
+    }));
+
+    // Merge them together
+    const combinedData = [...events, ...taskEvents];
+    res.json(makeOk({ events: combinedData }));
   } catch (err) {
     console.error("[api/calendar] GET error:", err);
     res.status(500).json(makeFail(err.message));
@@ -24,13 +44,41 @@ router.get("/", async (req, res) => {
 
 /**
  * GET /api/calendar/month/:year/:month
- * Get the current user's events for a specific month (month is 0-indexed: 0=Jan, 11=Dec)
+ * Get the current user's events AND tasks for a specific month (month is 0-indexed: 0=Jan, 11=Dec)
  */
 router.get("/month/:year/:month", async (req, res) => {
   try {
     const { year, month } = req.params;
-    const events = await CalendarService.findByMonth(parseInt(year), parseInt(month), req.sessionUser.email);
-    res.json(makeOk({ events }));
+    const y = parseInt(year);
+    const m = parseInt(month);
+    const ownerEmail = req.sessionUser.email;
+
+    // Calculate the start and end dates of the requested month for the Task query
+    const startDate = new Date(y, m, 1);
+    const endDate = new Date(y, m + 1, 0, 23, 59, 59, 999);
+
+    // Fetch events and tasks for this specific month concurrently
+    const [events, tasks] = await Promise.all([
+      CalendarService.findByMonth(y, m, ownerEmail),
+      Task.find({
+        ownerEmail,
+        dueDate: { $gte: startDate, $lte: endDate }
+      })
+    ]);
+
+    // Transform Tasks into "Event-like" objects
+    const taskEvents = tasks.map(task => ({
+      _id: task._id,
+      title: `[Task] ${task.title}`,
+      date: task.dueDate,
+      color: task.status === 'completed' ? 'gray' : 'green',
+      isTask: true,
+      status: task.status
+    }));
+
+    // Merge them together
+    const combinedData = [...events, ...taskEvents];
+    res.json(makeOk({ events: combinedData }));
   } catch (err) {
     console.error("[api/calendar] GET /month error:", err);
     res.status(500).json(makeFail(err.message));
@@ -39,12 +87,40 @@ router.get("/month/:year/:month", async (req, res) => {
 
 /**
  * GET /api/calendar/upcoming
- * Get the current user's upcoming events (next 7 days)
+ * Get the current user's upcoming events AND tasks (next 7 days)
  */
 router.get("/upcoming", async (req, res) => {
   try {
-    const events = await CalendarService.getUpcoming(req.sessionUser.email);
-    res.json(makeOk({ events }));
+    const ownerEmail = req.sessionUser.email;
+    
+    // Calculate date range for the next 7 days for the Task query
+    const startDate = new Date();
+    const endDate = new Date();
+    endDate.setDate(endDate.getDate() + 7);
+
+    // Fetch upcoming events and tasks concurrently
+    const [events, tasks] = await Promise.all([
+      CalendarService.getUpcoming(ownerEmail),
+      Task.find({
+        ownerEmail,
+        dueDate: { $gte: startDate, $lte: endDate },
+        status: { $ne: 'completed' } // Optional: Exclude completed tasks from "upcoming"
+      })
+    ]);
+
+    // Transform Tasks into "Event-like" objects
+    const taskEvents = tasks.map(task => ({
+      _id: task._id,
+      title: `[Task] ${task.title}`,
+      date: task.dueDate,
+      color: 'green', // Upcoming tasks are active
+      isTask: true,
+      status: task.status
+    }));
+
+    // Merge them together
+    const combinedData = [...events, ...taskEvents];
+    res.json(makeOk({ events: combinedData }));
   } catch (err) {
     console.error("[api/calendar] GET /upcoming error:", err);
     res.status(500).json(makeFail(err.message));
