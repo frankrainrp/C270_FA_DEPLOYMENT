@@ -102,6 +102,16 @@
 
             <button class="auth-submit" type="submit" data-send-code-button>Send code</button>
           </form>
+
+          <% if (typeof localDemoMode !== "undefined" && localDemoMode) { %>
+            <div class="auth-demo-entry">
+              <span>or</span>
+              <button class="auth-submit auth-submit-secondary" type="button" data-demo-login-button>
+                Enter local demo
+              </button>
+              <p>No email code required. Data is stored in the local Docker MongoDB volume.</p>
+            </div>
+          <% } %>
         </div>
 
         <!-- Step 2: enter the emailed code -->

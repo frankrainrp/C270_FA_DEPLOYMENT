@@ -14,6 +14,7 @@ one user's data is never visible to another.
 
 - Email OTP login/signup (n8n sends the code, Butler verifies it and issues
   a session)
+- One-click localhost demo login when the complete Docker stack is used
 - Per-account data isolation: tasks, notes, calendar events, and chat history
   are all scoped to the logged-in account
 - Streaming DeepSeek chat through an OpenAI-compatible client
@@ -40,9 +41,9 @@ Browser
   |     -> renderLayout.js
   |     -> layout.ejs + page partial
   |
-  |-- POST /api/auth/request-otp | verify-otp
-  |     -> AuthService -> n8n webhook (sends code) -> MongoDB (OtpChallenge/User)
-  |     -> session cookie (JWT) issued on success
+  |-- POST /api/auth/request-otp | verify-otp | demo
+  |     -> AuthService -> optional n8n webhook -> MongoDB (PendingOtp/Session)
+  |     -> opaque server-side session cookie issued on success
   |
   |-- POST /api/chat (SSE)
   |     -> middleware/requireAuth.js
@@ -64,7 +65,7 @@ Browser
 .
 |-- .env.example              Documented environment-variable template
 |-- .dockerignore             Docker build-context exclusions
-|-- Dockerfile                Production Node.js image
+|-- Dockerfile                Local-demo Node.js image
 |-- docker-compose.yml        Node.js application and MongoDB
 |-- docker-compose.db.yml     MongoDB-only local development stack
 |-- ci-validate.mjs           Required-file validation
@@ -213,49 +214,178 @@ embedded text and does not claim optical character recognition of images.
 2. `AuthService.requestOtp` calls the n8n webhook, which generates a code,
    emails it via SMTP, and returns it in the response. Only Butler's backend
    ever sees this response — the code is never sent to the browser.
-3. The code is stored server-side (`OtpChallenge`, with an expiry and a
+3. The code is stored server-side (`PendingOtp`, with an expiry and a
    max-attempts counter) and the browser is told only whether the account is
    new.
 4. The user submits the code; `AuthService.verifyOtp` checks it against the
-   stored challenge, upserts the `User` record, and issues a signed JWT
-   session cookie (`butler_session`).
+   stored challenge and issues an opaque `butler_session` cookie. The token's
+   identity and expiry are stored in MongoDB rather than inside the cookie.
 5. Every subsequent request to tasks/notes/calendar/chat/search is gated by
-   `middleware/requireAuth.js`, which decodes that cookie and filters every
+   `middleware/requireAuth.js`, which resolves that cookie and filters every
    database read/write by the resulting email (`ownerEmail`).
-6. Data created before this system existed has no owner; run
+6. When `LOCAL_DEMO_MODE=true`, `/auth/login` also offers a localhost demo
+   entry that creates the same kind of MongoDB-backed session without email.
+7. Data created before this system existed has no owner; run
    `npm run migrate:owner -- you@example.com` once to assign it to a real
    account (see Validation below).
 
-## Local setup
+## Local Docker usage tutorial
+
+### 1. Prerequisites
+
+Install Docker Desktop and make sure its Linux container engine is running.
+Git and Node.js are only required when developing outside the complete Docker
+stack. The default demo URL is `http://localhost:3001` because port 3000 is
+commonly used by other local applications.
+
+Verify Docker before continuing:
+
+```powershell
+docker --version
+docker compose version
+docker info
+```
+
+### 2. Create the local environment file
+
+From the repository root, copy the documented template:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+For a full AI-agent demonstration, open `.env` and set:
+
+```dotenv
+DEEPSEEK_API_KEY=your-real-api-key
+CHAT_MOCK_MODE=false
+```
+
+Keep `LOCAL_DEMO_MODE=true` for the one-click local account. The `.env` file is
+ignored by both Git and the Docker build context, so API keys are not committed
+or copied into the image. Without a DeepSeek key, Butler uses deterministic mock
+chat; the rest of the workspace works, but mock chat does not issue tool calls.
+
+### 3. Build and start the complete stack
+
+```powershell
+docker compose up -d --build --wait
+docker compose ps
+```
+
+Both `butler-app` and `mongo` should report `healthy`. Confirm application,
+database, login, and chat readiness with:
+
+```powershell
+Invoke-RestMethod http://localhost:3001/api/health
+```
+
+Expected fields include `status: ready`, `database: connected`, and either
+`chatMode: live` or `chatMode: mock`.
+
+### 4. Sign in to the local demo
+
+1. Open `http://localhost:3001`.
+2. Select **Enter local demo** on the login page.
+3. Butler creates an opaque server-side session for `demo@butler.local`.
+4. All tasks, notes, events, and chat history are stored in the local MongoDB
+   volume and scoped to that demo account.
+
+To demonstrate the real email flow instead, configure `N8N_OTP_WEBHOOK_URL`,
+enter an email address, and use the verification code delivered by the workflow.
+
+### 5. Demonstrate the Agent
+
+The following sequence shows the complete read/approval/write loop:
+
+1. In Chat, send: `List my current tasks and summarize them briefly.`
+2. Butler automatically runs the read-only `task_list` tool.
+3. Send: `Create a high priority task titled Finish the Docker demo tomorrow.`
+4. Review the proposed title, date, and priority in the confirmation card.
+5. Choose **Accept** to write it to MongoDB, or **Decline** to reject it.
+6. Open Tasks to confirm accepted changes appear in the workspace.
+
+Read-only tools run automatically. Create, update, toggle, pin, and delete tools
+always require confirmation.
+
+### 6. Explore the remaining demo
+
+- **Tasks:** create, filter, complete, and delete account-scoped tasks.
+- **Calendar:** manage dated events and view task deadlines.
+- **Notes:** create Markdown notes, tags, and pinned notes.
+- **Chat:** attach up to three text, PDF, or DOCX files for extraction.
+- **Search:** search the signed-in account's persisted workspace data.
+- **Achievements:** view progress derived from real stored activity.
+
+### 7. Logs, restart, and shutdown
+
+```powershell
+# Follow application logs
+docker compose logs -f butler-app
+
+# Restart only the Node.js application
+docker compose restart butler-app
+
+# Stop and remove containers while preserving MongoDB data
+docker compose down
+
+# Start the existing build again
+docker compose up -d --wait
+```
+
+MongoDB data is stored in the named `butler_data` volume. Do not run
+`docker compose down -v` unless permanently deleting all local demo data is
+intentional.
+
+### 8. Reset the demo database
+
+Only use this when a clean demonstration is required and existing local data is
+no longer needed:
+
+```powershell
+docker compose down -v
+docker compose up -d --build --wait
+```
+
+The first command permanently removes the Compose MongoDB volume.
+
+### 9. Troubleshooting
+
+- **Port 3001 is already in use:** set `APP_PORT=3002` in `.env`, restart the
+  stack, and open `http://localhost:3002`.
+- **The application is unhealthy:** run `docker compose logs --tail 100
+  butler-app` and verify that MongoDB is healthy.
+- **Chat reports mock mode:** set a valid `DEEPSEEK_API_KEY`, ensure
+  `CHAT_MOCK_MODE=false`, and recreate the app with `docker compose up -d
+  --force-recreate butler-app`.
+- **Demo login is unavailable:** confirm `LOCAL_DEMO_MODE=true` and recreate the
+  app container.
+- **A changed MongoDB password does not work:** initialization variables apply
+  only to a new volume. Either restore the original local credentials or reset
+  the demo database intentionally.
+
+### 10. Database-only development
+
+Run MongoDB in Docker while running Node.js directly on the host:
 
 ```powershell
 Copy-Item .env.example .env
 npm install
-docker compose -f docker-compose.db.yml up -d
+docker compose -f docker-compose.db.yml up -d --wait
 npm start
 ```
 
-Open `http://localhost:3000`.
-
-The database-only Compose file uses the credentials documented in
-`.env.example`. Ensure the local `MONGO_URI` uses the same username, password,
-database, and `authSource=admin` values.
-
-## Complete Docker stack
-
-```powershell
-docker compose up -d --build
-docker compose ps
-```
-
-MongoDB data is stored in the named `butler_data` volume. Do not use
-`docker compose down -v` unless deleting the local database is intentional.
+Open `http://localhost:3000`. The database-only Compose file uses the
+credentials documented in `.env.example`; `MONGO_URI` must use the same
+username, password, database, and `authSource=admin` values. MongoDB is bound
+only to `127.0.0.1` in this development mode.
 
 ## Important environment variables
 
 | Variable | Purpose |
 |---|---|
-| `PORT` | Express HTTP port |
+| `PORT` | Express port for a direct `npm start` process |
+| `APP_PORT` | Host port for the complete Docker demo; defaults to `3001` |
 | `MONGO_URI` | MongoDB connection used by local Node.js |
 | `MONGO_CONNECT_TIMEOUT_MS` | Database connection timeout |
 | `DEEPSEEK_API_KEY` | Enables the real model path |
@@ -269,6 +399,9 @@ MongoDB data is stored in the named `butler_data` volume. Do not use
 | `SESSION_TTL_DAYS` | Lifetime of a server-side MongoDB session |
 | `SESSION_COOKIE_NAME` | Name of the httpOnly opaque-token cookie |
 | `AUTH_REQUIRED` | Enables the global login gate; defaults to `true` |
+| `LOCAL_DEMO_MODE` | Enables one-click local demo login; never expose publicly |
+| `LOCAL_DEMO_EMAIL` | Account identity used by the local demo |
+| `LOCAL_DEMO_NAME` | Display name used by the local demo |
 
 ## Validation
 

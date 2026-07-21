@@ -3,8 +3,13 @@ node_modules
 .gitignore
 .env
 .env.*
-!.env.example
 uploads
+test
+.agents
+.codex
+docker-compose*.yml
+ci-validate.mjs
+My workflow 370.json
 *.log
 npm-debug.log*
 README.md

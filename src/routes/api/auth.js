@@ -42,6 +42,23 @@ router.post("/verify-otp", async (req, res) => {
   }
 });
 
+/** Creates a localhost demo session when LOCAL_DEMO_MODE is explicitly enabled. */
+router.post("/demo", async (_req, res) => {
+  try {
+    const session = await AuthService.createLocalDemoSession();
+    const maxAgeMs = session.sessionTtlDays * 24 * 60 * 60 * 1000;
+    setSessionCookie(res, session.token, maxAgeMs);
+    res.json(makeOk({
+      user: { email: session.email, name: session.name },
+      demo: true,
+    }));
+  } catch (err) {
+    const status = err.status || 500;
+    if (status >= 500) console.error("[api/auth] demo login error:", err.message);
+    res.status(status).json(makeFail(err.message));
+  }
+});
+
 /** Returns the identity attached to the current unexpired server-side Session. */
 router.get("/me", async (req, res) => {
   try {

@@ -501,6 +501,7 @@ router.get("/auth/login", (req, res) => {
     lang: "en",
     theme: "retro",
     nextUrl: typeof req.query.next === "string" ? req.query.next : "/chat",
+    localDemoMode: AuthService.isLocalDemoMode(),
   });
 });
 

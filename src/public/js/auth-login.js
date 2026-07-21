@@ -26,6 +26,7 @@
   var verifyButton = document.querySelector("[data-verify-button]");
   var backButton = document.querySelector("[data-back-button]");
   var resendButton = document.querySelector("[data-resend-button]");
+  var demoLoginButton = document.querySelector("[data-demo-login-button]");
   var errorEmail = document.querySelector("[data-auth-error]");
   var errorCode = document.querySelector("[data-auth-error-code]");
   var codeSentTo = document.querySelector("[data-code-sent-to]");
@@ -220,6 +221,31 @@
         })
         .finally(function () {
           setTimeout(function () { setStatus(""); }, 2000);
+      });
+    });
+  }
+
+  if (demoLoginButton) {
+    demoLoginButton.addEventListener("click", function () {
+      showError(errorEmail, "");
+      demoLoginButton.disabled = true;
+      setStatus("Opening the local demo...");
+
+      fetch("/api/auth/demo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      })
+        .then(parseJson)
+        .then(function (result) {
+          if (!result.ok || !result.body.ok) {
+            throw new Error((result.body && result.body.error) || "Could not open the local demo.");
+          }
+          window.location.href = getRedirectTarget();
+        })
+        .catch(function (err) {
+          showError(errorEmail, err.message || "Could not open the local demo.");
+          setStatus("");
+          demoLoginButton.disabled = false;
         });
     });
   }

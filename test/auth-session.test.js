@@ -53,6 +53,8 @@ test("active auth service exposes MongoDB session operations instead of JWT oper
   assert.equal(typeof AuthService.verifyOtp, "function");
   assert.equal(typeof AuthService.getSessionByToken, "function");
   assert.equal(typeof AuthService.destroySession, "function");
+  assert.equal(typeof AuthService.createLocalDemoSession, "function");
+  assert.equal(typeof AuthService.isLocalDemoMode, "function");
   assert.equal(AuthService.verifySessionToken, undefined);
   assert.equal(AuthService.issueSessionToken, undefined);
 });
@@ -62,4 +64,14 @@ test("global auth guard keeps only login and health endpoints public", () => {
   assert.equal(isPublicPath("/api/health"), true);
   assert.equal(isPublicPath("/api/auth/request-otp"), true);
   assert.equal(isPublicPath("/api/tasks"), false);
+});
+
+test("local demo login is opt-in", () => {
+  const previous = process.env.LOCAL_DEMO_MODE;
+  delete process.env.LOCAL_DEMO_MODE;
+  assert.equal(AuthService.isLocalDemoMode(), false);
+  process.env.LOCAL_DEMO_MODE = "true";
+  assert.equal(AuthService.isLocalDemoMode(), true);
+  if (previous === undefined) delete process.env.LOCAL_DEMO_MODE;
+  else process.env.LOCAL_DEMO_MODE = previous;
 });

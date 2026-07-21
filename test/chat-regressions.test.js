@@ -97,8 +97,10 @@ test("MongoDB sessions do not depend on a JWT secret", () => {
 test("production requires an OTP delivery webhook", () => {
   const previousMode = process.env.NODE_ENV;
   const previousWebhook = process.env.N8N_OTP_WEBHOOK_URL;
+  const previousDemoMode = process.env.LOCAL_DEMO_MODE;
   process.env.NODE_ENV = "production";
   delete process.env.N8N_OTP_WEBHOOK_URL;
+  delete process.env.LOCAL_DEMO_MODE;
   try {
     assert.throws(
       () => AuthService.assertProductionConfig(),
@@ -109,5 +111,26 @@ test("production requires an OTP delivery webhook", () => {
     else process.env.NODE_ENV = previousMode;
     if (previousWebhook === undefined) delete process.env.N8N_OTP_WEBHOOK_URL;
     else process.env.N8N_OTP_WEBHOOK_URL = previousWebhook;
+    if (previousDemoMode === undefined) delete process.env.LOCAL_DEMO_MODE;
+    else process.env.LOCAL_DEMO_MODE = previousDemoMode;
+  }
+});
+
+test("explicit local demo mode does not require the OTP webhook", () => {
+  const previousMode = process.env.NODE_ENV;
+  const previousWebhook = process.env.N8N_OTP_WEBHOOK_URL;
+  const previousDemoMode = process.env.LOCAL_DEMO_MODE;
+  process.env.NODE_ENV = "production";
+  process.env.LOCAL_DEMO_MODE = "true";
+  delete process.env.N8N_OTP_WEBHOOK_URL;
+  try {
+    assert.doesNotThrow(() => AuthService.assertProductionConfig());
+  } finally {
+    if (previousMode === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = previousMode;
+    if (previousWebhook === undefined) delete process.env.N8N_OTP_WEBHOOK_URL;
+    else process.env.N8N_OTP_WEBHOOK_URL = previousWebhook;
+    if (previousDemoMode === undefined) delete process.env.LOCAL_DEMO_MODE;
+    else process.env.LOCAL_DEMO_MODE = previousDemoMode;
   }
 });

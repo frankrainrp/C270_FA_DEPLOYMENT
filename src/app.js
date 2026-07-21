@@ -16,6 +16,7 @@
 // ============================================================
 
 const express = require("express");
+const mongoose = require("mongoose");
 const path = require("path");
 
 // Optional .env loader.  Wrapped in try/catch so the app still boots
@@ -78,23 +79,46 @@ app.use((err, req, res, _next) => {
 });
 
 // ------------------------------------------------------------------
-// Database connection (MongoDB via Mongoose)
-// ------------------------------------------------------------------
-async function startDatabase() {
-  try {
-    await connectDb();
-  } catch (err) {
-    console.error("[db] MongoDB connection failed:", err.message);
-  }
-}
-
-// ------------------------------------------------------------------
 // Server bootstrap
 // ------------------------------------------------------------------
 const PORT = process.env.PORT || 3000;
+let server = null;
+let shuttingDown = false;
 
-startDatabase();
+/** Starts listening only after MongoDB is ready, so Docker health is truthful. */
+async function start() {
+  await connectDb();
+  server = app.listen(PORT, () => {
+    console.log(`Butler is running at http://localhost:${PORT}`);
+  });
+}
 
-app.listen(PORT, () => {
-  console.log(`Butler is running at http://localhost:${PORT}`);
+/** Drains HTTP connections and closes MongoDB cleanly when Docker stops. */
+async function shutdown(signal) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`[app] ${signal} received; shutting down.`);
+
+  if (server) {
+    await new Promise((resolve) => server.close(resolve));
+  }
+  await mongoose.disconnect();
+}
+
+process.once("SIGTERM", () => {
+  shutdown("SIGTERM").then(() => process.exit(0)).catch((err) => {
+    console.error("[app] shutdown failed:", err.message);
+    process.exit(1);
+  });
+});
+process.once("SIGINT", () => {
+  shutdown("SIGINT").then(() => process.exit(0)).catch((err) => {
+    console.error("[app] shutdown failed:", err.message);
+    process.exit(1);
+  });
+});
+
+start().catch((err) => {
+  console.error("[db] MongoDB connection failed:", err.message);
+  process.exit(1);
 });

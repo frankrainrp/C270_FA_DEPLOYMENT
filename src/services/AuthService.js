@@ -25,9 +25,23 @@ const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
 const RATE_LIMIT_MAX_REQUESTS = 5;
 const requestLog = new Map();
 
+/** Returns true only for explicit truthy environment values. */
+function envEnabled(value) {
+  return /^(1|true|yes)$/i.test(String(value || ""));
+}
+
+/** The passwordless demo entry is deliberately limited to local demo setups. */
+function isLocalDemoMode() {
+  return envEnabled(process.env.LOCAL_DEMO_MODE);
+}
+
 /** Fails fast when production cannot reach the configured OTP delivery workflow. */
 function assertProductionConfig() {
-  if (process.env.NODE_ENV === "production" && !process.env.N8N_OTP_WEBHOOK_URL) {
+  if (
+    process.env.NODE_ENV === "production"
+    && !isLocalDemoMode()
+    && !process.env.N8N_OTP_WEBHOOK_URL
+  ) {
     throw new Error("N8N_OTP_WEBHOOK_URL must be configured in production.");
   }
 }
@@ -55,6 +69,22 @@ function isRateLimited(email) {
   recent.push(now);
   requestLog.set(email, recent);
   return recent.length > RATE_LIMIT_MAX_REQUESTS;
+}
+
+/** Creates one opaque, server-side session for a validated local identity. */
+async function issueSession(email, name, isNew) {
+  const token = crypto.randomBytes(32).toString("hex");
+  const expiresAt = new Date(Date.now() + SESSION_TTL_DAYS * 24 * 60 * 60 * 1000);
+  await Session.create({ token, email, name, expiresAt });
+
+  return {
+    token,
+    email,
+    name,
+    isNew: Boolean(isNew),
+    expiresAt,
+    sessionTtlDays: SESSION_TTL_DAYS,
+  };
 }
 
 /** Calls n8n, stores the returned OTP server-side, and returns only safe metadata. */
@@ -144,23 +174,24 @@ async function verifyOtp(email, code) {
 
   await PendingOtp.deleteOne({ _id: pending._id });
 
-  const token = crypto.randomBytes(32).toString("hex");
-  const expiresAt = new Date(Date.now() + SESSION_TTL_DAYS * 24 * 60 * 60 * 1000);
-  await Session.create({
-    token,
-    email: normalizedEmail,
-    name: pending.name || "",
-    expiresAt,
-  });
+  return issueSession(normalizedEmail, pending.name || "", pending.isNewUser);
+}
 
-  return {
-    token,
-    email: normalizedEmail,
-    name: pending.name || "",
-    isNew: pending.isNewUser,
-    expiresAt,
-    sessionTtlDays: SESSION_TTL_DAYS,
-  };
+/** Creates the fixed local-demo identity without depending on email delivery. */
+async function createLocalDemoSession() {
+  if (!isLocalDemoMode()) {
+    throw httpError("Local demo login is disabled.", 404);
+  }
+  assertDatabaseReady();
+
+  const configuredEmail = String(process.env.LOCAL_DEMO_EMAIL || "demo@butler.local")
+    .trim()
+    .toLowerCase();
+  const email = EMAIL_RE.test(configuredEmail) ? configuredEmail : "demo@butler.local";
+  const name = String(process.env.LOCAL_DEMO_NAME || "Demo Student").trim().slice(0, 80)
+    || "Demo Student";
+
+  return issueSession(email, name, false);
 }
 
 /** Resolves an unexpired server-side Session by its opaque token. */
@@ -191,6 +222,8 @@ module.exports = {
   getSessionByToken,
   updateSessionName,
   destroySession,
+  createLocalDemoSession,
+  isLocalDemoMode,
   assertDatabaseReady,
   assertProductionConfig,
 };
