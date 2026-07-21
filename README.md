@@ -455,8 +455,8 @@ valid API key, and container runtime verification requires Docker Desktop.
 
 ## CI/CD and container delivery
 
-`.github/workflows/ci-cd.yml` runs on pull requests to `main`, pushes to `main`,
-and manual `workflow_dispatch` runs. It implements three dependent jobs:
+`.github/workflows/ci-cd.yml` runs on every branch push, pull requests to
+`main`, and manual `workflow_dispatch` runs. It implements three dependent jobs:
 
 1. **Test and security gate:** installs the lockfile, runs all validation and
    tests, blocks high-severity npm audit findings, and validates both Compose
