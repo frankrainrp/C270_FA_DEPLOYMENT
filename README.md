@@ -1,5 +1,7 @@
 # Butler
 
+[![CI and Container Delivery](https://github.com/HeinThuNyiNyi/butler-devops-CA2/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/HeinThuNyiNyi/butler-devops-CA2/actions/workflows/ci-cd.yml)
+
 Butler is a single-process Node.js study workspace with server-rendered EJS
 pages, MongoDB persistence, and a streaming AI agent. The agent can read current
 tasks, notes, and calendar events, then propose CRUD tool calls for the user to
@@ -29,6 +31,32 @@ one user's data is never visible to another.
 - Responsive EJS interface with paper, glass, and dark themes
 - Simulated billing/credits and profile settings (Task 6)
 - Docker configurations for either MongoDB alone or the complete stack
+
+## Quick start
+
+The complete local stack is the recommended way to run Butler for development
+or an on-device demonstration:
+
+```powershell
+git clone https://github.com/HeinThuNyiNyi/butler-devops-CA2.git
+Set-Location butler-devops-CA2
+Copy-Item .env.example .env
+docker compose up -d --build --wait
+docker compose ps
+Invoke-RestMethod http://localhost:3001/api/health
+```
+
+Open `http://localhost:3001`, select **Enter local demo**, and use the Chat,
+Tasks, Calendar, Notes, Search, and Achievements pages. A DeepSeek key is not
+required for the workspace; without one, Chat uses deterministic mock mode.
+Add a key to `.env` and keep `CHAT_MOCK_MODE=false` to demonstrate live agent
+tool calls.
+
+Stop the stack without deleting the MongoDB volume:
+
+```powershell
+docker compose down
+```
 
 ## Runtime architecture
 
@@ -63,6 +91,8 @@ Browser
 
 ```text
 .
+|-- .github/workflows/
+|   `-- ci-cd.yml             Test, Docker smoke test, and GHCR delivery
 |-- .env.example              Documented environment-variable template
 |-- .dockerignore             Docker build-context exclusions
 |-- Dockerfile                Local-demo Node.js image
@@ -71,7 +101,8 @@ Browser
 |-- ci-validate.mjs           Required-file validation
 |-- package.json              Dependencies and npm scripts
 |-- scripts/
-|   `-- migrate-owner-email.js  One-time: assigns pre-login data to an account
+|   |-- migrate-owner-email.js  One-time: assigns pre-login data to an account
+|   `-- smoke-check.mjs         Health, auth, page, and task CRUD smoke test
 |-- test/                     Node.js automated tests
 `-- src/
     |-- app.js                Express bootstrap and MongoDB connection
@@ -406,14 +437,129 @@ only to `127.0.0.1` in this development mode.
 ## Validation
 
 ```powershell
+npm ci
 npm run test:ci
+npm run audit:ci
 docker compose -f docker-compose.db.yml config -q
 docker compose config -q
+docker compose up -d --build --wait
+npm run smoke
 ```
 
 `npm run test:ci` verifies required deployment files and runs the Node.js test
-suite. The real DeepSeek path requires a valid API key, and container runtime
-verification requires Docker Desktop to be running.
+suite. `npm run audit:ci` fails on high-severity production dependency findings.
+`npm run smoke` expects the complete stack at `http://127.0.0.1:3001`; it checks
+readiness, local authentication, protected pages, MongoDB persistence, and task
+CRUD, then removes the task that it created. The real DeepSeek path requires a
+valid API key, and container runtime verification requires Docker Desktop.
+
+## CI/CD and container delivery
+
+`.github/workflows/ci-cd.yml` runs on pull requests to `main`, pushes to `main`,
+and manual `workflow_dispatch` runs. It implements three dependent jobs:
+
+1. **Test and security gate:** installs the lockfile, runs all validation and
+   tests, blocks high-severity npm audit findings, and validates both Compose
+   files.
+2. **Docker smoke test:** builds an isolated application/MongoDB stack, waits
+   for both services to become healthy, runs the authenticated smoke test,
+   verifies that the application uses UID 1000 instead of root, and uploads
+   Docker logs even when a step fails.
+3. **Container delivery:** after a successful push to `main`, rebuilds the
+   verified revision and publishes `latest` and immutable `sha-*` tags to
+   `ghcr.io/heinthunyinyi/butler-devops-ca2`, including OCI provenance and an
+   SBOM. Pull requests never receive package write permission.
+
+GitHub automatically supplies the short-lived `GITHUB_TOKEN`; no personal
+registry password belongs in repository secrets. The first GHCR package is
+private by default. Change its package visibility in GitHub if an external
+host must pull it anonymously.
+
+To run the pipeline manually, open the repository's **Actions** tab, select
+**CI and Container Delivery**, choose **Run workflow**, and wait for every job
+to turn green. A successful workflow run and its Docker log artifact are the
+primary CI/CD demonstration evidence.
+
+Publishing an image is continuous delivery, not a public application runtime.
+The local Compose stack remains the supported on-device deployment.
+
+## Public deployment requirements
+
+The current repository deliberately binds the complete demo to `127.0.0.1`.
+That is safe for a local presentation but is not a public cloud deployment.
+Before deploying the published image to Render, Railway, a VPS, or another
+public platform, configure all of the following:
+
+- a production MongoDB service and a secret `MONGO_URI`;
+- `NODE_ENV=production`, `AUTH_REQUIRED=true`, and `LOCAL_DEMO_MODE=false`;
+- a reachable n8n OTP webhook in `N8N_OTP_WEBHOOK_URL`;
+- a secret `DEEPSEEK_API_KEY` if live agent calls are required;
+- TLS/HTTPS, platform health checks against `/api/health`, persistent database
+  backups, and a rollback target using an immutable `sha-*` image tag;
+- a final deploy job or provider deploy hook that runs only after the test and
+  Docker smoke jobs pass.
+
+A public URL cannot be produced from repository code alone: it requires a
+chosen hosting account, database, domain or platform URL, and deployment
+credentials. Never expose the one-click local demo endpoint publicly.
+
+## Final-assessment demonstration checklist
+
+Prepare from a clean checkout of the actual `main` branch rather than an older
+local branch or image:
+
+```powershell
+git checkout main
+git pull --ff-only origin main
+git status --short
+git log -1 --oneline
+Copy-Item .env.example .env
+docker compose up -d --build --wait
+docker compose ps
+Invoke-RestMethod http://localhost:3001/api/health
+npm run smoke
+```
+
+During the demonstration:
+
+1. Show the green GitHub Actions run and explain build, test, security, smoke,
+   and delivery gates.
+2. Show both Compose services as healthy and explain application readiness,
+   MongoDB readiness, the non-root user, loopback port binding, and the named
+   data volume.
+3. Enter the local demo, ask the agent to list tasks, then ask it to create a
+   task. Explain why reads can run automatically while writes require explicit
+   confirmation.
+4. Accept the tool call, verify the task on the Tasks page, restart only the
+   application container, and show that MongoDB retained the task.
+5. Show one declined write operation, Docker logs, and the `/api/health`
+   response so both success and safe failure behaviour are visible.
+6. If a public deployment has been configured, repeat the health check and one
+   user flow through its external URL.
+
+Keep a mock-mode fallback ready for unreliable model connectivity. Mock mode
+proves streaming UI behaviour but does not emit agent tool calls, so test the
+live key and network before the presentation.
+
+## Post-CA2 improvement evidence
+
+Use application reliability improvements here rather than double-counting the
+core Docker and pipeline requirements:
+
+| Identified issue | Implemented correction | Evidence |
+|---|---|---|
+| API modules could be imported but never mounted, causing silent 404s | Central route registration plus an automated unmounted-route guard | `src/routes/index.js`, `ci-validate.mjs`, `npm run test:ci` |
+| Concurrent chat sends and repeated create calls could duplicate work | Send locking, bounded tool rounds, confirmation, and idempotency keys | `src/public/js/chat-ui.js`, `src/public/js/tool-executor.js`, `test/chat-regressions.test.js` |
+| Client-provided identity or context could cross account boundaries | Server-side sessions, route guards, and `ownerEmail`-scoped services | `src/lib/authGuard.js`, `src/middleware/requireAuth.js`, auth and chat regression tests |
+| Document uploads needed bounded and testable extraction | Memory-only decoding, type checks, and text limits | `src/services/DocumentDecodeService.js`, `test/document-decode.test.js` |
+
+For individual-contribution evidence, prepare the relevant commits and be able
+to explain how each component connects to the full DevOps workflow:
+
+```powershell
+git log --oneline --author="Your Name"
+git show --stat <commit>
+```
 
 ```powershell
 npm run migrate:owner -- you@example.com
