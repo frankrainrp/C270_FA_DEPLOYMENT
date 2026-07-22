@@ -17,6 +17,8 @@ requireFile('Dockerfile', 'Dockerfile');
 requireFile('docker-compose.yml', 'docker-compose.yml');
 requireFile('docker-compose.db.yml', 'docker-compose.db.yml (MongoDB-only dev stack)');
 requireFile('.env.example', '.env.example');
+requireFile('.github/workflows/ci-cd.yml', 'GitHub Actions CI/CD workflow');
+requireFile('scripts/smoke-check.mjs', 'Docker smoke-test script');
 
 // --- Document decoding (OCR/import) feature: required files ---
 requireFile('src/routes/api/documents.js', 'Documents API route');

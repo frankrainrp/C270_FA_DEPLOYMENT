@@ -7,6 +7,8 @@
     "start": "node src/app.js",
     "test": "node --test",
     "test:ci": "node ci-validate.mjs && npm test",
+    "audit:ci": "npm audit --omit=dev --audit-level=high",
+    "smoke": "node scripts/smoke-check.mjs",
     "migrate:owner": "node scripts/migrate-owner-email.js"
   },
   "dependencies": {
