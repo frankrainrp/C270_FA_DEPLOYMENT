@@ -6,6 +6,29 @@ const { requireAuthApi } = require("../../middleware/requireAuth");
 const router = express.Router();
 router.use(requireAuthApi);
 
+const TASK_UPDATE_FIELDS = ["title", "description", "dueDate", "priority", "status", "completed"];
+
+function taskUpdateFromBody(body) {
+  return TASK_UPDATE_FIELDS.reduce((update, field) => {
+    if (body && body[field] !== undefined) update[field] = body[field];
+    return update;
+  }, {});
+}
+
+async function updateTask(req, res) {
+  const updateData = taskUpdateFromBody(req.body);
+  if (Object.keys(updateData).length === 0) {
+    return res.status(400).json(makeFail("Provide at least one task field to update."));
+  }
+  if (updateData.title !== undefined && !String(updateData.title).trim()) {
+    return res.status(400).json(makeFail("Title cannot be empty."));
+  }
+
+  const task = await TaskService.update(req.params.id, updateData, req.sessionUser.email);
+  if (!task) return res.status(404).json(makeFail("Task not found."));
+  return res.json(makeOk({ task }));
+}
+
 /**
  * POST /api/tasks
  * Create a new task.
@@ -39,6 +62,17 @@ router.get("/stats", runSafe(async (req, res) => {
 }));
 
 /**
+ * GET /api/tasks/summary
+ * Deterministic account-scoped progress summary used by the AI agent.
+ */
+router.get("/summary", runSafe(async (req, res) => {
+  const requestedDays = Number(req.query.days);
+  const windowDays = Number.isFinite(requestedDays) ? requestedDays : 7;
+  const summary = await TaskService.getSummary(req.sessionUser.email, windowDays);
+  res.json(makeOk({ summary }));
+}));
+
+/**
  * GET /api/tasks/:id
  * Get a single task by ID.
  */
@@ -64,20 +98,8 @@ router.get("/", runSafe(async (req, res) => {
  * PUT /api/tasks/:id
  * Update an existing task.
  */
-router.put("/:id", runSafe(async (req, res) => {
-  const { title, description, dueDate, priority, status, completed } = req.body;
-  const updateData = { title, description, dueDate, priority, status, completed };
-
-  if (!title || !title.trim()) {
-    return res.status(400).json(makeFail("Title is required."));
-  }
-
-  const task = await TaskService.update(req.params.id, updateData, req.sessionUser.email);
-  if (!task) {
-    return res.status(404).json(makeFail("Task not found."));
-  }
-  res.json(makeOk({ task }));
-}));
+router.put("/:id", runSafe(updateTask));
+router.patch("/:id", runSafe(updateTask));
 
 /**
  * DELETE /api/tasks/:id

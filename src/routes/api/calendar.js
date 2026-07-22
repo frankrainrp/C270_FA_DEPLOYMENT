@@ -9,6 +9,33 @@ const { requireAuthApi } = require("../../middleware/requireAuth");
 // req.sessionUser.email so one account never sees another's events.
 router.use(requireAuthApi);
 
+const EVENT_UPDATE_FIELDS = ["title", "date", "description", "color", "tag", "allDay"];
+
+async function updateEvent(req, res) {
+  try {
+    const updateData = EVENT_UPDATE_FIELDS.reduce((update, field) => {
+      if (req.body && req.body[field] !== undefined) update[field] = req.body[field];
+      return update;
+    }, {});
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json(makeFail("Provide at least one event field to update."));
+    }
+    if (updateData.title !== undefined && !String(updateData.title).trim()) {
+      return res.status(400).json(makeFail("Title cannot be empty."));
+    }
+    if (updateData.date !== undefined && !updateData.date) {
+      return res.status(400).json(makeFail("Date cannot be empty."));
+    }
+
+    const event = await CalendarService.update(req.params.id, updateData, req.sessionUser.email);
+    if (!event) return res.status(404).json(makeFail("Event not found"));
+    return res.json(makeOk({ event }));
+  } catch (err) {
+    console.error("[api/calendar] update error:", err);
+    return res.status(500).json(makeFail(err.message));
+  }
+}
+
 /**
  * GET /api/calendar
  * Get the current user's calendar events AND tasks with due dates
@@ -193,29 +220,8 @@ router.post("/", async (req, res) => {
  * PUT /api/calendar/:id
  * Update an event (must belong to the current user)
  */
-router.put("/:id", async (req, res) => {
-  try {
-    const { title, date, description, color, tag, allDay } = req.body;
-
-    const event = await CalendarService.update(req.params.id, {
-      title,
-      date,
-      description,
-      color,
-      tag,
-      allDay,
-    }, req.sessionUser.email);
-
-    if (!event) {
-      return res.status(404).json(makeFail("Event not found"));
-    }
-
-    res.json(makeOk({ event }));
-  } catch (err) {
-    console.error("[api/calendar] PUT error:", err);
-    res.status(500).json(makeFail(err.message));
-  }
-});
+router.put("/:id", updateEvent);
+router.patch("/:id", updateEvent);
 
 /**
  * DELETE /api/calendar/:id

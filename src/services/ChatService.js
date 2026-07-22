@@ -25,6 +25,7 @@ const { buildSystemPrompt } = require("./ChatPrompt");
 const { CHAT_TOOLS } = require("./ChatToolDefinitions");
 const { buildSnapshot } = require("./ContextService");
 const ChatSessionService = require("./ChatSessionService");
+const TaskService = require("./TaskService");
 
 const MODEL_MAP = {
   "deepseek-v4-flash":    { apiModel: "deepseek-chat",     supportsTools: true  },
@@ -176,19 +177,37 @@ function isFollowUpToolRound(messages) {
   return list[list.length - 1].role === "tool";
 }
 
+/** Recognises task-progress questions that can be answered deterministically without a model. */
+function requestsTaskSummary(text) {
+  return /(task\s+(summary|overview|progress|workload)|summari[sz]e\s+(my\s+)?tasks?|completion\s+rate|completed\s+this\s+week|overdue\s+(tasks?|work)|what\s+should\s+i\s+do\s+next|任务(摘要|总结|进度)|学习进度|完成率|逾期任务)/i.test(String(text || ""));
+}
+
 /** Emits a deterministic local SSE response when the real model path is disabled. */
 async function streamMock(input, res) {
   beginSse(res);
 
   const lastUser = extractLastUserMessage(input.messages);
   const echo = lastUser ? lastUser.content : "Hello!";
-  const reply = `Butler (mock mode): I received "${echo}". Configure DEEPSEEK_API_KEY in .env to enable tool calling against MongoDB.`;
+  let reply;
+  if (lastUser && requestsTaskSummary(lastUser.content)) {
+    try {
+      const summary = await TaskService.getSummary(input.ownerEmail, 7);
+      reply = `${TaskService.formatSummary(summary)}\n\nGenerated locally from your current MongoDB tasks; AI model access is not required.`;
+    } catch (err) {
+      reply = `Task summary is temporarily unavailable because workspace data could not be read: ${err.message}`;
+    }
+  } else {
+    reply = `Butler (mock mode): I received "${echo}". Configure DEEPSEEK_API_KEY in .env to enable tool calling against MongoDB.`;
+  }
 
   const words = reply.split(/(\s+)/);
+  const chunkDelayMs = Number.isFinite(input.mockChunkDelayMs)
+    ? Math.min(100, Math.max(0, input.mockChunkDelayMs))
+    : 20;
   for (const chunk of words) {
     if (input.signal && input.signal.aborted) return;
     writeSse(res, { choices: [{ delta: { content: chunk }, finish_reason: null }] });
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    if (chunkDelayMs) await new Promise((resolve) => setTimeout(resolve, chunkDelayMs));
   }
   writeSse(res, { choices: [{ delta: {}, finish_reason: "stop" }] });
   res.write("data: [DONE]\n\n");

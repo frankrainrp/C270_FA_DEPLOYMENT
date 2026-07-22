@@ -69,11 +69,12 @@
     },
     // Updates the editable fields of an existing task.
     task_update: function (args) {
-      return ButlerApi.put("/tasks/" + args.id, {
+      return ButlerApi.patch("/tasks/" + args.id, {
         title:       args.title,
         description: args.description,
         dueDate:     args.dueDate,
         priority:    args.priority,
+        status:      args.status,
         completed:   args.completed,
       });
     },
@@ -89,6 +90,10 @@
     task_list: function (args) {
       return ButlerApi.get("/tasks" + toQuery({ view: args.view || "all" }));
     },
+    // Reads deterministic task progress metrics instead of asking the model to count raw records.
+    task_summary: function (args) {
+      return ButlerApi.get("/tasks/summary" + toQuery({ days: args.days || 7 }));
+    },
 
     // ---------- NOTES ----------
     // Creates an account-scoped note and forwards the tool-call id for idempotency.
@@ -102,7 +107,7 @@
     },
     // Updates the editable fields of an existing note.
     note_update: function (args) {
-      return ButlerApi.put("/notes/" + args.id, {
+      return ButlerApi.patch("/notes/" + args.id, {
         title:   args.title,
         content: args.content,
         tags:    args.tags,
@@ -136,7 +141,7 @@
     },
     // Updates the editable fields of an existing calendar event.
     event_update: function (args) {
-      return ButlerApi.put("/calendar/" + args.id, {
+      return ButlerApi.patch("/calendar/" + args.id, {
         title:       args.title,
         date:        args.date,
         description: args.description,

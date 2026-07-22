@@ -8,6 +8,30 @@ const { requireAuthApi } = require("../../middleware/requireAuth");
 // req.sessionUser.email so one account never sees another's notes.
 router.use(requireAuthApi);
 
+const NOTE_UPDATE_FIELDS = ["title", "content", "tags", "pinned"];
+
+async function updateNote(req, res) {
+  try {
+    const updateData = NOTE_UPDATE_FIELDS.reduce((update, field) => {
+      if (req.body && req.body[field] !== undefined) update[field] = req.body[field];
+      return update;
+    }, {});
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json(makeFail("Provide at least one note field to update."));
+    }
+    if (updateData.title !== undefined && !String(updateData.title).trim()) {
+      return res.status(400).json(makeFail("Title cannot be empty."));
+    }
+
+    const note = await NoteService.update(req.params.id, updateData, req.sessionUser.email);
+    if (!note) return res.status(404).json(makeFail("Note not found"));
+    return res.json(makeOk({ note }));
+  } catch (err) {
+    console.error("[api/notes] update error:", err);
+    return res.status(500).json(makeFail(err.message));
+  }
+}
+
 /**
  * GET /api/notes
  * Get the current user's notes, optionally filtered (all or pinned)
@@ -84,27 +108,8 @@ router.post("/", async (req, res) => {
  * PUT /api/notes/:id
  * Update a note (must belong to the current user)
  */
-router.put("/:id", async (req, res) => {
-  try {
-    const { title, content, tags, pinned } = req.body;
-
-    const note = await NoteService.update(req.params.id, {
-      title,
-      content,
-      tags,
-      pinned,
-    }, req.sessionUser.email);
-
-    if (!note) {
-      return res.status(404).json(makeFail("Note not found"));
-    }
-
-    res.json(makeOk({ note }));
-  } catch (err) {
-    console.error("[api/notes] PUT error:", err);
-    res.status(500).json(makeFail(err.message));
-  }
-});
+router.put("/:id", updateNote);
+router.patch("/:id", updateNote);
 
 /**
  * DELETE /api/notes/:id

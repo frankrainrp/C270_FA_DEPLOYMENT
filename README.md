@@ -20,6 +20,8 @@ one user's data is never visible to another.
 - Streaming DeepSeek chat through an OpenAI-compatible client
 - Deterministic offline chat through `CHAT_MOCK_MODE`
 - Multi-round agent tool calls for tasks, notes, and calendar events
+- Deterministic MongoDB-grounded task summaries with completion rate, overdue
+  work, weekly progress, and prioritised next actions
 - Explicit user confirmation before write operations
 - MongoDB-backed chat history and workspace data
 - In-memory document decoding for text files, PDF, and DOCX
@@ -186,6 +188,9 @@ Browser
    matching authenticated REST endpoint.
 7. The REST route calls its service, which reads or writes MongoDB filtered
    by `ownerEmail`.
+   Task-progress questions use the deterministic `/api/tasks/summary` endpoint
+   so counts, completion rate, overdue work, and priorities are calculated from
+   stored records instead of estimated by the model.
 8. Tool results are appended as `role: "tool"` messages and sent back to the
    model for a natural-language confirmation.
 9. The loop stops when no tool calls remain or after six tool rounds.
@@ -298,8 +303,10 @@ enter an email address, and use the verification code delivered by the workflow.
 
 The following sequence shows the complete read/approval/write loop:
 
-1. In Chat, send: `List my current tasks and summarize them briefly.`
-2. Butler automatically runs the read-only `task_list` tool.
+1. In Chat, select **Task summary**, or send: `Summarize my tasks, completion
+   rate, overdue work, and top priorities.`
+2. Butler automatically runs the read-only `task_summary` tool. The same
+   MongoDB-grounded summary remains available in mock mode if model access fails.
 3. Send: `Create a high priority task titled Finish the Docker demo tomorrow.`
 4. Review the proposed title, date, and priority in the confirmation card.
 5. Choose **Accept** to write it to MongoDB, or **Decline** to reject it.
@@ -402,6 +409,19 @@ only to `127.0.0.1` in this development mode.
 | `LOCAL_DEMO_MODE` | Enables one-click local demo login; never expose publicly |
 | `LOCAL_DEMO_EMAIL` | Account identity used by the local demo |
 | `LOCAL_DEMO_NAME` | Display name used by the local demo |
+
+## CA2 Agent feedback improvement
+
+CA2 feedback asked the team to extend the Agent beyond note creation and add
+task summaries. The current implementation provides a demonstrable evidence
+chain:
+
+| Feedback | Implemented correction | Verification |
+|---|---|---|
+| Agent focused mainly on notes | Account-scoped task, note, and calendar tools with a bounded multi-round loop | `ChatToolDefinitions.js`, `tool-executor.js` |
+| Generate task summaries | Deterministic `task_summary` tool with completion rate, overdue/upcoming counts, weekly completion, and top priorities | `TaskService.getSummary`, `GET /api/tasks/summary` |
+| Features were not fully integrated | Task reads and writes use the same authenticated REST services and MongoDB records as the Tasks and Calendar pages | Agent/API integration test |
+| Production/demo reliability | Read-only local summary fallback when the external model is unavailable; writes remain approval-gated and idempotent | `agent-task-summary.test.js` |
 
 ## Validation
 

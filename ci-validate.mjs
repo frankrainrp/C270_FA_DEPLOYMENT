@@ -46,6 +46,7 @@ requireFile('src/lib/authGuard.js', 'global auth guard');
 requireFile('src/lib/db.js', 'database connector');
 requireFile('src/views/auth/login.ejs', 'Login view');
 requireFile('src/public/js/auth-login.js', 'Login client script');
+requireFile('test/agent-task-summary.test.js', 'Agent task-summary integration tests');
 
 // --- Per-account data (tasks/notes/calendar/chat): required files ---
 requireFile('src/middleware/requireAuth.js', 'requireAuth middleware');

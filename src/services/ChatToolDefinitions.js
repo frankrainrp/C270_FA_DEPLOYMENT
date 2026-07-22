@@ -48,6 +48,7 @@ const CHAT_TOOLS = [
           title:       { type: "string" },
           dueDate:     { type: "string" },
           priority:    { type: "string", enum: ["low", "medium", "high"] },
+          status:      { type: "string", enum: ["active", "in_progress", "completed"] },
           description: { type: "string" },
           completed:   { type: "boolean" },
         },
@@ -88,6 +89,24 @@ const CHAT_TOOLS = [
         type: "object",
         properties: {
           view: { type: "string", enum: ["all", "active", "completed", "upcoming"] },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "task_summary",
+      description: "Return deterministic task progress metrics and top priorities. Use for task summaries, completion rate, overdue work, weekly progress, workload, or what to do next. Read-only.",
+      parameters: {
+        type: "object",
+        properties: {
+          days: {
+            type: "integer",
+            minimum: 1,
+            maximum: 30,
+            description: "Upcoming-task window in days. Defaults to 7.",
+          },
         },
       },
     },

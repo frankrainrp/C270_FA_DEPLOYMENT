@@ -2,7 +2,10 @@ const Note = require("../models/Note");
 const { notePreview } = require("../lib/panelHelpers");
 
 function normalizeNoteInput(data) {
-  const out = { ...data };
+  const out = Object.entries(data || {}).reduce((result, [key, value]) => {
+    if (value !== undefined) result[key] = value;
+    return result;
+  }, {});
   const body = out.content != null ? out.content : out.preview;
   if (body != null) {
     out.content = String(body);

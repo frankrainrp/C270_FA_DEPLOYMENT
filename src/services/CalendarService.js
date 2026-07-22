@@ -1,5 +1,14 @@
 const CalendarEvent = require("../models/CalendarEvent");
 
+const EDITABLE_FIELDS = ["title", "date", "description", "color", "tag", "allDay"];
+
+function normalizeEventUpdate(data) {
+  return EDITABLE_FIELDS.reduce((update, field) => {
+    if (data && data[field] !== undefined) update[field] = data[field];
+    return update;
+  }, {});
+}
+
 class CalendarService {
   /**
    * Create a new calendar event, owned by ownerEmail.
@@ -51,9 +60,11 @@ class CalendarService {
    * Update an event, scoped to ownerEmail.
    */
   async update(eventId, updateData, ownerEmail) {
+    const normalized = normalizeEventUpdate(updateData);
+    if (Object.keys(normalized).length === 0) return await this.findById(eventId, ownerEmail);
     return await CalendarEvent.findOneAndUpdate(
       { _id: eventId, ownerEmail },
-      updateData,
+      { $set: normalized },
       { new: true, runValidators: true }
     );
   }
