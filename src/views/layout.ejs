@@ -5,21 +5,21 @@
     WallpaperLayer + TopBar + LeftRail + main panel + MobileTabBar.
 
     Locals accepted (populated by lib/renderLayout.js):
-    - title               : page title
-    - theme               : paper | dark | retro
-    - activeNav           : chat | tasks | calendar | notes
+    - title                : page title
+    - theme                : paper | dark | retro
+    - activeNav            : chat | tasks | calendar | notes
     - activeCustomPanelId : currently selected custom panel id
-    - tabsOrder           : ordered list of built-in tab ids
-    - hiddenTabs          : list of built-in tab ids to hide
-    - customPanels        : [{ id, label, emoji }]
-    - authProfile         : { name, email, imageUrl }
-    - plan                : free | pro | max
-    - planName            : display name shown in the user menu
-    - rail                : sidebar data forwarded to partials/sidebar.ejs
-    - page                : file under views/pages/ to include as main content
-    - pageLocals          : extra locals forwarded to the page partial
-    - labels              : optional string dictionary
-    - t                   : optional translation function
+    - tabsOrder            : ordered list of built-in tab ids
+    - hiddenTabs           : list of built-in tab ids to hide
+    - customPanels         : [{ id, label, emoji }]
+    - authProfile          : { name, email, imageUrl }
+    - plan                 : free | pro | max
+    - planName             : display name shown in the user menu
+    - rail                 : sidebar data forwarded to partials/sidebar.ejs
+    - page                 : file under views/pages/ to include as main content
+    - pageLocals           : extra locals forwarded to the page partial
+    - labels               : optional string dictionary
+    - t                    : optional translation function
   */
   const value = (name, fallback) => (
     typeof locals !== "undefined" && Object.prototype.hasOwnProperty.call(locals, name)
@@ -296,6 +296,16 @@
                 <span>Upcoming</span>
                 <strong data-stat-upcoming>0</strong>
               </div>
+              <div class="learning-stat-card stat-danger">
+                <span>Overdue</span>
+                <strong data-stat-overdue>0</strong>
+              </div>
+            </div>
+            <div class="learning-stats-grid">
+              <div class="learning-stat-card stat-success">
+                <span>Completion rate</span>
+                <strong data-stat-completion-rate>0%</strong>
+              </div>
               <div class="learning-stat-card stat-neutral">
                 <span>Study goal</span>
                 <strong>Keep focus strong</strong>
@@ -309,6 +319,16 @@
               <div class="weekly-trend-bars" data-weekly-bars></div>
               <div class="weekly-trend-labels" data-weekly-labels></div>
               <div class="weekly-trend-note" data-weekly-note></div>
+            </div>
+            <div class="weekly-trend">
+              <div class="weekly-trend-header">
+                <span>Tasks completed per week (last 6 weeks)</span>
+                <strong class="weekly-trend-count" data-multiweek-total>0 completed</strong>
+              </div>
+              <div class="weekly-trend-bars" data-multiweek-bars></div>
+              <div class="weekly-trend-labels" data-multiweek-labels></div>
+              <div class="weekly-trend-note" data-multiweek-note></div>
+              <div class="trend-indicator" data-trend-indicator></div>
             </div>
             <div class="tag-distribution">
               <div class="tag-distribution-label">Task tag distribution</div>

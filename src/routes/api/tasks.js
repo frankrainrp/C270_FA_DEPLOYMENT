@@ -28,14 +28,25 @@ router.post("/", runSafe(async (req, res) => {
  * GET /api/tasks/stats
  * Get task statistics for the current user.
  *
- * IMPORTANT: this must be declared BEFORE GET /:id. Express matches
- * routes in registration order, and "/:id" would otherwise swallow
- * requests to "/stats" (treating "stats" as the :id param), which is
- * exactly what was breaking the 7-day completion trend widget.
+ * IMPORTANT: literal-path routes like this and /weekly-stats must be
+ * declared BEFORE GET /:id. Express matches routes in registration
+ * order, and "/:id" would otherwise swallow requests to these paths
+ * (treating "stats"/"weekly-stats" as the :id param).
  */
 router.get("/stats", runSafe(async (req, res) => {
   const stats = await TaskService.getStats(req.sessionUser.email);
   res.json(makeOk({ stats }));
+}));
+
+/**
+ * GET /api/tasks/weekly-stats?weeks=6
+ * Get tasks-completed-per-week counts for the current user, for
+ * charting the multi-week completion trend.
+ */
+router.get("/weekly-stats", runSafe(async (req, res) => {
+  const weeksBack = parseInt(req.query.weeks, 10) || 6;
+  const weeklyStats = await TaskService.getWeeklyCompletionCounts(req.sessionUser.email, weeksBack);
+  res.json(makeOk({ weeklyStats }));
 }));
 
 /**

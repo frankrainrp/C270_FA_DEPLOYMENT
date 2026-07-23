@@ -164,66 +164,135 @@
   }
 
   function renderWeeklyTrend(completedTasks) {
-    var weekdayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-    var now = new Date();
-    var days = [];
-    for (var i = 6; i >= 0; i -= 1) {
-      var day = new Date(now);
-      day.setDate(now.getDate() - i);
-      day.setHours(0, 0, 0, 0, 0);
-      days.push({
-        label: weekdayNames[day.getDay()],
-        date: day,
-        count: 0,
-      });
-    }
+  var weekdayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  var now = new Date();
+  var currentDayOfWeek = now.getDay(); // 0 = Sunday ... 6 = Saturday
 
-    completedTasks.forEach(function (task) {
-      var dateValue = task.updatedAt || task.createdAt;
-      var completedDate = dateValue ? new Date(dateValue) : null;
-      if (!completedDate || !task.completed) return;
-      completedDate.setHours(0, 0, 0, 0, 0);
-      days.forEach(function (day) {
-        if (completedDate.getTime() === day.date.getTime()) day.count += 1;
-      });
+  // Find this week's Sunday (go back to the most recent Sunday).
+  var weekStart = new Date(now);
+  weekStart.setDate(now.getDate() - currentDayOfWeek);
+  weekStart.setHours(0, 0, 0, 0, 0);
+
+  var days = [];
+  for (var i = 0; i <= 6; i += 1) {
+    var day = new Date(weekStart);
+    day.setDate(weekStart.getDate() + i);
+    days.push({
+      label: weekdayNames[i],
+      date: day,
+      count: 0,
     });
+  }
 
-    var total = days.reduce(function (sum, item) { return sum + item.count; }, 0);
-    miniAppsPanel.querySelector("[data-weekly-total]").textContent = total + " completed";
-    var bars = miniAppsPanel.querySelector("[data-weekly-bars]");
-    if (!bars) return;
-    bars.innerHTML = "";
-    var maxCount = Math.max(1, total, days.reduce(function (max, item) { return Math.max(max, item.count); }, 0));
+  completedTasks.forEach(function (task) {
+    var dateValue = task.updatedAt || task.createdAt;
+    var completedDate = dateValue ? new Date(dateValue) : null;
+    if (!completedDate || !task.completed) return;
+    completedDate.setHours(0, 0, 0, 0, 0);
     days.forEach(function (day) {
+      if (completedDate.getTime() === day.date.getTime()) day.count += 1;
+    });
+  });
+
+  var total = days.reduce(function (sum, item) { return sum + item.count; }, 0);
+  miniAppsPanel.querySelector("[data-weekly-total]").textContent = total + " completed";
+  var bars = miniAppsPanel.querySelector("[data-weekly-bars]");
+  if (!bars) return;
+  bars.innerHTML = "";
+  var maxCount = Math.max(1, total, days.reduce(function (max, item) { return Math.max(max, item.count); }, 0));
+  days.forEach(function (day) {
+    var bar = document.createElement("div");
+    bar.className = "weekly-bar";
+    var height = total === 0 ? 50 : Math.round((day.count / maxCount) * 100);
+    var visibleHeight = day.count === 0 ? 40 : Math.max(height, 30);
+    if (day.count === 0) {
+      bar.classList.add("weekly-bar-empty");
+    }
+    var countLabel = total === 0 ? "–" : day.count;
+    bar.innerHTML = "<span>" + countLabel + "</span>";
+    bar.style.height = visibleHeight + "%";
+    bar.title = day.label + ": " + day.count;
+    bar.appendChild(document.createElement("span"));
+    bars.appendChild(bar);
+  });
+
+  var note = miniAppsPanel.querySelector("[data-weekly-note]");
+  if (note) {
+    note.textContent = total === 0 ? "No completed tasks yet, start adding tasks to see your trend." : "";
+  }
+
+  var labels = miniAppsPanel.querySelector("[data-weekly-labels]");
+  if (!labels) return;
+  labels.innerHTML = "";
+  days.forEach(function (day) {
+    var label = document.createElement("div");
+    label.className = "weekly-label";
+    label.textContent = day.label.slice(0, 3);
+    labels.appendChild(label);
+  });
+}
+
+  // ---------- Multi-week completion trend ----------
+  function renderMultiWeekTrend(weeklyStats) {
+    var bars = miniAppsPanel.querySelector("[data-multiweek-bars]");
+    var labels = miniAppsPanel.querySelector("[data-multiweek-labels]");
+    var note = miniAppsPanel.querySelector("[data-multiweek-note]");
+    var totalEl = miniAppsPanel.querySelector("[data-multiweek-total]");
+    if (!bars || !labels || !Array.isArray(weeklyStats)) return;
+
+    var total = weeklyStats.reduce(function (sum, w) { return sum + w.count; }, 0);
+    if (totalEl) totalEl.textContent = total + " completed";
+
+    bars.innerHTML = "";
+    labels.innerHTML = "";
+    var maxCount = Math.max(1, weeklyStats.reduce(function (max, w) { return Math.max(max, w.count); }, 0));
+
+    weeklyStats.forEach(function (week) {
       var bar = document.createElement("div");
       bar.className = "weekly-bar";
-      var height = total === 0 ? 50 : Math.round((day.count / maxCount) * 100);
-      var visibleHeight = day.count === 0 ? 40 : Math.max(height, 30);
-      if (day.count === 0) {
-        bar.classList.add("weekly-bar-empty");
-      }
-      var countLabel = total === 0 ? "–" : day.count;
+      var height = total === 0 ? 50 : Math.round((week.count / maxCount) * 100);
+      var visibleHeight = week.count === 0 ? 40 : Math.max(height, 30);
+      if (week.count === 0) bar.classList.add("weekly-bar-empty");
+      var countLabel = total === 0 ? "–" : week.count;
       bar.innerHTML = "<span>" + countLabel + "</span>";
       bar.style.height = visibleHeight + "%";
-      bar.title = day.label + ": " + day.count;
-      bar.appendChild(document.createElement("span"));
+      bar.title = week.label + ": " + week.count;
       bars.appendChild(bar);
-    });
 
-    var note = miniAppsPanel.querySelector("[data-weekly-note]");
-    if (note) {
-      note.textContent = total === 0 ? "No completed tasks yet, start adding tasks to see your trend." : "";
-    }
-
-    var labels = miniAppsPanel.querySelector("[data-weekly-labels]");
-    if (!labels) return;
-    labels.innerHTML = "";
-    days.forEach(function (day) {
       var label = document.createElement("div");
       label.className = "weekly-label";
-      label.textContent = day.label.slice(0, 3);
+      label.textContent = week.label;
       labels.appendChild(label);
     });
+
+    if (note) {
+      note.textContent = total === 0 ? "No completions in this window yet." : "";
+    }
+  }
+
+  // ---------- Trend direction indicator (new) ----------
+  function renderTrendIndicator(trend) {
+    var el = miniAppsPanel.querySelector("[data-trend-indicator]");
+    if (!el || !trend) return;
+
+    if (trend.previousWeekCount === 0 && trend.currentWeekCount === 0) {
+      el.textContent = "No completions yet this week or last week.";
+      el.className = "trend-indicator trend-neutral";
+      return;
+    }
+
+    if (trend.previousWeekCount === 0) {
+      el.textContent = "↑ " + trend.currentWeekCount + " completed this week (no completions last week to compare against)";
+      el.className = "trend-indicator trend-up";
+      return;
+    }
+
+    var arrow = trend.direction === "up" ? "↑" : trend.direction === "down" ? "↓" : "→";
+    var changeText = trend.percentChange === null ? "" : " (" + (trend.percentChange > 0 ? "+" : "") + trend.percentChange + "%)";
+    var comparisonWord = trend.direction === "up" ? "more" : trend.direction === "down" ? "fewer" : "the same as";
+
+    el.textContent = arrow + " " + trend.currentWeekCount + " completed this week — " + comparisonWord + " than last week" + changeText;
+    el.className = "trend-indicator trend-" + trend.direction;
   }
 
   function renderTagDistribution(tasks) {
@@ -265,30 +334,43 @@
     completed.textContent = stats.completed;
     active.textContent = stats.active;
     upcoming.textContent = stats.upcoming;
-    var text = "Butler progress update:\nCompleted " + stats.completed + " tasks, " + stats.active + " in progress, and " + stats.upcoming + " upcoming. Keep the study momentum going!";
+    var text = "Butler progress update:\nCompleted " + stats.completed + " tasks, " + stats.active + " in progress, " + stats.upcoming + " upcoming, and " + stats.overdue + " overdue. Completion rate: " + stats.completionRate + "%. Keep the study momentum going!";
     summary.textContent = "Today I have completed " + stats.completed + " tasks and I’m working on " + stats.active + " more.";
     shareText.value = text;
   }
 
   async function loadLearningTools() {
-  if (!window.ButlerApi || !miniAppsPanel) return;
+    if (!window.ButlerApi || !miniAppsPanel) return;
 
-  try {
-    var statsResponse = await window.ButlerApi.get("/tasks/stats");
-    var stats = statsResponse.stats; // unwrap, matches makeOk({ stats }) shape
+    try {
+      var statsResponse = await window.ButlerApi.get("/tasks/stats");
+      var stats = statsResponse.stats; // unwrap, matches makeOk({ stats }) shape
 
-    var allTasks = await window.ButlerApi.get("/tasks?view=all");
-    var completedTasks = Array.isArray(allTasks.tasks) ? allTasks.tasks.filter(function (task) { return task.completed; }) : [];
-    miniAppsPanel.querySelector("[data-stat-completed]").textContent = stats.completed;
-    miniAppsPanel.querySelector("[data-stat-active]").textContent = stats.active;
-    miniAppsPanel.querySelector("[data-stat-upcoming]").textContent = stats.upcoming;
-    renderWeeklyTrend(completedTasks);
-    renderTagDistribution(Array.isArray(allTasks.tasks) ? allTasks.tasks : []);
-    updateShareCard(stats);
-  } catch (err) {
-    console.error("Learning tools load failed:", err);
+      var weeklyResponse = await window.ButlerApi.get("/tasks/weekly-stats?weeks=6");
+      var weeklyData = weeklyResponse.weeklyStats || { weeks: [], trend: null };
+
+      var allTasks = await window.ButlerApi.get("/tasks?view=all");
+      var completedTasks = Array.isArray(allTasks.tasks) ? allTasks.tasks.filter(function (task) { return task.completed; }) : [];
+
+      miniAppsPanel.querySelector("[data-stat-completed]").textContent = stats.completed;
+      miniAppsPanel.querySelector("[data-stat-active]").textContent = stats.active;
+      miniAppsPanel.querySelector("[data-stat-upcoming]").textContent = stats.upcoming;
+
+      var overdueEl = miniAppsPanel.querySelector("[data-stat-overdue]");
+      if (overdueEl) overdueEl.textContent = stats.overdue;
+
+      var rateEl = miniAppsPanel.querySelector("[data-stat-completion-rate]");
+      if (rateEl) rateEl.textContent = stats.completionRate + "%";
+
+      renderWeeklyTrend(completedTasks);
+      renderMultiWeekTrend(weeklyData.weeks);
+      renderTrendIndicator(weeklyData.trend);
+      renderTagDistribution(Array.isArray(allTasks.tasks) ? allTasks.tasks : []);
+      updateShareCard(stats);
+    } catch (err) {
+      console.error("Learning tools load failed:", err);
+    }
   }
-}
 
   function copyShareText() {
     var shareText = miniAppsPanel.querySelector("[data-share-text]");
