@@ -309,15 +309,35 @@ router.get("/search", requireAuthPage, async (req, res, next) => {
 // -----------------------------------------------------------
 // Tasks
 // -----------------------------------------------------------
+// In src/routes/pages.js
+
+
+// Find the router.get("/tasks") route and replace it with this:
 router.get("/tasks", requireAuthPage, async (req, res, next) => {
   const ownerEmail = req.sessionUser.email;
-
   try {
     const view = req.query.view || "all";
-    const [tasks, stats] = await Promise.all([
-      TaskService.findAll(view, ownerEmail),
+    
+    // FIX: ALWAYS fetch "all" tasks so the client-side tabs have the data!
+    const [tasks, stats, events] = await Promise.all([
+      TaskService.findAll("all", ownerEmail), // <--- Changed from 'view' to '"all"'
       TaskService.getStats(ownerEmail),
+      CalendarService.findAll(ownerEmail), 
     ]);
+
+    const eventTasks = events.map((e) => {
+      const plain = e.toObject ? e.toObject() : e;
+      return {
+        _id: plain._id,
+        title: `🗓️ ${plain.title}`, 
+        dueDate: plain.date,
+        description: plain.description || "",
+        status: "active", 
+        priority: "medium",
+        completed: false,
+        isEvent: true
+      };
+    });
 
     const [rail, authContext] = await Promise.all([
       buildTasksRail(view, ownerEmail, stats),
@@ -332,19 +352,25 @@ router.get("/tasks", requireAuthPage, async (req, res, next) => {
       completed: "Completed tasks",
     }[view] || "All tasks";
 
+    const combinedTasks = [
+      ...tasks.map((t) => t.toObject ? t.toObject() : t),
+      ...eventTasks
+    ];
+
+    combinedTasks.sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
+
     renderLayout(res, {
       title: "Tasks",
       activeNav: "tasks",
       page: "task",
       rail,
-      pageLocals: { tasks: tasks.map((t) => t.toObject()), taskViewLabel },
+      pageLocals: { tasks: combinedTasks, taskViewLabel },
       ...authContext,
     });
   } catch (err) {
     next(err);
   }
 });
-
 // -----------------------------------------------------------
 // Task detail: there's no standalone detail page for tasks (unlike
 // Notes, which has an activeNote side panel) — the task workspace is
