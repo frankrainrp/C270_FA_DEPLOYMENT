@@ -29,6 +29,11 @@ function expectStatus(actual, expected, label) {
 async function main() {
   console.log(`[smoke] Checking ${baseUrl}`);
 
+  const live = await request("/api/live");
+  expectStatus(live.response.status, 200, "liveness endpoint");
+  assert.equal(live.body?.ok, true, "liveness response must be successful");
+  assert.equal(live.body?.data?.status, "alive", "application process must be alive");
+
   const health = await request("/api/health");
   expectStatus(health.response.status, 200, "health endpoint");
   assert.equal(health.body?.ok, true, "health response must be successful");

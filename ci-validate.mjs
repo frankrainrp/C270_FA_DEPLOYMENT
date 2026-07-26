@@ -19,6 +19,13 @@ requireFile('docker-compose.db.yml', 'docker-compose.db.yml (MongoDB-only dev st
 requireFile('.env.example', '.env.example');
 requireFile('.github/workflows/ci-cd.yml', 'GitHub Actions CI/CD workflow');
 requireFile('scripts/smoke-check.mjs', 'Docker smoke-test script');
+requireFile('src/routes/api/live.js', 'process-only Kubernetes liveness route');
+requireFile('k8s/base/kustomization.yaml', 'Kubernetes base kustomization');
+requireFile('k8s/overlays/staging/kustomization.yaml', 'Kubernetes staging overlay');
+requireFile('k8s/overlays/production/kustomization.yaml', 'Kubernetes production overlay');
+requireFile('ansible/requirements.yml', 'Ansible Galaxy requirements');
+requireFile('ansible/playbooks/bootstrap-k3s.yml', 'Ansible K3s bootstrap playbook');
+requireFile('ansible/playbooks/deploy.yml', 'Ansible Kubernetes deployment playbook');
 
 // --- Document decoding (OCR/import) feature: required files ---
 requireFile('src/routes/api/documents.js', 'Documents API route');
@@ -49,6 +56,14 @@ requireFile('src/lib/db.js', 'database connector');
 requireFile('src/views/auth/login.ejs', 'Login view');
 requireFile('src/public/js/auth-login.js', 'Login client script');
 requireFile('test/agent-task-summary.test.js', 'Agent task-summary integration tests');
+requireFile('src/services/StudyBriefingService.js', 'cross-module study briefing service');
+requireFile('src/routes/api/briefing.js', 'authenticated study briefing API route');
+requireFile('src/public/js/markdown-renderer.js', 'safe note Markdown renderer');
+requireFile('test/study-briefing.test.js', 'Agent study-briefing integration tests');
+requireFile('test/markdown-renderer.test.js', 'note Markdown renderer tests');
+requireFile('test/task-completion-analytics.test.js', 'task completion analytics tests');
+requireFile('test/task-workspace.test.js', 'integrated task workspace tests');
+requireFile('test/profile-avatar.test.js', 'Kubernetes-safe avatar validation tests');
 
 // --- Per-account data (tasks/notes/calendar/chat): required files ---
 requireFile('src/middleware/requireAuth.js', 'requireAuth middleware');
@@ -128,6 +143,7 @@ const guardedApiRoutes = [
   'src/routes/api/notes.js',
   'src/routes/api/calendar.js',
   'src/routes/api/chat.js',
+  'src/routes/api/briefing.js',
 ];
 for (const routePath of guardedApiRoutes) {
   if (fs.existsSync(routePath)) {

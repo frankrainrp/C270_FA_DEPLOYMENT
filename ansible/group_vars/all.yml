@@ -1,0 +1,13 @@
+---
+# Pin the cluster version so repeated provisioning is reproducible.
+k3s_version: v1.36.2+k3s1
+
+# Prefer a private address reachable by every node. Override this inventory
+# variable when the first server's ansible_host is a public address.
+k3s_api_address: "{{ hostvars[groups['k3s_server'][0]].ansible_host }}"
+
+# Never put the real token in this file. Export K3S_TOKEN before running the
+# bootstrap playbook or provide it from Ansible Vault.
+k3s_token: "{{ lookup('ansible.builtin.env', 'K3S_TOKEN') }}"
+
+k3s_kubeconfig_output: "{{ lookup('ansible.builtin.env', 'HOME') }}/.kube/butler-k3s.yaml"

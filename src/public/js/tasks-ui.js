@@ -40,7 +40,7 @@
               <span>Due Date</span>
               <input type="date" data-task-date-input />
             </label>
-            <label class="calendar-event-field">
+            <label class="calendar-event-field" data-task-only-field>
               <span>Priority</span>
               <select data-task-priority-input>
                 <option value="low">Low</option>
@@ -49,7 +49,7 @@
               </select>
             </label>
           </div>
-          <label class="calendar-event-field">
+          <label class="calendar-event-field" data-task-only-field>
             <span>Status</span>
             <select data-task-status-input>
               <option value="active" selected>Active</option>
@@ -81,10 +81,15 @@
     var statusInput = modal.querySelector("[data-task-status-input]");
     var kicker = modal.querySelector("[data-task-modal-kicker]");
     var titleHeading = modal.querySelector("#task-modal-title");
+    var isEvent = Boolean(taskData && taskData.itemType === "event");
+    modal.dataset.itemType = isEvent ? "event" : "task";
+    modal.querySelectorAll("[data-task-only-field]").forEach(function (field) {
+      field.hidden = isEvent;
+    });
 
     if (taskData) {
-      kicker.textContent = "Edit Task";
-      titleHeading.textContent = "Update task details";
+      kicker.textContent = isEvent ? "Edit calendar event" : "Edit task";
+      titleHeading.textContent = isEvent ? "Update event details" : "Update task details";
       idInput.value = taskData.id;
       titleInput.value = taskData.title || "";
       descInput.value = taskData.description || "";
@@ -95,9 +100,7 @@
       }
       priorityInput.value = taskData.priority || "medium";
       
-      // Select correct status
-      if (taskData.completed === "true") statusInput.value = "completed";
-      else statusInput.value = "active";
+      statusInput.value = taskData.status || (taskData.completed === "true" ? "completed" : "active");
     } else {
       kicker.textContent = "New Task";
       titleHeading.textContent = "Create a study task";
@@ -125,10 +128,12 @@
         title: title,
         description: descInput.value.trim(),
         dueDate: dateInput.value || null,
-        priority: priorityInput.value,
-        status: statusInput.value,
-        completed: statusInput.value === "completed"
       };
+      if (modal.dataset.itemType !== "event") {
+        payload.priority = priorityInput.value;
+        payload.status = statusInput.value;
+        payload.completed = statusInput.value === "completed";
+      }
 
       newSubmitBtn.disabled = true;
 
@@ -173,7 +178,10 @@
     if (deleteBtn) {
       var delCard = deleteBtn.closest(".task-card");
       var delId = delCard.getAttribute("data-task-id");
-      if (confirm("Delete this task?")) {
+      var deleteLabel = delCard.getAttribute("data-item-type") === "event"
+        ? "Delete this calendar event?"
+        : "Delete this task?";
+      if (confirm(deleteLabel)) {
         deleteBtn.disabled = true;
         ButlerApi.del("/tasks/" + delId).then(function() {
            window.location.reload();
@@ -194,7 +202,9 @@
         description: editCard.getAttribute("data-description"),
         dueDate: editCard.getAttribute("data-task-due-date"),
         priority: editCard.getAttribute("data-priority"),
-        completed: editCard.getAttribute("data-task-completed")
+        completed: editCard.getAttribute("data-task-completed"),
+        status: editCard.getAttribute("data-task-status"),
+        itemType: editCard.getAttribute("data-item-type")
       });
     }
 

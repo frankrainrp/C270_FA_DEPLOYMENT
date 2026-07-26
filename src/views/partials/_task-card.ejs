@@ -7,12 +7,16 @@
   */
   const dueLabel = fmtDue(t.dueDate);
   const description = t.description || "";
+  const isEvent = Boolean(t.isEvent);
+  const status = t.status || (t.completed ? "completed" : "active");
 %>
 <article
-  class="task-card <%= t.status === 'completed' ? 'completed' : '' %>"
-  draggable="true" 
+  class="task-card <%= status === 'completed' ? 'completed' : '' %> <%= isEvent ? 'task-card-event' : '' %>"
+  draggable="<%= isEvent ? 'false' : 'true' %>"
   data-task-id="<%= t._id %>"
-  data-task-completed="<%= t.status === 'completed' %>"
+  data-task-completed="<%= status === 'completed' %>"
+  data-task-status="<%= status %>"
+  data-item-type="<%= isEvent ? 'event' : 'task' %>"
   data-task-due-date="<%= t.dueDate ? new Date(t.dueDate).toISOString() : '' %>"
   data-title="<%= t.title %>"
   data-due="<%= dueLabel %>"
@@ -21,18 +25,25 @@
   data-notes="<%= t.notes || '' %>"
   style="--task-color: <%= priorityColor[t.priority] || priorityColor.medium %>"
 >
-  <input
-    class="task-checkbox"
-    type="checkbox"
-    <%= t.status === "completed" ? "checked" : "" %>
-    data-task-toggle
-    aria-label="Toggle complete"
-  />
+  <% if (isEvent) { %>
+    <span class="task-event-mark calendar-icon" aria-hidden="true"></span>
+  <% } else { %>
+    <input
+      class="task-checkbox"
+      type="checkbox"
+      <%= status === "completed" ? "checked" : "" %>
+      data-task-toggle
+      aria-label="Toggle complete"
+    />
+  <% } %>
   <div class="task-main">
-    <div class="task-title"><%= t.title %></div>
+    <div class="task-title">
+      <%= t.title %>
+      <% if (isEvent) { %><span class="task-type-badge">Calendar event</span><% } %>
+    </div>
     <div class="task-meta">
       <span>Due <%= dueLabel %></span>
-      <span>Priority: <%= t.priority || 'medium' %></span>
+      <% if (!isEvent) { %><span>Priority: <%= t.priority || 'medium' %></span><% } %>
     </div>
   </div>
   <div class="task-actions">

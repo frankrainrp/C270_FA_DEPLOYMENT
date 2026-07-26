@@ -83,7 +83,9 @@
     var tabButtons = miniAppsPanel.querySelectorAll(".mini-app-tab");
     var panels = miniAppsPanel.querySelectorAll("[data-panel]");
     tabButtons.forEach(function (button) {
-      button.classList.toggle("mini-app-tab-active", button.dataset.tab === tabName);
+      var active = button.dataset.tab === tabName;
+      button.classList.toggle("mini-app-tab-active", active);
+      button.setAttribute("aria-selected", active ? "true" : "false");
     });
     panels.forEach(function (panel) {
       panel.hidden = panel.dataset.panel !== tabName;

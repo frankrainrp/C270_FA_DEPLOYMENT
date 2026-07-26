@@ -36,6 +36,7 @@ function buildSystemPrompt(input) {
     "Use markdown for lists and concise structured answers.",
     "",
     "TOOL USAGE RULES:",
+    "- When the user asks to plan their day or week, requests a study briefing, asks what to focus on across tasks/notes/calendar, or asks to connect their workspace, ALWAYS call study_briefing first.",
     "- When the user asks to create, update, delete, toggle, or list tasks, call the matching task_* tool.",
     "- When the user asks for a task summary, completion rate, weekly progress, overdue work, workload, or priorities, ALWAYS call task_summary first and base every number on its result.",
     "- When the user asks to create, update, delete, pin, or list notes, call the matching note_* tool.",

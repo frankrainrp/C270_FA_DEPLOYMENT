@@ -42,7 +42,7 @@ class UserProfileService {
   }
 
   /**
-   * Store the public URL of an uploaded avatar image.
+   * Store the bounded data URL of an uploaded avatar image.
    * File-type / size validation happens in the multer layer before
    * this is ever called (see routes/api/profile.js).
    */

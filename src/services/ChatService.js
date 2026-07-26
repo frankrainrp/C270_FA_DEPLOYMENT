@@ -26,6 +26,7 @@ const { CHAT_TOOLS } = require("./ChatToolDefinitions");
 const { buildSnapshot } = require("./ContextService");
 const ChatSessionService = require("./ChatSessionService");
 const TaskService = require("./TaskService");
+const StudyBriefingService = require("./StudyBriefingService");
 
 const MODEL_MAP = {
   "deepseek-v4-flash":    { apiModel: "deepseek-chat",     supportsTools: true  },
@@ -182,6 +183,11 @@ function requestsTaskSummary(text) {
   return /(task\s+(summary|overview|progress|workload)|summari[sz]e\s+(my\s+)?tasks?|completion\s+rate|completed\s+this\s+week|overdue\s+(tasks?|work)|what\s+should\s+i\s+do\s+next|任务(摘要|总结|进度)|学习进度|完成率|逾期任务)/i.test(String(text || ""));
 }
 
+/** Recognises cross-module planning requests for the deterministic briefing fallback. */
+function requestsStudyBriefing(text) {
+  return /(study\s+briefing|plan\s+(my\s+)?(day|week)|weekly\s+plan|daily\s+plan|connect\s+(my\s+)?(tasks?|notes?|calendar)|what\s+should\s+i\s+focus\s+on|学习简报|学习计划|规划(今天|本周)|今天学什么|本周学什么)/i.test(String(text || ""));
+}
+
 /** Emits a deterministic local SSE response when the real model path is disabled. */
 async function streamMock(input, res) {
   beginSse(res);
@@ -189,7 +195,14 @@ async function streamMock(input, res) {
   const lastUser = extractLastUserMessage(input.messages);
   const echo = lastUser ? lastUser.content : "Hello!";
   let reply;
-  if (lastUser && requestsTaskSummary(lastUser.content)) {
+  if (lastUser && requestsStudyBriefing(lastUser.content)) {
+    try {
+      const briefing = await StudyBriefingService.getBriefing(input.ownerEmail, 7);
+      reply = `${StudyBriefingService.format(briefing)}\n\nGenerated locally from your current tasks, notes, and calendar; AI model access is not required.`;
+    } catch (err) {
+      reply = `Study briefing is temporarily unavailable because workspace data could not be read: ${err.message}`;
+    }
+  } else if (lastUser && requestsTaskSummary(lastUser.content)) {
     try {
       const summary = await TaskService.getSummary(input.ownerEmail, 7);
       reply = `${TaskService.formatSummary(summary)}\n\nGenerated locally from your current MongoDB tasks; AI model access is not required.`;

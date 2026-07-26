@@ -1,6 +1,6 @@
 # Butler
 
-[![CI and Container Delivery](https://github.com/HeinThuNyiNyi/butler-devops-CA2/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/HeinThuNyiNyi/butler-devops-CA2/actions/workflows/ci-cd.yml)
+[![CI, Container Delivery, and Kubernetes Deployment](https://github.com/HeinThuNyiNyi/butler-devops-CA2/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/HeinThuNyiNyi/butler-devops-CA2/actions/workflows/ci-cd.yml)
 
 Butler is a single-process Node.js study workspace with server-rendered EJS
 pages, MongoDB persistence, and a streaming AI agent. The agent can read current
@@ -24,15 +24,21 @@ one user's data is never visible to another.
 - Multi-round agent tool calls for tasks, notes, and calendar events
 - Deterministic MongoDB-grounded task summaries with completion rate, overdue
   work, weekly progress, and prioritised next actions
+- Cross-module study briefings that rank focus items from live tasks, pinned or
+  recent notes, and upcoming calendar events
 - Explicit user confirmation before write operations
 - MongoDB-backed chat history and workspace data
 - In-memory document decoding for text files, PDF, and DOCX
 - Search across the current account's persisted notes, tasks, and chat messages
 - Account-scoped achievement badges derived from real workspace activity
-- Direct note links, pinned-note filtering, and in-editor pin controls
+- Direct note links, pinned-note filtering, in-editor pin controls, and a safe
+  rendered Markdown preview
 - Responsive EJS interface with paper, glass, and dark themes
 - Simulated billing/credits and profile settings (Task 6)
 - Docker configurations for either MongoDB alone or the complete stack
+- Ansible provisioning for a cloud-hosted K3s cluster
+- Kubernetes staging and production deployments with TLS, probes, HPA, PDB,
+  network policy, immutable GHCR images, health verification, and rollback
 
 ## Quick start
 
@@ -94,10 +100,25 @@ Browser
 ```text
 .
 |-- .github/workflows/
-|   `-- ci-cd.yml             Test, Docker smoke test, and GHCR delivery
+|   `-- ci-cd.yml             Test, publish, Ansible deploy, and verification
+|-- ansible/
+|   |-- inventory.example.yml Cloud VM inventory template
+|   |-- requirements.*        Pinned Ansible and Kubernetes dependencies
+|   |-- group_vars/all.yml    Non-secret K3s defaults
+|   |-- templates/            Persistent K3s server configuration
+|   `-- playbooks/
+|       |-- bootstrap-k3s.yml Install a K3s server and optional agents
+|       |-- export-kubeconfig.yml  Export protected cluster access
+|       |-- deploy.yml        Apply secrets/manifests, verify, and auto-rollback
+|       `-- rollback.yml      Operator-initiated previous-revision rollback
+|-- k8s/
+|   |-- base/                 Deployment, Service, Ingress, HPA, PDB, policy
+|   `-- overlays/
+|       |-- staging/          One-replica staging namespace and limits
+|       `-- production/       Production namespace and replica settings
 |-- .env.example              Documented environment-variable template
 |-- .dockerignore             Docker build-context exclusions
-|-- Dockerfile                Local-demo Node.js image
+|-- Dockerfile                Shared local and production Node.js image
 |-- docker-compose.yml        Node.js application and MongoDB
 |-- docker-compose.db.yml     MongoDB-only local development stack
 |-- ci-validate.mjs           Required-file validation
@@ -167,6 +188,8 @@ Browser
 - `api/documents.js` accepts one multipart document and returns extracted text.
 - `api/tasks.js`, `api/notes.js`, and `api/calendar.js` expose CRUD APIs,
   each requiring login and scoped to the caller's account.
+- `api/briefing.js` combines the caller's task, note, and calendar data into a
+  deterministic planning view for the Agent.
 - `api/profile.js` and `api/billing.js` back the Task 6 settings/billing UI.
 - `api/health.js` provides the Docker and deployment liveness endpoint.
 
@@ -186,6 +209,8 @@ Browser
 - `DocumentDecodeService.js` extracts safe text from supported documents.
 - `TaskService.js`, `NoteService.js`, and `CalendarService.js` own database
   operations for their respective domains, scoped by `ownerEmail`.
+- `StudyBriefingService.js` ranks cross-module focus items without asking the
+  language model to infer or count workspace data.
 - `UserProfileService.js` manages account-scoped profile and billing data.
 - `AchievementService.js` derives per-account badge progress from persisted
   tasks, notes, calendar events, and chat messages.
@@ -200,6 +225,8 @@ Browser
   the multi-round agent loop.
 - `tool-executor.js` maps approved tool calls to REST endpoints.
 - `tasks-ui.js`, `notes-ui.js`, and `calendar-ui.js` control their pages.
+- `markdown-renderer.js` renders saved note Markdown while escaping raw HTML
+  and restricting clickable links to HTTP(S).
 - `shell.js` controls global navigation, search, learning tools, and menus.
 - `auth-login.js` drives the two-step email OTP login/signup flow and
   honors a `?next=` redirect back to whatever page requested login.
@@ -222,6 +249,8 @@ Browser
    Task-progress questions use the deterministic `/api/tasks/summary` endpoint
    so counts, completion rate, overdue work, and priorities are calculated from
    stored records instead of estimated by the model.
+   Daily and weekly planning questions use `/api/briefing`, which joins those
+   task metrics with pinned/recent notes and upcoming calendar events.
 8. Tool results are appended as `role: "tool"` messages and sent back to the
    model for a natural-language confirmation.
 9. The loop stops when no tool calls remain or after six tool rounds.
@@ -463,6 +492,7 @@ npm run audit:ci
 docker compose -f docker-compose.db.yml config -q
 docker compose config -q
 docker compose up -d --build --wait
+Invoke-RestMethod http://localhost:3001/api/live
 npm run smoke
 ```
 
@@ -473,55 +503,315 @@ readiness, local authentication, protected pages, MongoDB persistence, and task
 CRUD, then removes the task that it created. The real DeepSeek path requires a
 valid API key, and container runtime verification requires Docker Desktop.
 
-## CI/CD and container delivery
+Deployment configuration validation additionally runs in Linux/WSL:
+
+```bash
+kubectl kustomize k8s/overlays/staging >/dev/null
+kubectl kustomize k8s/overlays/production >/dev/null
+ansible-playbook --syntax-check -i ansible/inventory.example.yml ansible/playbooks/bootstrap-k3s.yml
+ansible-playbook --syntax-check ansible/playbooks/deploy.yml
+```
+
+## Complete build, test, publish, and cloud deployment
+
+The repository uses one delivery chain from source code to a Kubernetes cloud
+runtime. Docker Compose remains the reproducible local and CI stack; Ansible
+provisions Linux cloud hosts and drives deployment; K3s/Kubernetes runs the
+published image. No application-platform deploy hook is required.
+
+```text
+push / pull request
+  -> Node tests + npm audit + deployment-file validation
+  -> Docker Compose build + authenticated end-to-end smoke test
+  -> push ghcr.io/...:sha-<full-commit> with SBOM and provenance (main only)
+  -> Ansible deploy to Kubernetes staging
+  -> HTTPS readiness smoke test
+  -> GitHub production approval
+  -> Ansible deploy of the identical SHA image to production
+  -> automatic rollback attempt if rollout or health verification fails
+```
+
+### Pipeline jobs
 
 `.github/workflows/ci-cd.yml` runs on every branch push, pull requests to
-`main`, and manual `workflow_dispatch` runs. It implements three dependent jobs:
+`main`, and manual validation runs.
 
-1. **Test and security gate:** installs the lockfile, runs all validation and
-   tests, blocks high-severity npm audit findings, and validates both Compose
-   files.
-2. **Docker smoke test:** builds an isolated application/MongoDB stack, waits
-   for both services to become healthy, runs the authenticated smoke test,
-   verifies that the application uses UID 1000 instead of root, and uploads
-   Docker logs even when a step fails.
-3. **Container delivery:** after a successful push to `main`, rebuilds the
-   verified revision and publishes `latest` and immutable `sha-*` tags to
-   `ghcr.io/heinthunyinyi/butler-devops-ca2`, including OCI provenance and an
-   SBOM. Pull requests never receive package write permission.
+1. **Test and security gate** installs the npm lockfile, validates required
+   files, runs all Node tests, blocks high-severity production dependency
+   findings, and validates both Compose files.
+2. **Validate Kubernetes and Ansible** renders both Kustomize overlays and runs
+   syntax checks against every Ansible playbook.
+3. **Build and smoke-test containers** starts Butler and MongoDB with Compose,
+   checks `/api/live` and `/api/health`, authenticates, exercises protected
+   pages and task CRUD, verifies UID 1000, and always uploads logs.
+4. **Publish verified image** runs only for a successful push to `main`. It
+   publishes `latest` and `sha-<40-character-commit>` to GHCR with OCI
+   provenance and an SBOM.
+5. **Deploy staging with Ansible** injects protected secrets, applies the
+   staging overlay, pins the exact SHA image, waits for rollout, and checks the
+   public HTTPS health endpoint.
+6. **Approve and deploy production with Ansible** waits for the GitHub
+   `production` Environment approval and promotes the same SHA image. A failed
+   rollout or smoke test triggers an Ansible rollback attempt.
 
-GitHub automatically supplies the short-lived `GITHUB_TOKEN`; no personal
-registry password belongs in repository secrets. The first GHCR package is
-private by default. Change its package visibility in GitHub if an external
-host must pull it anonymously.
+Pull requests and non-`main` branches never receive package or cluster write
+access. A workflow run on those branches proves build and test only.
 
-To run the pipeline manually, open the repository's **Actions** tab, select
-**CI and Container Delivery**, choose **Run workflow**, and wait for every job
-to turn green. A successful workflow run and its Docker log artifact are the
-primary CI/CD demonstration evidence.
+## Cloud architecture
 
-Publishing an image is continuous delivery, not a public application runtime.
-The local Compose stack remains the supported on-device deployment.
+The included infrastructure profile targets Linux cloud virtual machines and
+installs K3s, a conformant lightweight Kubernetes distribution. The example
+inventory contains three server nodes for embedded-etcd high availability and
+one worker. For a small demonstration cluster, keep only one server and any
+number of workers. Do not use two server nodes; use one or three.
 
-## Public deployment requirements
+Production application data remains in MongoDB Atlas. It is deliberately not
+stored inside the Kubernetes cluster, so Pod replacement and cluster upgrades
+do not own the database lifecycle.
 
-The current repository deliberately binds the complete demo to `127.0.0.1`.
-That is safe for a local presentation but is not a public cloud deployment.
-Before deploying the published image to Render, Railway, a VPS, or another
-public platform, configure all of the following:
+Kubernetes provides:
 
-- a production MongoDB service and a secret `MONGO_URI`;
-- `NODE_ENV=production`, `AUTH_REQUIRED=true`, and `LOCAL_DEMO_MODE=false`;
-- a reachable n8n OTP webhook in `N8N_OTP_WEBHOOK_URL`;
-- a secret `DEEPSEEK_API_KEY` if live agent calls are required;
-- TLS/HTTPS, platform health checks against `/api/health`, persistent database
-  backups, and a rollback target using an immutable `sha-*` image tag;
-- a final deploy job or provider deploy hook that runs only after the test and
-  Docker smoke jobs pass.
+- separate `butler-staging` and `butler-production` namespaces;
+- a non-root Deployment with a read-only root filesystem and immutable image;
+- process-only liveness at `/api/live` and database-aware readiness at
+  `/api/health`;
+- a ClusterIP Service and Traefik HTTPS Ingress;
+- HorizontalPodAutoscaler, PodDisruptionBudget, resource requests/limits, and
+  NetworkPolicy;
+- TLS, runtime, and GHCR credentials created by Ansible from protected GitHub
+  Environment secrets;
+- rolling updates, revision history, public health verification, and rollback.
 
-A public URL cannot be produced from repository code alone: it requires a
-chosen hosting account, database, domain or platform URL, and deployment
-credentials. Never expose the one-click local demo endpoint publicly.
+### 1. Cloud and service prerequisites
+
+Prepare the following before the first public deployment:
+
+- one Ubuntu/Debian VM for a small cluster, or three control-plane VMs plus
+  optional worker VMs for high availability;
+- unique hostnames, SSD storage, SSH key access, and private networking between
+  nodes;
+- inbound TCP 22 from the operator, TCP 80/443 from the internet, TCP 6443
+  only from nodes/operators, UDP 8472 only between nodes, and TCP 10250 only
+  between nodes;
+- a DNS hostname for staging and another for production;
+- a valid PEM TLS certificate/private key for each hostname;
+- MongoDB Atlas with backups and a least-privilege database user; allow the
+  cluster's stable outbound IP in Atlas Network Access;
+- a production HTTPS n8n OTP webhook and a DeepSeek API key;
+- Python 3.13+, OpenSSH, Ansible, `kubectl`, and `gh` on the control machine.
+
+Never expose UDP 8472 publicly. The cloud security group remains the outer
+firewall even when an operating-system firewall is configured.
+
+### 2. Install Ansible dependencies
+
+Run Ansible from Linux, macOS, or WSL. From the repository root:
+
+```bash
+python3 -m venv .venv-ansible
+source .venv-ansible/bin/activate
+python -m pip install --requirement ansible/requirements.txt
+ansible-galaxy collection install --requirements-file ansible/requirements.yml
+```
+
+The pinned files currently install Ansible Core, the Kubernetes Python client,
+and `kubernetes.core`. Update them deliberately and let CI syntax-check every
+playbook before merging.
+
+### 3. Provision K3s with Ansible
+
+Copy the inventory and replace the documentation-only IP addresses and SSH
+user. Keep either one or three entries under `k3s_server`.
+
+```bash
+cp ansible/inventory.example.yml ansible/inventory.yml
+${EDITOR:-vi} ansible/inventory.yml
+
+export K3S_TOKEN="$(openssl rand -hex 32)"
+ansible all -i ansible/inventory.yml -m ping
+ansible-playbook -i ansible/inventory.yml ansible/playbooks/bootstrap-k3s.yml
+ansible-playbook -i ansible/inventory.yml ansible/playbooks/export-kubeconfig.yml
+
+export KUBECONFIG="$HOME/.kube/butler-k3s.yaml"
+kubectl get nodes -o wide
+kubectl get pods --all-namespaces
+```
+
+`K3S_TOKEN` is a cluster credential. Store it in a password manager or Ansible
+Vault, never in the inventory or Git. The bootstrap playbook pins the K3s
+version, enables Kubernetes Secret encryption at rest, installs the first
+server, joins two additional servers when present, joins worker nodes, and
+waits for all nodes to become Ready.
+
+For a three-server cluster, place a TCP load balancer in front of port 6443 and
+override `k3s_api_address` in the inventory with its stable private address.
+The load balancer and DNS records are cloud-account resources and therefore
+cannot be created by this provider-neutral repository.
+
+### 4. Configure DNS and TLS
+
+Point each public DNS record to the external address used by the K3s Traefik
+Ingress. Confirm resolution before enabling CD:
+
+```bash
+dig +short staging.example.com
+dig +short app.example.com
+```
+
+Obtain certificates from a trusted certificate authority. Keep the full-chain
+certificate and private key in separate local PEM files. Ansible creates the
+`butler-tls` Kubernetes Secret at deployment time; the PEM files must never be
+committed.
+
+If the cluster uses an Ingress controller other than the bundled K3s Traefik,
+change `ingressClassName`, its annotations, and the NetworkPolicy ingress
+selector in `k8s/base/` before deployment.
+
+### 5. Configure GitHub Environments and secrets
+
+Create two GitHub Environments in **Settings → Environments**:
+
+- `staging`: automatic deployment from a successful `main` push;
+- `production`: add required reviewers so production waits for approval.
+
+At repository level, create the Actions variable
+`CLOUD_DEPLOY_ENABLED=true` only after both Environments and the cluster are
+ready. Until then, main still publishes a verified GHCR image while the two
+cluster deployment jobs stay safely skipped instead of failing on missing
+credentials.
+
+Configure these variables in each Environment:
+
+| Variable | Example |
+|---|---|
+| `APP_HOST` | `staging.example.com` or `app.example.com` |
+| `APP_URL` | `https://staging.example.com` or `https://app.example.com` |
+| `GHCR_USERNAME` | GitHub account allowed to read the package |
+
+Configure these secrets independently in each Environment:
+
+| Secret | Purpose |
+|---|---|
+| `KUBE_CONFIG_B64` | Base64 kubeconfig with least-privilege cluster access |
+| `MONGO_URI` | Environment-specific Atlas connection string |
+| `DEEPSEEK_API_KEY` | Live Agent model credential |
+| `N8N_OTP_WEBHOOK_URL` | Production HTTPS OTP workflow |
+| `GHCR_READ_TOKEN` | Read-only `read:packages` credential for private GHCR |
+| `TLS_CERTIFICATE` | PEM full-chain certificate |
+| `TLS_PRIVATE_KEY` | PEM private key |
+
+Generate and upload the kubeconfig value from the control machine:
+
+```bash
+KUBE_CONFIG_B64="$(base64 -w 0 "$HOME/.kube/butler-k3s.yaml")"
+gh secret set KUBE_CONFIG_B64 --env staging --body "$KUBE_CONFIG_B64"
+gh secret set KUBE_CONFIG_B64 --env production --body "$KUBE_CONFIG_B64"
+
+gh variable set APP_HOST --env staging --body "staging.example.com"
+gh variable set APP_URL --env staging --body "https://staging.example.com"
+gh variable set GHCR_USERNAME --env staging --body "YOUR_GITHUB_USER"
+
+gh secret set TLS_CERTIFICATE --env staging < staging-fullchain.pem
+gh secret set TLS_PRIVATE_KEY --env staging < staging-private-key.pem
+```
+
+Repeat the variables and certificate commands for `production`. Set the other
+secrets interactively with `gh secret set NAME --env ENVIRONMENT` so their
+values do not appear in the command history. Do not print or echo secrets in a
+workflow.
+
+The exported K3s admin kubeconfig is sufficient for initial setup but broader
+than a mature CD identity should be. After the first deployment, replace it
+with a namespace-scoped service account or cloud workload identity permitted
+to manage only Butler resources.
+
+### 6. First automated deployment
+
+The deployment workflow must exist on `main`, and the repository variable
+`CLOUD_DEPLOY_ENABLED` must be `true`; a successful run on a feature branch
+does not publish or deploy. Merge through a protected pull request:
+
+```bash
+git switch main
+git pull --ff-only origin main
+git merge --ff-only YOUR_VERIFIED_BRANCH
+git push origin main
+```
+
+Then follow **Actions → CI, Container Delivery, and Kubernetes Deployment**.
+The expected sequence is:
+
+```text
+quality + deployment-validation
+  -> docker-smoke
+  -> publish
+  -> deploy-staging
+  -> production Environment approval
+  -> deploy-production
+```
+
+The deployment jobs use `ansible/playbooks/deploy.yml`. They do not rebuild the
+image. Staging and production both receive the exact
+`ghcr.io/...:sha-${GITHUB_SHA}` image that passed CI.
+
+### 7. Verify the cloud deployment
+
+```bash
+export KUBECONFIG="$HOME/.kube/butler-k3s.yaml"
+kubectl -n butler-staging get deployment,pods,service,ingress,hpa,pdb
+kubectl -n butler-production get deployment,pods,service,ingress,hpa,pdb
+kubectl -n butler-production rollout history deployment/butler
+
+curl --fail --show-error https://app.example.com/api/live
+curl --fail --show-error https://app.example.com/api/health
+```
+
+`/api/live` should return `status: alive`. `/api/health` should return
+`status: ready` and `database: connected`. Complete a real OTP login and one
+read-only Agent request, then approve one write request and verify the saved
+record.
+
+### 8. Manual deployment and rollback
+
+Normal releases use GitHub Actions. For an authorized operator deployment,
+load the same values from a secret manager into environment variables and run:
+
+```bash
+export DEPLOY_ENV=production
+export K8S_AUTH_KUBECONFIG="$HOME/.kube/butler-k3s.yaml"
+export IMAGE="ghcr.io/heinthunyinyi/butler-devops-ca2:sha-FULL_40_CHAR_COMMIT"
+export APP_HOST="app.example.com"
+export APP_URL="https://app.example.com"
+# Load MONGO_URI, DEEPSEEK_API_KEY, N8N_OTP_WEBHOOK_URL,
+# GHCR_USERNAME, GHCR_READ_TOKEN, TLS_CERTIFICATE, and TLS_PRIVATE_KEY
+# from the approved secret manager without printing them.
+ansible-playbook ansible/playbooks/deploy.yml
+```
+
+Roll back one Kubernetes Deployment revision and re-check health:
+
+```bash
+export DEPLOY_ENV=production
+export K8S_AUTH_KUBECONFIG="$HOME/.kube/butler-k3s.yaml"
+export APP_URL="https://app.example.com"
+ansible-playbook ansible/playbooks/rollback.yml
+```
+
+Application rollback does not reverse destructive database migrations. Use
+backward-compatible expand/contract migrations and test Atlas restore
+procedures separately.
+
+### 9. What is and is not automatic
+
+After the cluster, DNS, certificates, Atlas, GitHub Environments, and secrets
+are configured, every successful `main` push completes build, test, image
+publication, staging deployment, production approval, production deployment,
+public verification, and failure rollback logic in the cloud.
+
+The repository cannot purchase virtual machines, register a domain, approve a
+certificate, or create third-party API credentials without access to those
+accounts. Until those external resources and secrets exist, CI is cloud-hosted
+but the application is not yet publicly deployed.
 
 ## Final-assessment demonstration checklist
 
@@ -542,8 +832,9 @@ npm run smoke
 
 During the demonstration:
 
-1. Show the green GitHub Actions run and explain build, test, security, smoke,
-   and delivery gates.
+1. Show the green GitHub Actions run and explain test, deployment validation,
+   Docker smoke, GHCR publication, Ansible staging deployment, production
+   approval, and verification gates.
 2. Show both Compose services as healthy and explain application readiness,
    MongoDB readiness, the non-root user, loopback port binding, and the named
    data volume.
@@ -554,8 +845,9 @@ During the demonstration:
    application container, and show that MongoDB retained the task.
 5. Show one declined write operation, Docker logs, and the `/api/health`
    response so both success and safe failure behaviour are visible.
-6. If a public deployment has been configured, repeat the health check and one
-   user flow through its external URL.
+6. For the cloud path, show the Ansible inventory/playbooks, Kubernetes
+   staging/production overlays, a `sha-*` Deployment image, rollout history,
+   HTTPS `/api/live` and `/api/health`, and one real OTP user flow.
 
 Keep a mock-mode fallback ready for unreliable model connectivity. Mock mode
 proves streaming UI behaviour but does not emit agent tool calls, so test the

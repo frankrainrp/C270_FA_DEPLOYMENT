@@ -1137,6 +1137,7 @@ html[data-theme="dark"] .sidebar-item:hover {
 .database-icon,
 .card-icon,
 .settings-icon,
+.trophy-icon,
 .crown-icon,
 .logout-icon,
 .pin-icon,
@@ -1384,6 +1385,29 @@ html[data-theme="dark"] .sidebar-item:hover {
   top: 4px;
   height: 2px;
   background: currentColor;
+}
+
+.trophy-icon {
+  border: 0;
+}
+
+.trophy-icon::before {
+  content: "";
+  position: absolute;
+  inset: 1px 3px 6px;
+  border: 1.7px solid currentColor;
+  border-radius: 3px 3px 7px 7px;
+}
+
+.trophy-icon::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  bottom: 1px;
+  height: 5px;
+  border-bottom: 1.7px solid currentColor;
+  box-shadow: 0 -2px 0 -1px currentColor;
 }
 
 .crown-icon {
@@ -1881,6 +1905,38 @@ html[data-theme="dark"] .sidebar-item:hover {
   opacity: 0.68;
 }
 
+.task-card-event {
+  --task-color: var(--color-info) !important;
+}
+
+.task-event-mark {
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  color: var(--color-info);
+}
+
+.task-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.task-type-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--color-info) 14%, var(--color-surface));
+  color: color-mix(in srgb, var(--color-info) 72%, var(--color-text));
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .task-checkbox {
   width: 20px;
   height: 20px;
@@ -2352,6 +2408,8 @@ html[data-theme="dark"] .sidebar-item:hover {
 .note-body-input {
   flex: 1;
   min-height: 0;
+  width: 100%;
+  height: 100%;
   padding: 18px;
   border: 0;
   outline: 0;
@@ -2361,6 +2419,66 @@ html[data-theme="dark"] .sidebar-item:hover {
   font-family: var(--font-body);
   font-size: 14px;
   line-height: 1.7;
+}
+
+.note-body-shell {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.note-body-input[hidden],
+.note-markdown-preview[hidden] {
+  display: none;
+}
+
+.note-mode-switch {
+  display: inline-flex;
+  padding: 3px;
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--color-surface) 82%, transparent);
+}
+
+.note-mode-button {
+  min-height: 30px;
+  padding: 4px 12px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.note-mode-button:hover {
+  color: var(--color-text);
+}
+
+.note-mode-button.active {
+  background: var(--color-primary);
+  color: #fff;
+  box-shadow: var(--shadow-card);
+}
+
+.note-markdown-preview {
+  height: 100%;
+}
+
+.note-preview-empty {
+  min-height: 100%;
+  display: grid;
+  place-content: center;
+  gap: 6px;
+  text-align: center;
+  color: var(--color-text-muted);
+}
+
+.note-preview-empty strong {
+  color: var(--color-text);
 }
 
 .obsidian-md {
@@ -2396,9 +2514,37 @@ html[data-theme="dark"] .sidebar-item:hover {
   margin: 0.75em 0;
 }
 
+.obsidian-md a {
+  color: var(--color-primary);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+}
+
+.obsidian-md hr {
+  margin: 1.5em 0;
+  border: 0;
+  border-top: 1px solid var(--color-border);
+}
+
 .obsidian-md ul,
 .obsidian-md ol {
   padding-left: 1.4em;
+}
+
+.obsidian-md li + li {
+  margin-top: 0.35em;
+}
+
+.obsidian-md .markdown-task {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  list-style: none;
+}
+
+.obsidian-md .markdown-task input {
+  margin-top: 0.3em;
+  accent-color: var(--color-primary);
 }
 
 .obsidian-md blockquote {
@@ -3754,6 +3900,159 @@ html[data-theme="dark"] .sidebar-item:hover {
 .mobile-drawer-backdrop,
 .mobile-tabbar {
   display: none;
+}
+
+/* Learning-tools drawer refinement: clipped rounded shell, themed cards,
+   and a scrollbar that stays subtle in light, dark, and paper themes. */
+.mini-apps-drawer {
+  width: min(420px, calc(100vw - 36px));
+  max-height: calc(100dvh - 112px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0;
+  border-color: color-mix(in srgb, var(--color-border) 78%, var(--glass-border));
+  border-radius: 24px;
+  background: color-mix(in srgb, var(--color-surface-strong) 90%, transparent);
+  box-shadow:
+    0 22px 60px color-mix(in srgb, var(--color-text) 18%, transparent),
+    inset 0 1px 0 color-mix(in srgb, white 55%, transparent);
+  animation: mini-app-drawer-in 180ms ease-out;
+  isolation: isolate;
+}
+
+.mini-app-header {
+  flex: 0 0 auto;
+  padding: 18px 20px 15px;
+  border-bottom-color: var(--color-border-soft);
+  background: color-mix(in srgb, var(--color-surface-strong) 92%, transparent);
+}
+
+.mini-app-close {
+  flex: 0 0 auto;
+  border: 1px solid var(--color-border-soft);
+  background: var(--color-surface);
+}
+
+.mini-app-scroll {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 18px 18px;
+  scrollbar-width: thin;
+  scrollbar-color:
+    color-mix(in srgb, var(--color-primary) 42%, var(--color-border))
+    color-mix(in srgb, var(--color-surface) 72%, transparent);
+}
+
+.mini-app-scroll::-webkit-scrollbar,
+.notes-list::-webkit-scrollbar,
+.note-markdown-preview::-webkit-scrollbar,
+.note-body-input::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.mini-app-scroll::-webkit-scrollbar-track,
+.notes-list::-webkit-scrollbar-track,
+.note-markdown-preview::-webkit-scrollbar-track,
+.note-body-input::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.mini-app-scroll::-webkit-scrollbar-thumb,
+.notes-list::-webkit-scrollbar-thumb,
+.note-markdown-preview::-webkit-scrollbar-thumb,
+.note-body-input::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: var(--radius-pill);
+  background:
+    color-mix(in srgb, var(--color-primary) 42%, var(--color-border))
+    padding-box;
+}
+
+.mini-app-scroll::-webkit-scrollbar-thumb:hover,
+.notes-list::-webkit-scrollbar-thumb:hover,
+.note-markdown-preview::-webkit-scrollbar-thumb:hover,
+.note-body-input::-webkit-scrollbar-thumb:hover {
+  background:
+    color-mix(in srgb, var(--color-primary) 68%, var(--color-border))
+    padding-box;
+}
+
+.mini-app-tabs {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  margin: 0;
+  padding: 14px 0 12px;
+  background: color-mix(in srgb, var(--color-surface-strong) 94%, transparent);
+  backdrop-filter: blur(14px);
+}
+
+.mini-app-tab {
+  min-height: 38px;
+  padding: 8px 9px;
+  transition: border-color 140ms ease, background 140ms ease, color 140ms ease;
+}
+
+.focus-timer-panel,
+.learning-stats-panel,
+.share-card-shell {
+  padding-top: 4px;
+}
+
+.focus-timer-circle,
+.learning-stat-card,
+.weekly-trend,
+.tag-distribution,
+.share-card-shell,
+.share-card-metrics div {
+  border-color: var(--color-border-soft);
+  background: color-mix(in srgb, var(--color-surface) 86%, transparent);
+}
+
+.weekly-trend {
+  border-radius: 18px;
+  padding: 15px;
+}
+
+.weekly-trend-bars {
+  min-height: 104px;
+  padding: 12px 9px 6px;
+  border-color: var(--color-border-soft);
+  background: color-mix(in srgb, var(--color-primary-soft) 36%, var(--color-surface));
+}
+
+.weekly-bar {
+  border-color: var(--color-border);
+  background: color-mix(in srgb, var(--color-surface-strong) 88%, transparent);
+}
+
+.weekly-bar span:first-child,
+.weekly-label,
+.weekly-trend-note {
+  color: var(--color-text-muted);
+}
+
+.share-card-text {
+  border-color: var(--color-border-soft);
+  background: var(--color-surface);
+}
+
+.mini-app-footer {
+  padding: 14px 2px 0;
+}
+
+@keyframes mini-app-drawer-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 @media (max-width: 920px) {

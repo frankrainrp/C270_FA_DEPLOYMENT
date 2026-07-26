@@ -1,0 +1,20 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: butler-production
+resources:
+  - ../../base
+  - namespace.yaml
+replicas:
+  - name: butler
+    count: 2
+patches:
+  - target:
+      kind: Ingress
+      name: butler
+    patch: |-
+      - op: replace
+        path: /spec/tls/0/hosts/0
+        value: butler.invalid
+      - op: replace
+        path: /spec/rules/0/host
+        value: butler.invalid

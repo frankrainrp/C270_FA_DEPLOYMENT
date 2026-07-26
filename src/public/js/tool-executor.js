@@ -94,6 +94,10 @@
     task_summary: function (args) {
       return ButlerApi.get("/tasks/summary" + toQuery({ days: args.days || 7 }));
     },
+    // Combines task, note, and calendar data for a grounded study plan.
+    study_briefing: function (args) {
+      return ButlerApi.get("/briefing" + toQuery({ days: args.days || 7 }));
+    },
 
     // ---------- NOTES ----------
     // Creates an account-scoped note and forwards the tool-call id for idempotency.

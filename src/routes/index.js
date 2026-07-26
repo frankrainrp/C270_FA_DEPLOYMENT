@@ -6,6 +6,7 @@
 // ============================================================
 
 const pages = require("./pages");
+const apiLive = require("./api/live");
 const apiHealth = require("./api/health");
 const apiChat = require("./api/chat");
 const apiTasks = require("./api/tasks");
@@ -15,6 +16,7 @@ const apiProfile = require("./api/profile");
 const apiBilling = require("./api/billing");
 const apiAuth = require("./api/auth");
 const apiDocuments = require("./api/documents");
+const apiBriefing = require("./api/briefing");
 const { authGuard } = require("../lib/authGuard");
 
 module.exports = function mountRoutes(app) {
@@ -25,6 +27,7 @@ module.exports = function mountRoutes(app) {
   app.use(pages);
 
   // JSON / SSE API surface.
+  app.use("/api/live", apiLive);
   app.use("/api/health", apiHealth);
   app.use("/api/chat", apiChat);
   // NOTE: tasks/notes/calendar were previously imported here but never
@@ -37,4 +40,5 @@ module.exports = function mountRoutes(app) {
   app.use("/api/billing", apiBilling);
   app.use("/api/auth", apiAuth);
   app.use("/api/documents", apiDocuments);
+  app.use("/api/briefing", apiBriefing);
 };

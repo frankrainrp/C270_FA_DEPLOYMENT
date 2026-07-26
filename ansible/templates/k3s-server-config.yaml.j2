@@ -1,0 +1,11 @@
+write-kubeconfig-mode: "0600"
+{% if inventory_hostname == groups['k3s_server'][0] %}
+cluster-init: true
+{% else %}
+server: "https://{{ k3s_api_address }}:6443"
+{% endif %}
+secrets-encryption: true
+tls-san:
+  - "{{ k3s_api_address }}"
+node-label:
+  - "butler.dev/role=application"

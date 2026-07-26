@@ -10,20 +10,16 @@
 // name/email reflect the real logged-in User record and email is
 // read-only (it's the verified login identity — changing it here
 // wouldn't re-verify it). Without a session, this falls back to the
-// original Task 6 shared demo profile so existing local testing
-// still works. Avatar/plan/credits stay on the shared demo profile
-// either way — those aren't per-account yet.
+// account-scoped UserProfile document. Avatar, plan, and credits are
+// therefore isolated by the verified session email as well.
 //
 // Validation ("quality checks") lives at two layers:
-//   1. multer fileFilter/limits reject the wrong type/size before any
-//      bytes hit disk.
+//   1. multer fileFilter/limits and image signatures reject the wrong
+//      type/size while the upload remains in memory.
 //   2. UserProfileService / User / the Mongoose schemas reject bad
 //      name/email.
 // ============================================================
 
-const fs = require("fs");
-const path = require("path");
-const crypto = require("crypto");
 const express = require("express");
 const multer = require("multer");
 
@@ -36,33 +32,36 @@ const router = express.Router();
 router.use(requireAuthApi);
 
 // ------------------------------------------------------------------
-// Upload target: src/public/uploads/avatars.  "uploads/" is gitignored
-// (user-generated files never get committed), so it may not exist on a
-// fresh clone — create it lazily on boot.
+// Avatars are held in memory while validating and then stored as bounded data
+// URLs in MongoDB. Container-local files would be lost or inconsistent across
+// Kubernetes replicas, and they would violate the read-only root filesystem.
 // ------------------------------------------------------------------
-const UPLOAD_DIR = path.join(__dirname, "..", "..", "public", "uploads", "avatars");
-fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-
 const ALLOWED_MIME = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
-const MIME_EXTENSION = {
-  "image/png": ".png",
-  "image/jpeg": ".jpg",
-  "image/webp": ".webp",
-  "image/gif": ".gif",
-};
 const MAX_AVATAR_BYTES = 2 * 1024 * 1024; // 2 MB
 
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, UPLOAD_DIR),
-  filename: (req, file, cb) => {
-    const ownerHash = crypto.createHash("sha256").update(req.sessionUser.email).digest("hex").slice(0, 16);
-    const ext = MIME_EXTENSION[file.mimetype] || ".jpg";
-    cb(null, `avatar-${ownerHash}-${crypto.randomUUID()}${ext}`);
-  },
-});
+function hasExpectedImageSignature(buffer, mimeType) {
+  if (!Buffer.isBuffer(buffer)) return false;
+  if (mimeType === "image/png") {
+    return buffer.length >= 8
+      && buffer.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+  }
+  if (mimeType === "image/jpeg") {
+    return buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
+  }
+  if (mimeType === "image/gif") {
+    const header = buffer.subarray(0, 6).toString("ascii");
+    return header === "GIF87a" || header === "GIF89a";
+  }
+  if (mimeType === "image/webp") {
+    return buffer.length >= 12
+      && buffer.subarray(0, 4).toString("ascii") === "RIFF"
+      && buffer.subarray(8, 12).toString("ascii") === "WEBP";
+  }
+  return false;
+}
 
 const upload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: MAX_AVATAR_BYTES },
   fileFilter: (_req, file, cb) => {
     if (!ALLOWED_MIME.has(file.mimetype)) {
@@ -131,8 +130,7 @@ router.put("/", async (req, res) => {
 /**
  * POST /api/profile/avatar
  * multipart/form-data, field name "avatar".
- * NOTE: avatar storage is still on the shared demo profile, not
- * per-account, regardless of login state — a known simplification.
+ * The validated data URL is account-scoped and survives Pod replacement.
  */
 router.post("/avatar", (req, res) => {
   upload.single("avatar")(req, res, async (err) => {
@@ -145,11 +143,14 @@ router.post("/avatar", (req, res) => {
     if (!req.file) {
       return res.status(400).json(makeFail("No image file was uploaded."));
     }
+    if (!hasExpectedImageSignature(req.file.buffer, req.file.mimetype)) {
+      return res.status(400).json(makeFail("The uploaded file does not match its declared image type."));
+    }
 
     try {
-      const publicUrl = `/uploads/avatars/${req.file.filename}`;
-      const profile = await UserProfileService.setAvatar(req.sessionUser.email, publicUrl);
-      res.status(201).json(makeOk({ profile, avatarUrl: publicUrl }));
+      const avatarUrl = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
+      const profile = await UserProfileService.setAvatar(req.sessionUser.email, avatarUrl);
+      res.status(201).json(makeOk({ profile, avatarUrl }));
     } catch (saveErr) {
       console.error("[api/profile] avatar save error:", saveErr);
       res.status(500).json(makeFail(saveErr.message));
@@ -158,3 +159,4 @@ router.post("/avatar", (req, res) => {
 });
 
 module.exports = router;
+module.exports.hasExpectedImageSignature = hasExpectedImageSignature;

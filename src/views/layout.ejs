@@ -240,11 +240,12 @@
           <button class="icon-button mini-app-close" type="button" data-close-mini-apps aria-label="Close learning tools">×</button>
         </div>
 
-        <div class="mini-app-tabs">
-          <button type="button" class="mini-app-tab mini-app-tab-active" data-tab="focus">Focus on timing</button>
-          <button type="button" class="mini-app-tab" data-tab="stats">Learning Statistics</button>
-          <button type="button" class="mini-app-tab" data-tab="share">Share Card</button>
-        </div>
+        <div class="mini-app-scroll" data-mini-app-scroll>
+          <div class="mini-app-tabs" role="tablist" aria-label="Learning tools">
+            <button type="button" role="tab" aria-selected="true" class="mini-app-tab mini-app-tab-active" data-tab="focus">Focus timer</button>
+            <button type="button" role="tab" aria-selected="false" class="mini-app-tab" data-tab="stats">Study analytics</button>
+            <button type="button" role="tab" aria-selected="false" class="mini-app-tab" data-tab="share">Share card</button>
+          </div>
 
         <div class="mini-app-panel" data-panel="focus">
           <div class="focus-timer-panel">
@@ -370,7 +371,8 @@
           <textarea class="share-card-text" data-share-text readonly></textarea>
         </div>
 
-        <p class="mini-app-footer">Progress data is loaded from your current tasks.</p>
+          <p class="mini-app-footer">Progress data is loaded from your current tasks.</p>
+        </div>
       </div>
 
       <div class="layout-body">

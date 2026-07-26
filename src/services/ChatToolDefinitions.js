@@ -111,6 +111,24 @@ const CHAT_TOOLS = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "study_briefing",
+      description: "Combine live tasks, recent or pinned notes, and upcoming calendar events into a grounded study briefing with ranked focus items. Use for daily or weekly planning and cross-module recommendations. Read-only.",
+      parameters: {
+        type: "object",
+        properties: {
+          days: {
+            type: "integer",
+            minimum: 1,
+            maximum: 30,
+            description: "Planning window in days. Defaults to 7.",
+          },
+        },
+      },
+    },
+  },
 
   // ---------- NOTES ----------
   {

@@ -185,15 +185,20 @@ class TaskService {
     }
 
     const startsCompleted = taskData.completed === true || taskData.status === "completed";
+    const completedAt = startsCompleted ? new Date() : null;
     try {
-      return await new Task({
+      const saved = await new Task({
         ...taskData,
         ownerEmail,
         status: startsCompleted ? "completed" : taskData.status || "active",
         completed: startsCompleted,
-        completedAt: startsCompleted ? new Date() : null,
+        completedAt,
         idempotencyKey: idempotencyKey || undefined,
       }).save();
+      if (startsCompleted) {
+        await this._adjustDailyStat(ownerEmail, completedAt, 1);
+      }
+      return saved;
     } catch (err) {
       if (err && err.code === 11000 && idempotencyKey) {
         return await Task.findOne({ ownerEmail, idempotencyKey });
@@ -257,19 +262,37 @@ class TaskService {
    * Update task
    */
   async update(taskId, updateData, ownerEmail) {
-    const normalized = normalizeTaskUpdate(updateData);
+    const task = await Task.findOne({ _id: taskId, ownerEmail });
+    if (!task) return null;
+
+    const now = new Date();
+    const normalized = normalizeTaskUpdate(updateData, now);
     if (Object.keys(normalized).length === 0) return await this.findById(taskId, ownerEmail);
-    return await Task.findOneAndUpdate(
-      {
-        _id: taskId,
-        ownerEmail,
-      },
-      { $set: normalized },
-      {
-        new: true,
-        runValidators: true,
-      }
-    );
+
+    const wasCompleted = taskIsCompleted(task);
+    const previousCompletedAt = validDate(task.completedAt || task.updatedAt) || now;
+    const willBeCompleted = normalized.completed !== undefined
+      ? normalized.completed
+      : normalized.status !== undefined
+        ? normalized.status === "completed"
+        : wasCompleted;
+
+    // Editing an already-completed task must not rewrite the historical
+    // completion date, otherwise weekly analytics drift on every save.
+    if (wasCompleted && willBeCompleted) {
+      delete normalized.completedAt;
+    }
+
+    Object.assign(task, normalized);
+    const saved = await task.save();
+
+    if (!wasCompleted && willBeCompleted) {
+      await this._adjustDailyStat(ownerEmail, saved.completedAt || now, 1);
+    } else if (wasCompleted && !willBeCompleted) {
+      await this._adjustDailyStat(ownerEmail, previousCompletedAt, -1);
+    }
+
+    return saved;
   }
 
   /**
@@ -381,9 +404,10 @@ class TaskService {
    * comparing the current week to the previous week.
    */
   async getWeeklyCompletionCounts(ownerEmail, weeksBack = 6) {
+    const safeWeeksBack = Math.min(52, Math.max(2, Number(weeksBack) || 6));
     const now = new Date();
     const startDate = new Date(now);
-    startDate.setDate(startDate.getDate() - weeksBack * 7);
+    startDate.setDate(startDate.getDate() - safeWeeksBack * 7);
     const startKey = formatDateKey(startDate);
 
     const results = await DailyStat.aggregate([
@@ -408,7 +432,7 @@ class TaskService {
     ]);
 
     const weeks = [];
-    for (let i = weeksBack - 1; i >= 0; i -= 1) {
+    for (let i = safeWeeksBack - 1; i >= 0; i -= 1) {
       const d = new Date(now);
       d.setDate(d.getDate() - i * 7);
       const isoWeek = getISOWeek(d);

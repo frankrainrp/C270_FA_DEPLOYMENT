@@ -1,0 +1,268 @@
+---
+- name: Deploy Butler to Kubernetes
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    deploy_environment: "{{ lookup('ansible.builtin.env', 'DEPLOY_ENV') }}"
+    kubeconfig_path: "{{ lookup('ansible.builtin.env', 'K8S_AUTH_KUBECONFIG') }}"
+    image_ref: "{{ lookup('ansible.builtin.env', 'IMAGE') }}"
+    app_host: "{{ lookup('ansible.builtin.env', 'APP_HOST') }}"
+    app_url: "{{ lookup('ansible.builtin.env', 'APP_URL') | regex_replace('/$', '') }}"
+    mongo_uri: "{{ lookup('ansible.builtin.env', 'MONGO_URI') }}"
+    deepseek_api_key: "{{ lookup('ansible.builtin.env', 'DEEPSEEK_API_KEY') }}"
+    n8n_otp_webhook_url: "{{ lookup('ansible.builtin.env', 'N8N_OTP_WEBHOOK_URL') }}"
+    ghcr_username: "{{ lookup('ansible.builtin.env', 'GHCR_USERNAME') }}"
+    ghcr_token: "{{ lookup('ansible.builtin.env', 'GHCR_READ_TOKEN') }}"
+    tls_certificate: "{{ lookup('ansible.builtin.env', 'TLS_CERTIFICATE') }}"
+    tls_private_key: "{{ lookup('ansible.builtin.env', 'TLS_PRIVATE_KEY') }}"
+    namespace_by_environment:
+      staging: butler-staging
+      production: butler-production
+    target_namespace: "{{ namespace_by_environment[deploy_environment] | default('') }}"
+    repository_root: "{{ playbook_dir }}/../.."
+    overlay_path: "{{ repository_root }}/k8s/overlays/{{ deploy_environment }}"
+
+  pre_tasks:
+    - name: Validate deployment inputs
+      ansible.builtin.assert:
+        that:
+          - deploy_environment in ["staging", "production"]
+          - kubeconfig_path | length > 0
+          - image_ref is match('^ghcr\\.io/.+:sha-[0-9a-f]{40}$')
+          - app_host | length > 0
+          - app_url is match('^https://')
+          - mongo_uri | length > 0
+          - deepseek_api_key | length > 0
+          - n8n_otp_webhook_url is match('^https://')
+          - ghcr_username | length > 0
+          - ghcr_token | length > 0
+          - tls_certificate is search('BEGIN CERTIFICATE')
+          - tls_private_key is search('BEGIN .*PRIVATE KEY')
+        fail_msg: Configure every required GitHub Environment secret/variable before deploying.
+      no_log: true
+
+    - name: Verify access to the target cluster
+      kubernetes.core.k8s_info:
+        kubeconfig: "{{ kubeconfig_path }}"
+        api_version: v1
+        kind: Namespace
+      register: cluster_access
+
+  tasks:
+    - name: Deploy and verify the immutable image
+      block:
+        - name: Create the environment namespace
+          kubernetes.core.k8s:
+            kubeconfig: "{{ kubeconfig_path }}"
+            state: present
+            apply: true
+            definition:
+              apiVersion: v1
+              kind: Namespace
+              metadata:
+                name: "{{ target_namespace }}"
+                labels:
+                  app.kubernetes.io/name: butler
+                  app.kubernetes.io/environment: "{{ deploy_environment }}"
+                  pod-security.kubernetes.io/enforce: restricted
+                  pod-security.kubernetes.io/audit: restricted
+                  pod-security.kubernetes.io/warn: restricted
+
+        - name: Create or update application runtime secrets
+          kubernetes.core.k8s:
+            kubeconfig: "{{ kubeconfig_path }}"
+            state: present
+            apply: true
+            definition:
+              apiVersion: v1
+              kind: Secret
+              metadata:
+                name: butler-runtime
+                namespace: "{{ target_namespace }}"
+              type: Opaque
+              stringData:
+                MONGO_URI: "{{ mongo_uri }}"
+                DEEPSEEK_API_KEY: "{{ deepseek_api_key }}"
+                N8N_OTP_WEBHOOK_URL: "{{ n8n_otp_webhook_url }}"
+          no_log: true
+
+        - name: Build the private GHCR pull configuration
+          ansible.builtin.set_fact:
+            ghcr_docker_config:
+              auths:
+                ghcr.io:
+                  username: "{{ ghcr_username }}"
+                  password: "{{ ghcr_token }}"
+                  auth: "{{ (ghcr_username + ':' + ghcr_token) | b64encode }}"
+          no_log: true
+
+        - name: Create or update the GHCR pull secret
+          kubernetes.core.k8s:
+            kubeconfig: "{{ kubeconfig_path }}"
+            state: present
+            apply: true
+            definition:
+              apiVersion: v1
+              kind: Secret
+              metadata:
+                name: ghcr-pull
+                namespace: "{{ target_namespace }}"
+              type: kubernetes.io/dockerconfigjson
+              stringData:
+                .dockerconfigjson: "{{ ghcr_docker_config | to_json }}"
+          no_log: true
+
+        - name: Create or update the TLS secret
+          kubernetes.core.k8s:
+            kubeconfig: "{{ kubeconfig_path }}"
+            state: present
+            apply: true
+            definition:
+              apiVersion: v1
+              kind: Secret
+              metadata:
+                name: butler-tls
+                namespace: "{{ target_namespace }}"
+              type: kubernetes.io/tls
+              stringData:
+                tls.crt: "{{ tls_certificate }}"
+                tls.key: "{{ tls_private_key }}"
+          no_log: true
+
+        - name: Build the selected Kustomize overlay
+          ansible.builtin.command:
+            argv: [kubectl, kustomize, "{{ overlay_path }}"]
+          register: rendered_manifests
+          changed_when: false
+
+        - name: Apply Kubernetes resources with server-side ownership
+          kubernetes.core.k8s:
+            kubeconfig: "{{ kubeconfig_path }}"
+            state: present
+            apply: true
+            definition: "{{ rendered_manifests.stdout | from_yaml_all | list }}"
+
+        - name: Pin the Deployment to the verified GHCR SHA image
+          kubernetes.core.k8s:
+            kubeconfig: "{{ kubeconfig_path }}"
+            state: present
+            merge_type: strategic-merge
+            definition:
+              apiVersion: apps/v1
+              kind: Deployment
+              metadata:
+                name: butler
+                namespace: "{{ target_namespace }}"
+              spec:
+                template:
+                  spec:
+                    containers:
+                      - name: butler
+                        image: "{{ image_ref }}"
+
+        - name: Set the environment's real HTTPS hostname
+          kubernetes.core.k8s:
+            kubeconfig: "{{ kubeconfig_path }}"
+            state: present
+            merge_type: strategic-merge
+            definition:
+              apiVersion: networking.k8s.io/v1
+              kind: Ingress
+              metadata:
+                name: butler
+                namespace: "{{ target_namespace }}"
+              spec:
+                tls:
+                  - hosts: ["{{ app_host }}"]
+                    secretName: butler-tls
+                rules:
+                  - host: "{{ app_host }}"
+                    http:
+                      paths:
+                        - path: /
+                          pathType: Prefix
+                          backend:
+                            service:
+                              name: butler
+                              port:
+                                number: 80
+
+        - name: Wait for the rolling deployment to finish
+          ansible.builtin.command:
+            argv:
+              - kubectl
+              - --kubeconfig
+              - "{{ kubeconfig_path }}"
+              - --namespace
+              - "{{ target_namespace }}"
+              - rollout
+              - status
+              - deployment/butler
+              - --timeout=5m
+          register: rollout_result
+          changed_when: false
+
+        - name: Verify the public readiness endpoint
+          ansible.builtin.uri:
+            url: "{{ app_url }}/api/health"
+            method: GET
+            return_content: true
+            validate_certs: true
+            status_code: 200
+          register: public_health
+          retries: 12
+          delay: 10
+          until:
+            - public_health.status == 200
+            - public_health.json.ok | default(false)
+            - public_health.json.data.status | default('') == 'ready'
+            - public_health.json.data.database | default('') == 'connected'
+
+        - name: Report the deployed revision
+          ansible.builtin.debug:
+            msg:
+              environment: "{{ deploy_environment }}"
+              namespace: "{{ target_namespace }}"
+              image: "{{ image_ref }}"
+              url: "{{ app_url }}"
+              health: "{{ public_health.json.data.status }}"
+
+      rescue:
+        - name: Capture recent application logs
+          ansible.builtin.command:
+            argv:
+              - kubectl
+              - --kubeconfig
+              - "{{ kubeconfig_path }}"
+              - --namespace
+              - "{{ target_namespace }}"
+              - logs
+              - deployment/butler
+              - --tail=150
+          register: failed_deployment_logs
+          changed_when: false
+          failed_when: false
+
+        - name: Print failure logs
+          ansible.builtin.debug:
+            var: failed_deployment_logs.stdout_lines
+
+        - name: Roll back to the previous Deployment revision
+          ansible.builtin.command:
+            argv:
+              - kubectl
+              - --kubeconfig
+              - "{{ kubeconfig_path }}"
+              - --namespace
+              - "{{ target_namespace }}"
+              - rollout
+              - undo
+              - deployment/butler
+          register: rollback_result
+          changed_when: rollback_result.rc == 0
+          failed_when: false
+
+        - name: Fail the deployment after rollback attempt
+          ansible.builtin.fail:
+            msg: "Deployment verification failed. Rollback was attempted; inspect the preceding logs and Kubernetes events."

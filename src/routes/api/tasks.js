@@ -33,7 +33,7 @@ async function updateTask(req, res) {
 
   const eventUpdate = {};
   if (updateData.title !== undefined) {
-    eventUpdate.title = String(updateData.title).replace("🗓️ ", "");
+    eventUpdate.title = String(updateData.title).trim();
   }
   if (updateData.description !== undefined) eventUpdate.description = updateData.description;
   if (updateData.dueDate !== undefined) eventUpdate.date = updateData.dueDate;
@@ -124,7 +124,7 @@ router.get("/", runSafe(async (req, res) => {
     const plain = e.toObject ? e.toObject() : e;
     return {
       _id: plain._id,
-      title: `🗓️ ${plain.title}`,
+      title: plain.title,
       dueDate: plain.date,
       description: plain.description || "",
       status: "active",

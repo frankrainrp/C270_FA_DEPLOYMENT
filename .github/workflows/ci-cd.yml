@@ -1,4 +1,4 @@
-name: CI and Container Delivery
+name: CI, Container Delivery, and Kubernetes Deployment
 
 on:
   push:
@@ -10,11 +10,13 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: pipeline-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
 
 env:
   NODE_VERSION: "24"
+  PYTHON_VERSION: "3.13"
+  IMAGE_NAME: ghcr.io/${{ github.repository }}
 
 jobs:
   quality:
@@ -24,6 +26,9 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
+
+      - name: Lint GitHub Actions workflow
+        run: docker run --rm --volume "$PWD:/repo" --workdir /repo rhysd/actionlint:1.7.12 -color
 
       - name: Set up Node.js
         uses: actions/setup-node@v6
@@ -44,6 +49,43 @@ jobs:
         run: |
           docker compose config -q
           docker compose -f docker-compose.db.yml config -q
+
+  deployment-validation:
+    name: Validate Kubernetes and Ansible
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: ansible/requirements.txt
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Install Ansible and Kubernetes dependencies
+        run: |
+          python -m pip install --requirement ansible/requirements.txt
+          ansible-galaxy collection install --requirements-file ansible/requirements.yml
+
+      - name: Build Kubernetes overlays
+        run: |
+          kubectl kustomize k8s/overlays/staging > "$RUNNER_TEMP/butler-staging.yaml"
+          kubectl kustomize k8s/overlays/production > "$RUNNER_TEMP/butler-production.yaml"
+          test -s "$RUNNER_TEMP/butler-staging.yaml"
+          test -s "$RUNNER_TEMP/butler-production.yaml"
+
+      - name: Run Ansible syntax checks
+        run: |
+          ansible-playbook --syntax-check --inventory ansible/inventory.example.yml ansible/playbooks/bootstrap-k3s.yml
+          ansible-playbook --syntax-check --inventory ansible/inventory.example.yml ansible/playbooks/export-kubeconfig.yml
+          ansible-playbook --syntax-check --inventory localhost, ansible/playbooks/deploy.yml
+          ansible-playbook --syntax-check --inventory localhost, ansible/playbooks/rollback.yml
 
   docker-smoke:
     name: Build and smoke-test containers
@@ -97,12 +139,14 @@ jobs:
   publish:
     name: Publish verified image to GHCR
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [quality, docker-smoke]
+    needs: [quality, deployment-validation, docker-smoke]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
       contents: read
       packages: write
+    outputs:
+      image: ${{ steps.image.outputs.ref }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
@@ -117,14 +161,21 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Generate image tags and OCI labels
+      - name: Define immutable image reference
+        id: image
+        shell: bash
+        run: |
+          echo "repository=${IMAGE_NAME,,}" >> "$GITHUB_OUTPUT"
+          echo "ref=${IMAGE_NAME,,}:sha-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Generate OCI labels
         id: meta
         uses: docker/metadata-action@v6
         with:
-          images: ghcr.io/${{ github.repository }}
+          images: ${{ steps.image.outputs.repository }}
           tags: |
             type=raw,value=latest
-            type=sha,prefix=sha-
+            type=raw,value=sha-${{ github.sha }}
 
       - name: Build and publish verified image
         uses: docker/build-push-action@v7
@@ -137,3 +188,115 @@ jobs:
           cache-to: type=gha,mode=max
           provenance: mode=max
           sbom: true
+
+  deploy-staging:
+    name: Deploy staging with Ansible
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.CLOUD_DEPLOY_ENABLED == 'true'
+    needs: publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    concurrency:
+      group: butler-staging-deployment
+      cancel-in-progress: true
+    environment:
+      name: staging
+      url: ${{ vars.APP_URL }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: ansible/requirements.txt
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Install Ansible and Kubernetes dependencies
+        run: |
+          python -m pip install --requirement ansible/requirements.txt
+          ansible-galaxy collection install --requirements-file ansible/requirements.yml
+
+      - name: Materialize the protected kubeconfig
+        shell: bash
+        env:
+          KUBE_CONFIG_B64: ${{ secrets.KUBE_CONFIG_B64 }}
+        run: |
+          test -n "$KUBE_CONFIG_B64"
+          printf '%s' "$KUBE_CONFIG_B64" | base64 --decode > "$RUNNER_TEMP/kubeconfig"
+          chmod 600 "$RUNNER_TEMP/kubeconfig"
+
+      - name: Deploy and verify staging
+        env:
+          DEPLOY_ENV: staging
+          K8S_AUTH_KUBECONFIG: ${{ runner.temp }}/kubeconfig
+          IMAGE: ${{ needs.publish.outputs.image }}
+          APP_HOST: ${{ vars.APP_HOST }}
+          APP_URL: ${{ vars.APP_URL }}
+          MONGO_URI: ${{ secrets.MONGO_URI }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          N8N_OTP_WEBHOOK_URL: ${{ secrets.N8N_OTP_WEBHOOK_URL }}
+          GHCR_USERNAME: ${{ vars.GHCR_USERNAME }}
+          GHCR_READ_TOKEN: ${{ secrets.GHCR_READ_TOKEN }}
+          TLS_CERTIFICATE: ${{ secrets.TLS_CERTIFICATE }}
+          TLS_PRIVATE_KEY: ${{ secrets.TLS_PRIVATE_KEY }}
+        run: ansible-playbook ansible/playbooks/deploy.yml
+
+  deploy-production:
+    name: Approve and deploy production with Ansible
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.CLOUD_DEPLOY_ENABLED == 'true'
+    needs: [publish, deploy-staging]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    concurrency:
+      group: butler-production-deployment
+      cancel-in-progress: false
+    environment:
+      name: production
+      url: ${{ vars.APP_URL }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: ansible/requirements.txt
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Install Ansible and Kubernetes dependencies
+        run: |
+          python -m pip install --requirement ansible/requirements.txt
+          ansible-galaxy collection install --requirements-file ansible/requirements.yml
+
+      - name: Materialize the protected kubeconfig
+        shell: bash
+        env:
+          KUBE_CONFIG_B64: ${{ secrets.KUBE_CONFIG_B64 }}
+        run: |
+          test -n "$KUBE_CONFIG_B64"
+          printf '%s' "$KUBE_CONFIG_B64" | base64 --decode > "$RUNNER_TEMP/kubeconfig"
+          chmod 600 "$RUNNER_TEMP/kubeconfig"
+
+      - name: Deploy and verify production
+        env:
+          DEPLOY_ENV: production
+          K8S_AUTH_KUBECONFIG: ${{ runner.temp }}/kubeconfig
+          IMAGE: ${{ needs.publish.outputs.image }}
+          APP_HOST: ${{ vars.APP_HOST }}
+          APP_URL: ${{ vars.APP_URL }}
+          MONGO_URI: ${{ secrets.MONGO_URI }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          N8N_OTP_WEBHOOK_URL: ${{ secrets.N8N_OTP_WEBHOOK_URL }}
+          GHCR_USERNAME: ${{ vars.GHCR_USERNAME }}
+          GHCR_READ_TOKEN: ${{ secrets.GHCR_READ_TOKEN }}
+          TLS_CERTIFICATE: ${{ secrets.TLS_CERTIFICATE }}
+          TLS_PRIVATE_KEY: ${{ secrets.TLS_PRIVATE_KEY }}
+        run: ansible-playbook ansible/playbooks/deploy.yml

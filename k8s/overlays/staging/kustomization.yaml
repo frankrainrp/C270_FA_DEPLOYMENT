@@ -1,0 +1,30 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: butler-staging
+resources:
+  - ../../base
+  - namespace.yaml
+replicas:
+  - name: butler
+    count: 1
+patches:
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: butler
+    patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 1
+      - op: replace
+        path: /spec/maxReplicas
+        value: 2
+  - target:
+      kind: Ingress
+      name: butler
+    patch: |-
+      - op: replace
+        path: /spec/tls/0/hosts/0
+        value: staging.butler.invalid
+      - op: replace
+        path: /spec/rules/0/host
+        value: staging.butler.invalid

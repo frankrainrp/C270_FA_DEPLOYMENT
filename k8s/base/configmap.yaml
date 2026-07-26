@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: butler-config
+  labels:
+    app.kubernetes.io/name: butler
+    app.kubernetes.io/component: web
+data:
+  NODE_ENV: production
+  PORT: "3000"
+  AUTH_REQUIRED: "true"
+  LOCAL_DEMO_MODE: "false"
+  CHAT_MOCK_MODE: "false"
+  DEEPSEEK_BASE_URL: https://api.deepseek.com/v1
+  MONGO_CONNECT_TIMEOUT_MS: "5000"
+  DOCUMENT_MAX_MB: "10"
+  DOCUMENT_TEXT_LIMIT: "60000"
+  OTP_TTL_MINUTES: "5"
+  OTP_MAX_ATTEMPTS: "5"
+  SESSION_TTL_DAYS: "30"
+  SESSION_COOKIE_NAME: butler_session

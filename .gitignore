@@ -5,6 +5,9 @@ node_modules/
 .env
 .env.local
 *.key
+*.pem
+*.kubeconfig
+ansible/inventory.yml
 
 # Logs
 *.log
@@ -21,3 +24,9 @@ uploads/
 # Build output
 dist/
 build/
+
+# Local validation artifacts
+/.playwright-cli/
+/output/
+/tmp/
+/$out/

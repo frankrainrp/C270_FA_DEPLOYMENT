@@ -26,6 +26,10 @@
   var list         = root.querySelector("[data-notes-list]");
   var saveBtn      = root.querySelector("[data-note-save]");
   var deleteBtn    = root.querySelector("[data-note-delete]");
+  // Note-list buttons also expose a data-note-preview snippet for global
+  // search, so scope this lookup to the actual editor preview surface.
+  var preview      = root.querySelector(".note-markdown-preview[data-note-preview]");
+  var modeButtons  = root.querySelectorAll("[data-note-mode]");
 
   if (!editor || !titleInput || !bodyInput) return;
 
@@ -46,6 +50,37 @@
     alert(action + " failed: " + (err && err.message ? err.message : "unknown"));
   }
 
+  function renderPreview() {
+    if (!preview) return;
+    var markdown = bodyInput.value || "";
+    if (!markdown.trim()) {
+      preview.innerHTML = '<div class="note-preview-empty"><strong>Nothing to preview yet.</strong><span>Switch to Edit and start writing in Markdown.</span></div>';
+      return;
+    }
+    preview.innerHTML = window.ButlerMarkdown
+      ? window.ButlerMarkdown.render(markdown)
+      : "<pre>" + markdown.replace(/[&<>]/g, function (char) {
+          return { "&": "&amp;", "<": "&lt;", ">": "&gt;" }[char];
+        }) + "</pre>";
+  }
+
+  function setMode(mode) {
+    var nextMode = mode === "edit" ? "edit" : "preview";
+    var editing = nextMode === "edit";
+    bodyInput.hidden = !editing;
+    if (preview) preview.hidden = editing;
+    modeButtons.forEach(function (button) {
+      var active = button.getAttribute("data-note-mode") === nextMode;
+      button.classList.toggle("active", active);
+      button.setAttribute("aria-pressed", active ? "true" : "false");
+    });
+    if (editing) {
+      bodyInput.focus();
+    } else {
+      renderPreview();
+    }
+  }
+
   // ---- load a note into the editor -----------------------------------
   async function loadNoteInto(id) {
     if (!id) return;
@@ -56,6 +91,7 @@
       bodyInput.value = note.content || "";
       setUpdated("just now");
       setPinLabel(!!note.pinned);
+      setMode("preview");
       // Highlight the selected note in the list.
       list.querySelectorAll(".note-list-item").forEach(function (el) {
         el.classList.toggle("active", el.dataset.noteId === String(note._id));
@@ -66,6 +102,15 @@
   }
 
   // ---- button wiring -------------------------------------------------
+  modeButtons.forEach(function (button) {
+    button.addEventListener("click", function () {
+      setMode(button.getAttribute("data-note-mode"));
+    });
+  });
+
+  bodyInput.addEventListener("input", renderPreview);
+  setMode(currentId() && bodyInput.value.trim() ? "preview" : "edit");
+
   if (list) {
     list.addEventListener("click", function (ev) {
       var item = ev.target.closest && ev.target.closest("[data-note-id]");

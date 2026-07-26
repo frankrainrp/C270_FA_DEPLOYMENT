@@ -11,7 +11,14 @@
     { _id: "", title: "", content: "", updatedAt: null };
 
   function previewOf(n) {
-    const body = String((n && n.content) || "").trim();
+    const body = String((n && n.content) || "")
+      .replace(/```[\s\S]*?```/g, " code ")
+      .replace(/!\[[^\]]*\]\([^)]+\)/g, " image ")
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+      .replace(/^[#>*+\-\d.)\s]+/gm, "")
+      .replace(/[*_~`]/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
     if (!body) return "(empty)";
     return body.length > 120 ? body.slice(0, 120) + "…" : body;
   }
@@ -112,17 +119,29 @@
     </div>
     <div class="note-editor-meta">
       <span id="note-updated-label">Updated <%= fmtUpdated(active.updatedAt) %></span>
-      <span class="drawer-pill">Markdown</span>
+      <div class="note-mode-switch" role="group" aria-label="Note display mode">
+        <button class="note-mode-button" type="button" data-note-mode="edit">Edit</button>
+        <button class="note-mode-button active" type="button" data-note-mode="preview">Preview</button>
+      </div>
     </div>
-    <textarea
-      id="note-body-input"
-      class="note-body-input"
-      aria-label="Note body"
-      placeholder="Write in markdown..."
-      data-note-body
-    ><%= active.content || "" %></textarea>
+    <div class="note-body-shell">
+      <textarea
+        id="note-body-input"
+        class="note-body-input"
+        aria-label="Note body"
+        placeholder="Write in markdown..."
+        data-note-body
+        hidden
+      ><%= active.content || "" %></textarea>
+      <div
+        class="note-markdown-preview obsidian-md"
+        data-note-preview
+        aria-label="Rendered note preview"
+      ></div>
+    </div>
   </article>
 </section>
 
 <script src="/js/api.js" defer></script>
+<script src="/js/markdown-renderer.js" defer></script>
 <script src="/js/notes-ui.js" defer></script>

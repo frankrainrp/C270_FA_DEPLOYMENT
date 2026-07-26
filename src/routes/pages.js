@@ -317,19 +317,19 @@ router.get("/tasks", requireAuthPage, async (req, res, next) => {
   const ownerEmail = req.sessionUser.email;
   try {
     const view = req.query.view || "all";
-    
-    // FIX: ALWAYS fetch "all" tasks so the client-side tabs have the data!
-    const [tasks, stats, events] = await Promise.all([
-      TaskService.findAll("all", ownerEmail), // <--- Changed from 'view' to '"all"'
-      TaskService.getStats(ownerEmail),
-      CalendarService.findAll(ownerEmail), 
+
+    // Load the complete integrated workspace once; the contextual rail selects
+    // which server-rendered group is visible.
+    const [tasks, events] = await Promise.all([
+      TaskService.findAll("all", ownerEmail),
+      CalendarService.findAll(ownerEmail),
     ]);
 
     const eventTasks = events.map((e) => {
       const plain = e.toObject ? e.toObject() : e;
       return {
         _id: plain._id,
-        title: `🗓️ ${plain.title}`, 
+        title: plain.title,
         dueDate: plain.date,
         description: plain.description || "",
         status: "active", 
@@ -338,11 +338,6 @@ router.get("/tasks", requireAuthPage, async (req, res, next) => {
         isEvent: true
       };
     });
-
-    const [rail, authContext] = await Promise.all([
-      buildTasksRail(view, ownerEmail, stats),
-      loadAuthContext(req),
-    ]);
 
     const taskViewLabel = {
       all: "All tasks",
@@ -359,12 +354,35 @@ router.get("/tasks", requireAuthPage, async (req, res, next) => {
 
     combinedTasks.sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
 
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const completed = (task) => task.status === "completed" || task.completed === true;
+    const pageStats = {
+      total: combinedTasks.length,
+      active: combinedTasks.filter((task) =>
+        !completed(task) && (task.status === "active" || (!task.status && !task.completed))
+      ).length,
+      in_progress: combinedTasks.filter((task) =>
+        !completed(task) && task.status === "in_progress"
+      ).length,
+      upcoming: combinedTasks.filter((task) => {
+        const due = task.dueDate ? new Date(task.dueDate) : null;
+        return !completed(task) && due && !Number.isNaN(due.getTime()) && due >= today;
+      }).length,
+      completed: combinedTasks.filter(completed).length,
+    };
+
+    const [rail, authContext] = await Promise.all([
+      buildTasksRail(view, ownerEmail, pageStats),
+      loadAuthContext(req),
+    ]);
+
     renderLayout(res, {
       title: "Tasks",
       activeNav: "tasks",
       page: "task",
       rail,
-      pageLocals: { tasks: combinedTasks, taskViewLabel },
+      pageLocals: { tasks: combinedTasks, taskViewLabel, taskView: view },
       ...authContext,
     });
   } catch (err) {

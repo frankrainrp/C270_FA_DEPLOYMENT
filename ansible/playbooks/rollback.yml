@@ -1,0 +1,62 @@
+---
+- name: Roll back Butler to the previous Kubernetes revision
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    deploy_environment: "{{ lookup('ansible.builtin.env', 'DEPLOY_ENV') }}"
+    kubeconfig_path: "{{ lookup('ansible.builtin.env', 'K8S_AUTH_KUBECONFIG') }}"
+    app_url: "{{ lookup('ansible.builtin.env', 'APP_URL') | regex_replace('/$', '') }}"
+    namespace_by_environment:
+      staging: butler-staging
+      production: butler-production
+    target_namespace: "{{ namespace_by_environment[deploy_environment] | default('') }}"
+  tasks:
+    - name: Validate rollback inputs
+      ansible.builtin.assert:
+        that:
+          - deploy_environment in ["staging", "production"]
+          - kubeconfig_path | length > 0
+          - app_url is match('^https://')
+
+    - name: Roll back one Deployment revision
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - --kubeconfig
+          - "{{ kubeconfig_path }}"
+          - --namespace
+          - "{{ target_namespace }}"
+          - rollout
+          - undo
+          - deployment/butler
+      register: rollback_result
+      changed_when: rollback_result.rc == 0
+
+    - name: Wait for rollback completion
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - --kubeconfig
+          - "{{ kubeconfig_path }}"
+          - --namespace
+          - "{{ target_namespace }}"
+          - rollout
+          - status
+          - deployment/butler
+          - --timeout=5m
+      changed_when: false
+
+    - name: Verify readiness after rollback
+      ansible.builtin.uri:
+        url: "{{ app_url }}/api/health"
+        method: GET
+        return_content: true
+        validate_certs: true
+        status_code: 200
+      register: rollback_health
+      retries: 12
+      delay: 10
+      until:
+        - rollback_health.status == 200
+        - rollback_health.json.data.status | default('') == 'ready'

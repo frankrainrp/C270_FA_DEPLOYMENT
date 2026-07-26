@@ -57,10 +57,10 @@
         <% } %>
       </div>
     </section>
-  <% } else if (active === "calendar" && !customActiveId) { %>
-    <button class="sidebar-primary" type="button" data-action="new-event">
+  <% } else if (active === "tasks" && !customActiveId) { %>
+    <button class="sidebar-primary" type="button" data-action="new-task">
       <span class="sidebar-primary-icon plus-icon" aria-hidden="true"></span>
-      <span><%= L("rail.calendar.new", "New Event") %></span>
+      <span><%= L("rail.tasks.new", "New Task") %></span>
     </button>
 
     <section class="sidebar-section" aria-labelledby="sidebar-task-title">
