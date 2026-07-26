@@ -393,6 +393,14 @@
         calendarState.year = year;
         calendarState.month = month;
         calendarState.events = Array.isArray(data.events) ? data.events : [];
+
+        if (monthLabel) {
+          monthLabel.textContent = new Date(year, month, 1).toLocaleDateString("en", {
+            month: "long",
+            year: "numeric"
+          });
+        }
+        if (eventCount) eventCount.textContent = String(calendarState.events.length);
         
         var today = new Date();
         var daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -461,6 +469,7 @@
       calendarState.selectedDay = now.getDate();
       loadMonth(now.getFullYear(), now.getMonth(), false);
     } else if (actionBtn.hasAttribute("data-calendar-new-event")) {
+      ev.stopPropagation();
       openEventModal();
     } else if (actionBtn.hasAttribute("data-refresh-calendar")) {
       var cursor = parseCursor();

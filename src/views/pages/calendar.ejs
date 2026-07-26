@@ -73,29 +73,52 @@
 
 <section class="calendar-panel" data-calendar-root data-calendar-year="<%= year %>" data-calendar-month="<%= month %>">
   <header class="calendar-toolbar">
-    <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-      <button class="glass-btn" type="button" data-calendar-prev data-calendar-target-year="<%= prevYear %>" data-calendar-target-month="<%= prevMonth %>">Prev</button>
-      <button class="glass-btn" type="button" data-calendar-today>Today</button>
-      <button class="glass-btn" type="button" data-calendar-next data-calendar-target-year="<%= nextYear %>" data-calendar-target-month="<%= nextMonth %>">Next</button>
+    <div class="calendar-toolbar-row calendar-toolbar-navigation">
+      <span class="calendar-toolbar-label">Browse month</span>
+      <div class="calendar-month-navigation" aria-label="Calendar month navigation">
+        <button
+          class="glass-btn calendar-nav-button"
+          type="button"
+          aria-label="Previous month"
+          data-calendar-prev
+          data-calendar-target-year="<%= prevYear %>"
+          data-calendar-target-month="<%= prevMonth %>"
+        >
+          <span aria-hidden="true">←</span>
+          <span>Previous</span>
+        </button>
+        <strong class="calendar-month-label" data-calendar-month-label><%= monthLabel %></strong>
+        <button
+          class="glass-btn calendar-nav-button"
+          type="button"
+          aria-label="Next month"
+          data-calendar-next
+          data-calendar-target-year="<%= nextYear %>"
+          data-calendar-target-month="<%= nextMonth %>"
+        >
+          <span>Next</span>
+          <span aria-hidden="true">→</span>
+        </button>
+      </div>
+      <button class="glass-btn calendar-today-button" type="button" data-calendar-today>Today</button>
     </div>
-    <strong style="font-family: var(--font-display); font-size: 20px;" data-calendar-month-label><%= monthLabel %></strong>
-    <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end;">
-      <span style="color: var(--color-text-muted);" data-calendar-event-count>
-        <%= events.length %> event<%= events.length === 1 ? "" : "s" %>
-      </span>
-      <button class="glass-btn" type="button" data-calendar-new-event data-action="new-event">New Event</button>
-      <button class="glass-btn" type="button" data-refresh-calendar>Refresh</button>
+
+    <div class="calendar-toolbar-row calendar-toolbar-events">
+      <div class="calendar-event-count">
+        <span>Events</span>
+        <strong data-calendar-event-count><%= events.length %></strong>
+      </div>
+      <div class="calendar-toolbar-event-actions">
+        <button class="glass-btn glass-btn-primary calendar-new-event-button" type="button" data-calendar-new-event data-action="new-event">New event</button>
+        <button class="glass-btn" type="button" data-refresh-calendar>Refresh events</button>
+      </div>
     </div>
   </header>
 
-  <div class="calendar-summary">
-    <div class="hero-card hero-main">
-      <p class="hero-kicker">Study rhythm</p>
-      <h3>Plan your week around calm study blocks and a few key milestones.</h3>
-    </div>
-    <div class="hero-card">
+  <div class="calendar-summary calendar-summary--selected">
+    <div class="hero-card calendar-selected-day">
       <p class="hero-kicker">Selected day</p>
-        <div class="chip-list" data-calendar-selected-chip-list>
+      <div class="chip-list" data-calendar-selected-chip-list>
         <% if (selectedEvents.length === 0) { %>
           <span class="calendar-chip">Free day</span>
         <% } else { %>
