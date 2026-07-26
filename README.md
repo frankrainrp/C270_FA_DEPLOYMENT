@@ -12,6 +12,27 @@ one-time codes (OTP, delivered through an n8n workflow), and every task,
 note, calendar event, and chat session is scoped to the signed-in account —
 one user's data is never visible to another.
 
+## Latest update — Kaiduo
+
+This latest project update was completed by **Kaiduo**. It addresses the CA2
+feedback by connecting the workspace modules more clearly, extending the Agent
+beyond note creation, improving the main user flows, and completing the
+production delivery path.
+
+| Area | Changes completed by Kaiduo |
+| --- | --- |
+| Tasks workspace | Moved task filters into the contextual sidebar; integrated task and calendar-event records; added clear event badges and task-only controls; redesigned the overview as a compact horizontal status row with neutral Total, amber Active, blue In Progress, red Upcoming, and green Completed states. |
+| Calendar workspace | Split month navigation and event actions into two labelled toolbar levels; removed the Study rhythm card; retained a compact full-width Selected day summary; fixed month labels and event counts after navigation; prevented duplicate New event handling; kept responsive drag-and-drop scheduling. |
+| Notes | Added a safe Markdown Edit/Preview experience with headings, emphasis, lists, task lists, quotes, links, inline code, and fenced code blocks while escaping raw HTML. |
+| Agent Chat | Added MongoDB-grounded task summaries and a read-only seven-day Study Briefing that combines the signed-in user's tasks, pinned or recent notes, and upcoming calendar events into ranked focus items; added deterministic mock-mode support when a model API is unavailable. |
+| Learning analytics and UI | Kept completion analytics in sync with direct task changes; added completion-rate and weekly metrics; refined the learning-tools drawer, themed scrollbar, responsive surfaces, profile achievement icon, and light/dark/paper presentation. |
+| Security and delivery | Hardened avatar uploads, health probes, Docker and Compose runtime security; added Kubernetes staging/production overlays, TLS ingress, HPA, PDB, NetworkPolicy, resource controls, Ansible K3s provisioning/deploy/rollback, and GitHub Actions test, security, validation, container smoke-test, publish, and gated deployment jobs. |
+
+The update is covered by **36 automated tests**, a zero-high-vulnerability
+production dependency audit, real Docker Compose health and CRUD smoke tests,
+Kubernetes rendering checks, Ansible syntax checks, and the remote GitHub
+Actions delivery pipeline.
+
 ## Main capabilities
 
 - Email OTP login/signup (n8n sends the code, Butler verifies it and issues
