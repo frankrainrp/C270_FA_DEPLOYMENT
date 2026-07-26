@@ -58,12 +58,16 @@
 %>
 <style>
   .tasks-workspace-layout {
-    display: block;
+    min-height: 0;
+    flex: 1;
+    display: flex;
+    overflow: hidden;
     padding: 24px 32px;
   }
 
   .tasks-content {
-    max-height: calc(100vh - 380px);
+    width: 100%;
+    max-height: none;
     overflow-y: auto;
     padding: 0 12px 28px 0;
     scrollbar-width: thin;
@@ -86,7 +90,7 @@
       padding: 16px;
     }
     .tasks-content {
-      max-height: 65vh;
+      max-height: none;
     }
   }
 </style>
@@ -111,23 +115,23 @@
       <p class="hero-kicker">Daily overview</p>
       <h3>Keep the study sprint moving with a calm, focused plan.</h3>
       <div class="hero-stats">
-        <div>
+        <div class="hero-stat hero-stat--active">
           <strong><%= allActiveTasks.length %></strong>
           <span>Active</span>
         </div>
-        <div>
+        <div class="hero-stat hero-stat--progress">
           <strong><%= progressTasks.length %></strong>
           <span>In Progress</span>
         </div>
-        <div>
+        <div class="hero-stat hero-stat--upcoming">
           <strong><%= allUpcomingTasks.length %></strong>
           <span>Upcoming</span>
         </div>
-        <div>
+        <div class="hero-stat hero-stat--completed">
           <strong><%= completedTasks.length %></strong>
           <span>Completed</span>
         </div>
-        <div>
+        <div class="hero-stat hero-stat--total">
           <strong><%= list.length %></strong>
           <span>Total</span>
         </div>

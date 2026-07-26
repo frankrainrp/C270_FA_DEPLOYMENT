@@ -1855,6 +1855,114 @@ html[data-theme="dark"] .sidebar-item:hover {
   overflow: hidden;
 }
 
+.productivity-hero {
+  flex: 0 0 auto;
+  padding: 14px 18px 0;
+}
+
+.productivity-hero .hero-main {
+  grid-template-columns: minmax(230px, 0.78fr) minmax(0, 1.72fr);
+  grid-template-rows: auto auto;
+  align-items: center;
+  gap: 3px 20px;
+  min-height: 82px;
+  padding: 13px 16px;
+  background:
+    radial-gradient(circle at 12% 20%, color-mix(in srgb, var(--color-primary) 12%, transparent), transparent 42%),
+    color-mix(in srgb, var(--color-surface) 84%, transparent);
+}
+
+.productivity-hero .hero-kicker,
+.productivity-hero .hero-main > h3 {
+  grid-column: 1;
+}
+
+.productivity-hero .hero-main > h3 {
+  max-width: 34ch;
+  line-height: 1.25;
+  text-wrap: balance;
+}
+
+.hero-stats {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  min-width: 0;
+}
+
+.hero-stat {
+  --stat-color: var(--color-warning);
+  --stat-surface: color-mix(in srgb, var(--stat-color) 11%, var(--color-surface-strong));
+  position: relative;
+  min-width: 0;
+  min-height: 50px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 11px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--stat-color) 25%, var(--color-border-soft));
+  border-radius: 10px;
+  background: var(--stat-surface);
+}
+
+.hero-stat::before {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--stat-color);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--stat-color) 14%, transparent);
+  content: "";
+}
+
+.hero-stat strong {
+  color: var(--stat-color);
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.hero-stat span {
+  min-width: 0;
+  color: color-mix(in srgb, var(--stat-color) 70%, var(--color-text));
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.hero-stat--progress {
+  --stat-color: var(--color-info);
+}
+
+.hero-stat--upcoming {
+  --stat-color: var(--color-danger);
+}
+
+.hero-stat--completed {
+  --stat-color: var(--color-success);
+}
+
+.hero-stat--total {
+  --stat-color: var(--color-text);
+  --stat-surface: color-mix(in srgb, var(--color-surface-strong) 88%, transparent);
+  border-color: var(--color-border-soft);
+}
+
+.hero-stat--total::before {
+  display: none;
+}
+
+.hero-stat--total strong {
+  color: var(--color-text);
+}
+
+.hero-stat--total span {
+  color: var(--color-text-muted);
+}
+
 .tasks-content {
   min-height: 0;
   flex: 1;
@@ -1863,6 +1971,44 @@ html[data-theme="dark"] .sidebar-item:hover {
   gap: 14px;
   overflow-y: auto;
   padding: 18px;
+}
+
+@media (max-width: 1120px) {
+  .productivity-hero .hero-main {
+    grid-template-columns: 1fr;
+    gap: 7px;
+  }
+
+  .productivity-hero .hero-kicker,
+  .productivity-hero .hero-main > h3,
+  .hero-stats {
+    grid-column: 1;
+  }
+
+  .hero-stats {
+    grid-row: auto;
+    margin-top: 4px;
+  }
+}
+
+@media (max-width: 700px) {
+  .productivity-hero {
+    padding: 10px 12px 0;
+  }
+
+  .productivity-hero .hero-main {
+    padding: 12px;
+  }
+
+  .hero-stats {
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(126px, 1fr);
+    overflow-x: auto;
+    padding: 2px 2px 6px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-border) transparent;
+  }
 }
 
 .task-group {
