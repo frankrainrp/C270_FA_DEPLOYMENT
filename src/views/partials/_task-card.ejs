@@ -10,6 +10,7 @@
 %>
 <article
   class="task-card <%= t.status === 'completed' ? 'completed' : '' %>"
+  draggable="true" 
   data-task-id="<%= t._id %>"
   data-task-completed="<%= t.status === 'completed' %>"
   data-task-due-date="<%= t.dueDate ? new Date(t.dueDate).toISOString() : '' %>"

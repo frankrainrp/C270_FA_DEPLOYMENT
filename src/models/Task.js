@@ -2,9 +2,6 @@ const mongoose = require("mongoose");
 
 const TaskSchema = new mongoose.Schema(
   {
-    // Every task belongs to exactly one account. Set from the logged-in
-    // session on create and used to filter every read/update/delete so
-    // one user's tasks never show up for another.
     ownerEmail: {
       type: String,
       required: [true, "ownerEmail is required"],
@@ -29,9 +26,9 @@ const TaskSchema = new mongoose.Schema(
       default: null,
     },
     status: {
-    type: String,
-    enum: ["active", "in_progress", "completed"],
-    default: "active",
+      type: String,
+      enum: ["active", "in_progress", "completed"],
+      default: "active",
     },
     completed: {
       type: Boolean,
@@ -45,6 +42,12 @@ const TaskSchema = new mongoose.Schema(
       type: String,
       enum: ["low", "medium", "high"],
       default: "medium",
+    },
+    // Internal housekeeping flag, set once by scripts/repairTaskStats.js
+    // so the migration is safe to re-run without double-counting stats.
+    statsBackfilled: {
+      type: Boolean,
+      default: false,
     },
   },
   {

@@ -2,10 +2,9 @@
   /*
     pages/task.ejs
     Study productivity task workspace with overview cards, task list,
-    and a detail drawer.  Task data comes from MongoDB via pages.js.
+    and an inner filter sidebar. Task data comes from MongoDB via pages.js.
   */
   const list = Array.isArray(locals.tasks) ? locals.tasks : [];
-
   const priorityColor = {
     high: "var(--color-danger)",
     medium: "var(--color-warning)",
@@ -28,11 +27,141 @@
     return dt.toISOString().slice(0, 10);
   }
 
-  const activeTasks = list.filter((t) => t.status === 'active');
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const completedTasks = list.filter((t) => t.status === 'completed' || t.completed === true);
   const progressTasks = list.filter((t) => t.status === 'in_progress');
-  const upcomingTasks = list.filter((t) => t.status === 'upcoming');
-  const completedTasks = list.filter((t) => t.status === 'completed');
+  
+  const upcomingTasks = list.filter((t) => 
+    (t.status === 'active' || (!t.status && !t.completed)) && 
+    (t.dueDate && new Date(t.dueDate) >= today)
+  );
+  
+  const activeTasks = list.filter((t) => 
+    (t.status === 'active' || (!t.status && !t.completed)) && 
+    !(t.dueDate && new Date(t.dueDate) >= today)
+  );
 %>
+<style>
+  .tasks-workspace-layout {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    gap: 32px;
+    padding: 24px 32px;
+    align-items: start;
+  }
+  .tasks-sidebar-title {
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    color: var(--color-text-faint);
+    margin: 0 0 12px 10px;
+  }
+  .tasks-filter-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    position: sticky;
+    top: 24px;
+  }
+  .tasks-filter-btn {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 10px 14px;
+    border: none;
+    background: transparent;
+    border-radius: 12px;
+    color: var(--color-text-muted);
+    font-size: 14px;
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .tasks-filter-btn:hover {
+    background: color-mix(in srgb, var(--color-text-muted) 10%, transparent);
+    color: var(--color-text);
+  }
+  .tasks-filter-btn.active {
+    background: var(--color-surface);
+    color: var(--color-primary);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    border: 1px solid var(--color-border-soft);
+  }
+  .tasks-filter-count {
+    font-size: 11px;
+    background: color-mix(in srgb, var(--color-text-muted) 15%, transparent);
+    padding: 2px 8px;
+    border-radius: 999px;
+  }
+  .tasks-filter-btn.active .tasks-filter-count {
+    background: color-mix(in srgb, var(--color-primary) 15%, transparent);
+    color: var(--color-primary);
+  }
+
+  /* NEW: Restrict the height of the main task list and make it scrollable */
+  .tasks-content {
+    max-height: calc(100vh - 320px); /* Adjusts dynamically to fit most screens */
+    overflow-y: auto;
+    padding-right: 12px; /* Adds a bit of padding so the scrollbar doesn't hug the content */
+  }
+  
+  /* NEW: Style the scrollbar to match Butler's clean aesthetic */
+  /* Restrict the height of the main task list and make it scrollable */
+  .tasks-content {
+    max-height: calc(100vh - 380px); /* CRITICAL FIX: Shrink the container so it doesn't bleed off the screen */
+    overflow-y: auto;
+    padding-right: 12px; 
+    padding-bottom: 100px; /* Add a massive buffer at the bottom so you can over-scroll the last item */
+  }
+  
+  /* Style the scrollbar to match Butler's clean aesthetic */
+  .tasks-content::-webkit-scrollbar {
+    width: 8px; /* Restored the missing width! */
+  }
+  .tasks-content::-webkit-scrollbar-thumb {
+    background: var(--color-border-soft);
+    border-radius: 999px;
+  }
+  .tasks-content::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  /* CRITICAL FIX: Force task cards to always be visible, overriding the legacy tasks-ui.js script */
+  .tasks-content .task-group .task-card {
+    display: flex !important;
+  }
+  .tasks-content .task-group .task-card[hidden] {
+    display: flex !important;
+  }
+
+  @media (max-width: 860px) {
+    .tasks-workspace-layout {
+      grid-template-columns: 1fr;
+      padding: 16px;
+      gap: 20px;
+    }
+    .tasks-filter-nav {
+      flex-direction: row;
+      overflow-x: auto;
+      padding-bottom: 8px;
+      position: static;
+    }
+    .tasks-filter-btn {
+      white-space: nowrap;
+      width: auto;
+      gap: 12px;
+    }
+    /* Expand task list height on mobile where headers are stacked differently */
+    .tasks-content {
+      max-height: 65vh;
+    }
+  }
+</style>
 
 <section class="tasks-panel" data-tasks-root>
   <header
@@ -42,7 +171,6 @@
     <div>
       <strong style="font-family: var(--font-display); font-size: 20px;">Tasks</strong>
       <span style="color: var(--color-text-muted); margin-left: 8px;">Study productivity workspace</span>
-      <span data-task-view-label style="color: var(--color-text-muted); margin-left: 8px; padding: 4px 10px; border: 1px solid var(--color-border-soft); border-radius: 999px; font-size: 12px;">Viewing <%= taskViewLabel %></span>
     </div>
     <div>
       <button class="glass-btn" type="button" data-action="new-task">New Task</button>
@@ -77,235 +205,172 @@
         </div>
       </div>
     </div>
-
-    <div class="hero-card">
-      <p class="hero-kicker">Achievements</p>
-      <ul class="chip-list">
-        <li><%= completedTasks.length %> completed</li>
-        <li><%= progressTasks.length %> in progress</li>
-        <li><%= upcomingTasks.length %> upcoming</li>
-        <li><%= activeTasks.length %> active</li>
-        <li>Ask Butler to add more</li>
-      </ul>
-    </div>
-
-    <div class="hero-card">
-      <p class="hero-kicker">Focus tools</p>
-      <div class="focus-tools">
-        <span>Pomodoro 25:00</span>
-        <span>Deep work</span>
-        <span>Noise block</span>
-      </div>
-    </div>
   </div>
 
-  <div class="tasks-content" data-tasks-list>
-    <% if (list.length === 0) { %>
-      <div style="padding: 40px; text-align: center; color: var(--color-text-muted);">
-        <p>No tasks yet.</p>
-        <p>Ask Butler in <a href="/chat">chat</a> to add one, e.g.
-          <em>"Add a task: finish CA2 tomorrow, high priority"</em>.</p>
-      </div>
-    <% } %>
+  <div class="tasks-workspace-layout">
+    
+    <!-- Local Filter Sidebar -->
+    <aside class="tasks-local-sidebar">
+      <h3 class="tasks-sidebar-title">Filters</h3>
+      <nav class="tasks-filter-nav">
+        <button class="tasks-filter-btn active" data-filter="all">
+          <span>All Tasks</span>
+          <span class="tasks-filter-count"><%= list.length %></span>
+        </button>
+        <button class="tasks-filter-btn" data-filter="active">
+          <span>Active</span>
+          <span class="tasks-filter-count"><%= activeTasks.length %></span>
+        </button>
+        <button class="tasks-filter-btn" data-filter="in_progress">
+          <span>In Progress</span>
+          <span class="tasks-filter-count"><%= progressTasks.length %></span>
+        </button>
+        <button class="tasks-filter-btn" data-filter="upcoming">
+          <span>Upcoming</span>
+          <span class="tasks-filter-count"><%= upcomingTasks.length %></span>
+        </button>
+        <button class="tasks-filter-btn" data-filter="completed">
+          <span>Completed</span>
+          <span class="tasks-filter-count"><%= completedTasks.length %></span>
+        </button>
+      </nav>
+    </aside>
 
-    <% if (activeTasks.length > 0) { %>
-      <div class="task-group">
+    <!-- Main Tasks List -->
+    <div class="tasks-content" data-tasks-list>
+      
+      <% if (list.length === 0) { %>
+        <div style="padding: 40px; text-align: center; color: var(--color-text-muted);">
+          <p>No tasks yet.</p>
+          <p>Click <strong>New Task</strong> to add one, or ask Butler in <a href="/chat">chat</a>.</p>
+        </div>
+      <% } %>
+
+      <!-- ACTIVE GROUP -->
+      <div class="task-group" data-task-group="active">
         <div class="task-group-title">
           <span>Active</span>
           <span><%= activeTasks.length %></span>
         </div>
-
-        <% activeTasks.forEach(function(t) {
-          const dueLabel = fmtDue(t.dueDate);
-          const description = t.description || "";
+        <% if (activeTasks.length === 0) { %>
+          <p style="color: var(--color-text-muted); font-size: 13px; padding: 10px;">No active tasks.</p>
+        <% } else { %>
+          <% activeTasks.forEach(function(t) { 
+            const dueLabel = fmtDue(t.dueDate);
+            const description = t.description || "";
           %>
-          <article
-            class="task-card"
-            data-task-id="<%= t._id %>"
-            data-task-completed="false"
-            data-task-due-date="<%= t.dueDate ? new Date(t.dueDate).toISOString() : '' %>"
-            data-title="<%= t.title %>"
-            data-due="<%= dueLabel %>"
-            data-priority="<%= t.priority || 'medium' %>"
-            data-description="<%= description %>"
-            data-notes="<%= description || 'No notes yet.' %>"
-            style="--task-color: <%= priorityColor[t.priority] || priorityColor.medium %>"
-          >
-            <input
-              class="task-checkbox"
-              type="checkbox"
-              <%= t.status === "completed" ? "checked" : "" %>
-              data-task-toggle
-              aria-label="Toggle complete"
-            />
-            <div class="task-main">
-              <div class="task-title"><%= t.title %></div>
-              <div class="task-meta">
-                <span>Due <%= dueLabel %></span>
-                <span>Priority: <%= t.priority || 'medium' %></span>
+            <article class="task-card" data-task-id="<%= t._id %>" data-task-completed="false" data-task-due-date="<%= t.dueDate ? new Date(t.dueDate).toISOString() : '' %>" data-title="<%= t.title %>" data-due="<%= dueLabel %>" data-priority="<%= t.priority || 'medium' %>" data-description="<%= description %>" data-notes="<%= description || 'No notes yet.' %>" style="--task-color: <%= priorityColor[t.priority] || priorityColor.medium %>">
+              <input class="task-checkbox" type="checkbox" <%= t.status === "completed" ? "checked" : "" %> data-task-toggle aria-label="Toggle complete" />
+              <div class="task-main">
+                <div class="task-title"><%= t.title %></div>
+                <div class="task-meta">
+                  <span>Due <%= dueLabel %></span>
+                  <span>Priority: <%= t.priority || 'medium' %></span>
+                </div>
               </div>
-            </div>
-            <div class="task-actions">
-              <button class="glass-btn task-edit-trigger" type="button" data-task-edit>Edit</button>
-              <button class="glass-btn" type="button" data-task-delete>Delete</button>
-            </div>
-          </article>
-        <% }) %>
-      </div>
+              <div class="task-actions">
+                <button class="glass-btn task-edit-trigger" type="button" data-task-edit>Edit</button>
+                <button class="glass-btn" type="button" data-task-delete>Delete</button>
+              </div>
+            </article>
+          <% }) %>
         <% } %>
+      </div>
 
-    <!-- =========================
-         In Progress Tasks
-    ========================== -->
-    <% if (progressTasks.length > 0) { %>
-      <div class="task-group">
+      <!-- IN PROGRESS GROUP -->
+      <div class="task-group" data-task-group="in_progress">
         <div class="task-group-title">
           <span>In Progress</span>
           <span><%= progressTasks.length %></span>
         </div>
-
-        <% progressTasks.forEach(function(t) {
-          const dueLabel = fmtDue(t.dueDate);
-          const description = t.description || "";
+        <% if (progressTasks.length === 0) { %>
+          <p style="color: var(--color-text-muted); font-size: 13px; padding: 10px;">No tasks in progress.</p>
+        <% } else { %>
+          <% progressTasks.forEach(function(t) { 
+            const dueLabel = fmtDue(t.dueDate);
+            const description = t.description || "";
           %>
-
-          <article
-            class="task-card"
-            data-task-id="<%= t._id %>"
-            data-task-completed="false"
-            data-task-due-date="<%= t.dueDate ? new Date(t.dueDate).toISOString() : '' %>"
-            data-title="<%= t.title %>"
-            data-due="<%= dueLabel %>"
-            data-priority="<%= t.priority || 'medium' %>"
-            data-description="<%= description %>"
-            data-notes="<%= description || 'No notes yet.' %>"
-            style="--task-color: <%= priorityColor[t.priority] || priorityColor.medium %>"
-          >
-            <input
-              class="task-checkbox"
-              type="checkbox"
-              <%= t.status === "completed" ? "checked" : "" %>
-              data-task-toggle
-              aria-label="Toggle complete"
-            />
-
-            <div class="task-main">
-              <div class="task-title"><%= t.title %></div>
-
-              <div class="task-meta">
-                <span>Due <%= dueLabel %></span>
-                <span>Priority: <%= t.priority || 'medium' %></span>
+            <article class="task-card" data-task-id="<%= t._id %>" data-task-completed="false" data-task-due-date="<%= t.dueDate ? new Date(t.dueDate).toISOString() : '' %>" data-title="<%= t.title %>" data-due="<%= dueLabel %>" data-priority="<%= t.priority || 'medium' %>" data-description="<%= description %>" data-notes="<%= description || 'No notes yet.' %>" style="--task-color: <%= priorityColor[t.priority] || priorityColor.medium %>">
+              <input class="task-checkbox" type="checkbox" <%= t.status === "completed" ? "checked" : "" %> data-task-toggle aria-label="Toggle complete" />
+              <div class="task-main">
+                <div class="task-title"><%= t.title %></div>
+                <div class="task-meta">
+                  <span>Due <%= dueLabel %></span>
+                  <span>Priority: <%= t.priority || 'medium' %></span>
+                </div>
               </div>
-            </div>
-
-            <div class="task-actions">
-              <button class="glass-btn task-edit-trigger" type="button" data-task-edit>Edit</button>
-              <button class="glass-btn" type="button" data-task-delete>Delete</button>
-            </div>
-          </article>
-
-        <% }) %>
+              <div class="task-actions">
+                <button class="glass-btn task-edit-trigger" type="button" data-task-edit>Edit</button>
+                <button class="glass-btn" type="button" data-task-delete>Delete</button>
+              </div>
+            </article>
+          <% }) %>
+        <% } %>
       </div>
-    <% } %>
 
-    <!-- =========================
-         Upcoming Tasks
-    ========================== -->
-    <% if (upcomingTasks.length > 0) { %>
-      <div class="task-group">
+      <!-- UPCOMING GROUP -->
+      <div class="task-group" data-task-group="upcoming">
         <div class="task-group-title">
           <span>Upcoming</span>
           <span><%= upcomingTasks.length %></span>
         </div>
-
-        <% upcomingTasks.forEach(function(t) {
-          const dueLabel = fmtDue(t.dueDate);
-          const description = t.description || "";
+        <% if (upcomingTasks.length === 0) { %>
+          <p style="color: var(--color-text-muted); font-size: 13px; padding: 10px;">No upcoming tasks.</p>
+        <% } else { %>
+          <% upcomingTasks.forEach(function(t) { 
+            const dueLabel = fmtDue(t.dueDate);
+            const description = t.description || "";
           %>
-          <article
-            class="task-card"
-            data-task-id="<%= t._id %>"
-            data-task-completed="false"
-            data-task-due-date="<%= t.dueDate ? new Date(t.dueDate).toISOString() : '' %>"
-            data-title="<%= t.title %>"
-            data-due="<%= dueLabel %>"
-            data-priority="<%= t.priority || 'medium' %>"
-            data-description="<%= description %>"
-            data-notes="<%= description || 'No notes yet.' %>"
-            style="--task-color: <%= priorityColor[t.priority] || priorityColor.medium %>"
-          >
-            <input
-              class="task-checkbox"
-              type="checkbox"
-              <%= t.status === "completed" ? "checked" : "" %>
-              data-task-toggle
-              aria-label="Toggle complete"
-            />
-            <div class="task-main">
-              <div class="task-title"><%= t.title %></div>
-              <div class="task-meta">
-                <span>Due <%= dueLabel %></span>
-                <span>Priority: <%= t.priority || 'medium' %></span>
+            <article class="task-card" data-task-id="<%= t._id %>" data-task-completed="false" data-task-due-date="<%= t.dueDate ? new Date(t.dueDate).toISOString() : '' %>" data-title="<%= t.title %>" data-due="<%= dueLabel %>" data-priority="<%= t.priority || 'medium' %>" data-description="<%= description %>" data-notes="<%= description || 'No notes yet.' %>" style="--task-color: <%= priorityColor[t.priority] || priorityColor.medium %>">
+              <input class="task-checkbox" type="checkbox" <%= t.status === "completed" ? "checked" : "" %> data-task-toggle aria-label="Toggle complete" />
+              <div class="task-main">
+                <div class="task-title"><%= t.title %></div>
+                <div class="task-meta">
+                  <span>Due <%= dueLabel %></span>
+                  <span>Priority: <%= t.priority || 'medium' %></span>
+                </div>
               </div>
-            </div>
-            <div class="task-actions">
-              <button class="glass-btn task-edit-trigger" type="button" data-task-edit>Edit</button>
-              <button class="glass-btn" type="button" data-task-delete>Delete</button>
-            </div>
-          </article>
-        <% }) %>
+              <div class="task-actions">
+                <button class="glass-btn task-edit-trigger" type="button" data-task-edit>Edit</button>
+                <button class="glass-btn" type="button" data-task-delete>Delete</button>
+              </div>
+            </article>
+          <% }) %>
+        <% } %>
       </div>
-    <% } %>
 
-    <!-- =========================
-         Completed Tasks
-    ========================== -->
-
-    <% if (completedTasks.length > 0) { %>
-      <div class="task-group">
+      <!-- COMPLETED GROUP -->
+      <div class="task-group" data-task-group="completed">
         <div class="task-group-title">
           <span>Completed</span>
           <span><%= completedTasks.length %></span>
         </div>
-
-        <% completedTasks.forEach(function(t) {
-          const dueLabel = fmtDue(t.dueDate);
-          const description = t.description || "";
+        <% if (completedTasks.length === 0) { %>
+          <p style="color: var(--color-text-muted); font-size: 13px; padding: 10px;">No completed tasks yet.</p>
+        <% } else { %>
+          <% completedTasks.forEach(function(t) { 
+            const dueLabel = fmtDue(t.dueDate);
+            const description = t.description || "";
           %>
-          <article
-            class="task-card completed"
-            data-task-id="<%= t._id %>"
-            data-task-completed="true"
-            data-task-due-date="<%= t.dueDate ? new Date(t.dueDate).toISOString() : '' %>"
-            data-title="<%= t.title %>"
-            data-due="<%= dueLabel %>"
-            data-priority="<%= t.priority || 'medium' %>"
-            data-description="<%= description %>"
-            data-notes="<%= description || 'No notes yet.' %>"
-            style="--task-color: <%= priorityColor[t.priority] || priorityColor.medium %>"
-          >
-            <input
-              class="task-checkbox"
-              type="checkbox"
-              <%= t.status === "completed" ? "checked" : "" %>
-              data-task-toggle
-              aria-label="Toggle complete"
-            />
-            <div class="task-main">
-              <div class="task-title"><%= t.title %></div>
-              <div class="task-meta">
-                <span>Due <%= dueLabel %></span>
-                <span>Priority: <%= t.priority || 'medium' %></span>
+            <article class="task-card completed" data-task-id="<%= t._id %>" data-task-completed="true" data-task-due-date="<%= t.dueDate ? new Date(t.dueDate).toISOString() : '' %>" data-title="<%= t.title %>" data-due="<%= dueLabel %>" data-priority="<%= t.priority || 'medium' %>" data-description="<%= description %>" data-notes="<%= description || 'No notes yet.' %>" style="--task-color: <%= priorityColor[t.priority] || priorityColor.medium %>">
+              <input class="task-checkbox" type="checkbox" <%= t.status === "completed" ? "checked" : "" %> data-task-toggle aria-label="Toggle complete" />
+              <div class="task-main">
+                <div class="task-title"><%= t.title %></div>
+                <div class="task-meta">
+                  <span>Due <%= dueLabel %></span>
+                  <span>Priority: <%= t.priority || 'medium' %></span>
+                </div>
               </div>
-            </div>
-            <div class="task-actions">
-              <button class="glass-btn task-edit-trigger" type="button" data-task-edit>Edit</button>
-              <button class="glass-btn" type="button" data-task-delete>Delete</button>
-            </div>
-          </article>
-        <% }) %>
+              <div class="task-actions">
+                <button class="glass-btn task-edit-trigger" type="button" data-task-edit>Edit</button>
+                <button class="glass-btn" type="button" data-task-delete>Delete</button>
+              </div>
+            </article>
+          <% }) %>
+        <% } %>
       </div>
-    <% } %>
+
+    </div>
   </div>
 </section>
 
@@ -313,21 +378,50 @@
 <script src="/js/tasks-ui.js" defer></script>
 
 <script>
-  // Coming from a search-result link (/tasks/:id -> /tasks?view=all&highlight=<id>):
-  // scroll to the matching card and flash it so it's obvious which task
-  // was clicked, since there's no standalone task detail page.
-  //
-  // Deferred (not inline-immediate) so it runs AFTER tasks-ui.js's
-  // syncViewUi() has finished hiding/showing cards for the current view —
-  // otherwise this could highlight a card that gets hidden a moment later.
+  document.addEventListener("DOMContentLoaded", function () {
+    const filterBtns = document.querySelectorAll(".tasks-filter-btn");
+    const taskGroups = document.querySelectorAll("[data-task-group]");
+
+    // 1. OVERRIDE LEGACY SCRIPT: Keep stripping the hidden attribute just in case
+    const observer = new MutationObserver(() => {
+      document.querySelectorAll('.task-card[hidden]').forEach(card => card.removeAttribute('hidden'));
+    });
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true });
+
+    // 2. Setup our instant tabs
+    filterBtns.forEach(function(btn) {
+      btn.addEventListener("click", function() {
+        filterBtns.forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+
+        const filterVal = btn.getAttribute("data-filter");
+
+        taskGroups.forEach(function(group) {
+          const groupName = group.getAttribute("data-task-group");
+          if (filterVal === "all") {
+            group.style.display = "block";
+          } else {
+            group.style.display = (groupName === filterVal) ? "block" : "none";
+          }
+        });
+      });
+    });
+
+    // 3. Handle incoming URL parameters seamlessly
+    const params = new URLSearchParams(window.location.search);
+    const viewQuery = params.get("view");
+    if (viewQuery && viewQuery !== "all") {
+      const targetBtn = document.querySelector(`.tasks-filter-btn[data-filter="${viewQuery}"]`);
+      if (targetBtn) targetBtn.click();
+    }
+  });
+
   document.addEventListener("DOMContentLoaded", function () {
     const params = new URLSearchParams(window.location.search);
     const highlightId = params.get("highlight");
     if (!highlightId) return;
-
     const card = document.querySelector('[data-task-id="' + highlightId + '"]');
-    if (!card || card.hidden) return;
-
+    if (!card) return;
     card.scrollIntoView({ behavior: "smooth", block: "center" });
     card.style.outline = "2px solid var(--accent, #6fbf73)";
     card.style.outlineOffset = "2px";

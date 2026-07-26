@@ -51,17 +51,28 @@ router.get("/", async (req, res) => {
     ]);
 
     // Transform Tasks into "Event-like" objects
-    const taskEvents = tasks.map(task => ({
-      _id: task._id,
-      title: `[Task] ${task.title}`,
-      date: task.dueDate,
-      color: task.status === 'completed' ? 'gray' : 'green',
-      isTask: true,
-      status: task.status
-    }));
+    const taskEvents = tasks
+      .filter((t) => t.dueDate)
+      .map((t) => {
+        const plain = t.toObject();
+        return {
+          _id: plain._id,
+          title: plain.title,
+          date: plain.dueDate,
+          description: plain.description || "",
+          color: plain.completed ? "gray" : "green",
+          isTask: true,
+          completed: plain.completed,
+          priority: plain.priority,
+        };
+      });
 
-    // Merge them together
-    const combinedData = [...events, ...taskEvents];
+    // Merge them together safely
+    const combinedData = [
+      ...events.map((e) => e.toObject ? e.toObject() : e),
+      ...taskEvents,
+    ];
+
     res.json(makeOk({ events: combinedData }));
   } catch (err) {
     console.error("[api/calendar] GET error:", err);
@@ -94,17 +105,28 @@ router.get("/month/:year/:month", async (req, res) => {
     ]);
 
     // Transform Tasks into "Event-like" objects
-    const taskEvents = tasks.map(task => ({
-      _id: task._id,
-      title: `[Task] ${task.title}`,
-      date: task.dueDate,
-      color: task.status === 'completed' ? 'gray' : 'green',
-      isTask: true,
-      status: task.status
-    }));
+    const taskEvents = tasks
+      .filter((t) => t.dueDate)
+      .map((t) => {
+        const plain = t.toObject();
+        return {
+          _id: plain._id,
+          title: plain.title,
+          date: plain.dueDate,
+          description: plain.description || "",
+          color: plain.completed ? "gray" : "green",
+          isTask: true,
+          completed: plain.completed,
+          priority: plain.priority,
+        };
+      });
 
     // Merge them together
-    const combinedData = [...events, ...taskEvents];
+    const combinedData = [
+      ...events.map((e) => e.toObject ? e.toObject() : e),
+      ...taskEvents,
+    ];
+
     res.json(makeOk({ events: combinedData }));
   } catch (err) {
     console.error("[api/calendar] GET /month error:", err);
@@ -131,22 +153,33 @@ router.get("/upcoming", async (req, res) => {
       Task.find({
         ownerEmail,
         dueDate: { $gte: startDate, $lte: endDate },
-        status: { $ne: 'completed' } // Optional: Exclude completed tasks from "upcoming"
+        status: { $ne: 'completed' } // Exclude completed tasks from "upcoming"
       })
     ]);
 
     // Transform Tasks into "Event-like" objects
-    const taskEvents = tasks.map(task => ({
-      _id: task._id,
-      title: `[Task] ${task.title}`,
-      date: task.dueDate,
-      color: 'green', // Upcoming tasks are active
-      isTask: true,
-      status: task.status
-    }));
+    const taskEvents = tasks
+      .filter((t) => t.dueDate)
+      .map((t) => {
+        const plain = t.toObject();
+        return {
+          _id: plain._id,
+          title: plain.title,
+          date: plain.dueDate,
+          description: plain.description || "",
+          color: plain.completed ? "gray" : "green",
+          isTask: true,
+          completed: plain.completed,
+          priority: plain.priority,
+        };
+      });
 
     // Merge them together
-    const combinedData = [...events, ...taskEvents];
+    const combinedData = [
+      ...events.map((e) => e.toObject ? e.toObject() : e),
+      ...taskEvents,
+    ];
+
     res.json(makeOk({ events: combinedData }));
   } catch (err) {
     console.error("[api/calendar] GET /upcoming error:", err);
@@ -192,14 +225,12 @@ router.get("/:id", async (req, res) => {
 router.post("/", async (req, res) => {
   try {
     const { title, date, description, color, tag, allDay } = req.body;
-
     if (!title) {
       return res.status(400).json(makeFail("Title is required"));
     }
     if (!date) {
       return res.status(400).json(makeFail("Date is required"));
     }
-
     const event = await CalendarService.create({
       title,
       date,
@@ -208,7 +239,6 @@ router.post("/", async (req, res) => {
       tag,
       allDay,
     }, req.sessionUser.email, req.get("Idempotency-Key"));
-
     res.status(201).json(makeOk({ event }));
   } catch (err) {
     console.error("[api/calendar] POST error:", err);
@@ -230,11 +260,9 @@ router.patch("/:id", updateEvent);
 router.delete("/:id", async (req, res) => {
   try {
     const event = await CalendarService.delete(req.params.id, req.sessionUser.email);
-
     if (!event) {
       return res.status(404).json(makeFail("Event not found"));
     }
-
     res.json(makeOk({}));
   } catch (err) {
     console.error("[api/calendar] DELETE error:", err);
