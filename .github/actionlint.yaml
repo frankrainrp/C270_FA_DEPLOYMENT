@@ -1,0 +1,3 @@
+self-hosted-runner:
+  labels:
+    - butler-k3s
