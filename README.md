@@ -759,6 +759,11 @@ image manifest from GHCR. This catches missing, expired, or incorrectly scoped
 package credentials even when the K3s node already has a cached copy of the
 image.
 
+To verify one Environment without deploying or changing Kubernetes resources,
+run the **Verify GHCR Environment Credential** workflow manually and select
+`staging` or `production`. The production Environment's normal reviewer
+approval still applies.
+
 The local K3s admin kubeconfig is sufficient for initial setup but broader than
 a mature CD identity should be. After the first deployment, replace it with a
 namespace-scoped service account permitted to manage only Butler resources.

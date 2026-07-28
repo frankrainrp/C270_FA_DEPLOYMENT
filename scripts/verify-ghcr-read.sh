@@ -12,6 +12,7 @@ fi
 
 image_path="${IMAGE#ghcr.io/}"
 repository="${image_path%:*}"
+repository="${repository,,}"
 tag="${image_path##*:}"
 netrc_file="$(mktemp)"
 token_file="$(mktemp)"
