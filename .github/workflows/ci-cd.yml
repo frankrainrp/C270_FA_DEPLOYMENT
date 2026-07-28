@@ -46,7 +46,7 @@ jobs:
         run: npm run audit:ci
 
       - name: Scan source, secrets, and deployment configuration
-        uses: aquasecurity/trivy-action@0.36.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
           scan-ref: .
@@ -176,7 +176,7 @@ jobs:
         run: docker build --pull --tag "${{ steps.image.outputs.ref }}" .
 
       - name: Block high-severity candidate image vulnerabilities
-        uses: aquasecurity/trivy-action@0.36.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: image
           image-ref: ${{ steps.image.outputs.ref }}
