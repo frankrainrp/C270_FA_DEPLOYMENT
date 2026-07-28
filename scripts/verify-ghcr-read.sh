@@ -37,7 +37,7 @@ curl \
   "https://ghcr.io/token" > "$token_file"
 
 registry_token="$(
-  python - "$token_file" <<'PY'
+  python3 - "$token_file" <<'PY'
 import json
 import pathlib
 import sys
@@ -54,9 +54,19 @@ curl \
   --fail \
   --silent \
   --show-error \
-  --output /dev/null \
   --header "Authorization: Bearer ${registry_token}" \
-  --header "Accept: application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json" \
-  "https://ghcr.io/v2/${repository}/manifests/${tag}"
+  --header "Accept: application/vnd.oci.image.index.v1+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.docker.distribution.manifest.v2+json" \
+  --output /dev/null \
+  "$(
+    if [[ "${GHCR_VERIFY_REPOSITORY_ONLY:-false}" == "true" ]]; then
+      printf 'https://ghcr.io/v2/%s/tags/list?n=1' "$repository"
+    else
+      printf 'https://ghcr.io/v2/%s/manifests/%s' "$repository" "$tag"
+    fi
+  )"
 
-echo "GHCR read credential verified for ${repository}:${tag}."
+if [[ "${GHCR_VERIFY_REPOSITORY_ONLY:-false}" == "true" ]]; then
+  echo "GHCR read credential verified for repository ${repository}."
+else
+  echo "GHCR read credential verified for ${repository}:${tag}."
+fi

@@ -762,7 +762,8 @@ image.
 To verify one Environment without deploying or changing Kubernetes resources,
 run the **Verify GHCR Environment Credential** workflow manually and select
 `staging` or `production`. The production Environment's normal reviewer
-approval still applies.
+approval still applies. This standalone check reads the package tag list, so
+it verifies `read:packages` independently of image publication and deployment.
 
 The local K3s admin kubeconfig is sufficient for initial setup but broader than
 a mature CD identity should be. After the first deployment, replace it with a
