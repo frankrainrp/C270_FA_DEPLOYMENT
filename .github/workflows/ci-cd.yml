@@ -95,6 +95,7 @@ jobs:
         run: |
           ansible-playbook --syntax-check --inventory ansible/inventory.example.yml ansible/playbooks/bootstrap-k3s.yml
           ansible-playbook --syntax-check --inventory ansible/inventory.example.yml ansible/playbooks/export-kubeconfig.yml
+          ansible-playbook --syntax-check --inventory localhost, ansible/playbooks/install-cert-manager.yml
           ansible-playbook --syntax-check --inventory localhost, ansible/playbooks/deploy.yml
           ansible-playbook --syntax-check --inventory localhost, ansible/playbooks/rollback.yml
 
@@ -215,7 +216,7 @@ jobs:
 
   deploy-staging:
     name: Deploy staging with Ansible
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.CLOUD_DEPLOY_ENABLED == 'true'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.STAGING_DEPLOY_ENABLED == 'true'
     needs: publish
     runs-on: [self-hosted, Linux, X64, butler-k3s]
     timeout-minutes: 20
@@ -256,13 +257,11 @@ jobs:
           N8N_OTP_WEBHOOK_URL: ${{ secrets.N8N_OTP_WEBHOOK_URL }}
           GHCR_USERNAME: ${{ vars.GHCR_USERNAME }}
           GHCR_READ_TOKEN: ${{ secrets.GHCR_READ_TOKEN }}
-          TLS_CERTIFICATE: ${{ secrets.TLS_CERTIFICATE }}
-          TLS_PRIVATE_KEY: ${{ secrets.TLS_PRIVATE_KEY }}
         run: ansible-playbook ansible/playbooks/deploy.yml
 
   deploy-production:
     name: Approve and deploy production with Ansible
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.CLOUD_DEPLOY_ENABLED == 'true'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.PRODUCTION_DEPLOY_ENABLED == 'true'
     needs: [publish, deploy-staging]
     runs-on: [self-hosted, Linux, X64, butler-k3s]
     timeout-minutes: 20
@@ -303,6 +302,4 @@ jobs:
           N8N_OTP_WEBHOOK_URL: ${{ secrets.N8N_OTP_WEBHOOK_URL }}
           GHCR_USERNAME: ${{ vars.GHCR_USERNAME }}
           GHCR_READ_TOKEN: ${{ secrets.GHCR_READ_TOKEN }}
-          TLS_CERTIFICATE: ${{ secrets.TLS_CERTIFICATE }}
-          TLS_PRIVATE_KEY: ${{ secrets.TLS_PRIVATE_KEY }}
         run: ansible-playbook ansible/playbooks/deploy.yml

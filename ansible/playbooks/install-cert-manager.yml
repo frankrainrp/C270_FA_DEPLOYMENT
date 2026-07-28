@@ -1,0 +1,98 @@
+---
+- name: Install cert-manager and the Let's Encrypt issuer
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    kubeconfig_path: "{{ lookup('ansible.builtin.env', 'K8S_AUTH_KUBECONFIG') }}"
+    cert_manager_version: v1.21.0
+    cert_manager_manifest_url: >-
+      https://github.com/cert-manager/cert-manager/releases/download/{{ cert_manager_version }}/cert-manager.yaml
+    issuer_manifest: "{{ playbook_dir }}/../../k8s/cluster/letsencrypt-production.yaml"
+
+  pre_tasks:
+    - name: Validate cert-manager installation input
+      ansible.builtin.assert:
+        that:
+          - kubeconfig_path | length > 0
+          - cert_manager_version is match('^v[0-9]+\.[0-9]+\.[0-9]+$')
+        fail_msg: Set K8S_AUTH_KUBECONFIG before installing cert-manager.
+
+  tasks:
+    - name: Apply the pinned cert-manager release manifest
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - --kubeconfig
+          - "{{ kubeconfig_path }}"
+          - apply
+          - --server-side
+          - --force-conflicts
+          - --filename
+          - "{{ cert_manager_manifest_url }}"
+      register: cert_manager_apply
+      changed_when: >-
+        'created' in cert_manager_apply.stdout or
+        'configured' in cert_manager_apply.stdout or
+        'serverside-applied' in cert_manager_apply.stdout
+
+    - name: Wait for cert-manager controller
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - --kubeconfig
+          - "{{ kubeconfig_path }}"
+          - --namespace
+          - cert-manager
+          - rollout
+          - status
+          - deployment/cert-manager
+          - --timeout=5m
+      changed_when: false
+
+    - name: Wait for cert-manager webhook
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - --kubeconfig
+          - "{{ kubeconfig_path }}"
+          - --namespace
+          - cert-manager
+          - rollout
+          - status
+          - deployment/cert-manager-webhook
+          - --timeout=5m
+      changed_when: false
+
+    - name: Wait for cert-manager CA injector
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - --kubeconfig
+          - "{{ kubeconfig_path }}"
+          - --namespace
+          - cert-manager
+          - rollout
+          - status
+          - deployment/cert-manager-cainjector
+          - --timeout=5m
+      changed_when: false
+
+    - name: Apply the production Let's Encrypt ClusterIssuer
+      kubernetes.core.k8s:
+        kubeconfig: "{{ kubeconfig_path }}"
+        state: present
+        apply: true
+        src: "{{ issuer_manifest }}"
+
+    - name: Wait for the ClusterIssuer to become ready
+      kubernetes.core.k8s_info:
+        kubeconfig: "{{ kubeconfig_path }}"
+        api_version: cert-manager.io/v1
+        kind: ClusterIssuer
+        name: letsencrypt-production
+        wait: true
+        wait_condition:
+          type: Ready
+          status: "True"
+        wait_timeout: 180

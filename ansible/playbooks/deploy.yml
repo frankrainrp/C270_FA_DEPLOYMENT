@@ -14,8 +14,6 @@
     n8n_otp_webhook_url: "{{ lookup('ansible.builtin.env', 'N8N_OTP_WEBHOOK_URL') }}"
     ghcr_username: "{{ lookup('ansible.builtin.env', 'GHCR_USERNAME') }}"
     ghcr_token: "{{ lookup('ansible.builtin.env', 'GHCR_READ_TOKEN') }}"
-    tls_certificate: "{{ lookup('ansible.builtin.env', 'TLS_CERTIFICATE') }}"
-    tls_private_key: "{{ lookup('ansible.builtin.env', 'TLS_PRIVATE_KEY') }}"
     namespace_by_environment:
       staging: butler-staging
       production: butler-production
@@ -37,8 +35,6 @@
           - n8n_otp_webhook_url is match('^https://')
           - ghcr_username | length > 0
           - ghcr_token | length > 0
-          - tls_certificate is search('BEGIN CERTIFICATE')
-          - tls_private_key is search('BEGIN .*PRIVATE KEY')
         fail_msg: Configure every required GitHub Environment secret/variable before deploying.
       no_log: true
 
@@ -113,23 +109,6 @@
                 .dockerconfigjson: "{{ ghcr_docker_config | to_json }}"
           no_log: true
 
-        - name: Create or update the TLS secret
-          kubernetes.core.k8s:
-            kubeconfig: "{{ kubeconfig_path }}"
-            state: present
-            apply: true
-            definition:
-              apiVersion: v1
-              kind: Secret
-              metadata:
-                name: butler-tls
-                namespace: "{{ target_namespace }}"
-              type: kubernetes.io/tls
-              stringData:
-                tls.crt: "{{ tls_certificate }}"
-                tls.key: "{{ tls_private_key }}"
-          no_log: true
-
         - name: Build the selected Kustomize overlay
           ansible.builtin.command:
             argv: [kubectl, kustomize, "{{ overlay_path }}"]
@@ -172,6 +151,8 @@
               metadata:
                 name: butler
                 namespace: "{{ target_namespace }}"
+                annotations:
+                  cert-manager.io/cluster-issuer: letsencrypt-production
               spec:
                 tls:
                   - hosts: ["{{ app_host }}"]

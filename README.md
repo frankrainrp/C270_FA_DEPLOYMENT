@@ -599,8 +599,8 @@ Kubernetes provides:
 - a ClusterIP Service and Traefik HTTPS Ingress;
 - HorizontalPodAutoscaler, PodDisruptionBudget, resource requests/limits, and
   NetworkPolicy;
-- TLS, runtime, and GHCR credentials created by Ansible from protected GitHub
-  Environment secrets;
+- TLS certificates created and renewed by cert-manager, with runtime and GHCR
+  credentials created by Ansible from protected GitHub Environment secrets;
 - rolling updates, revision history, public health verification, and rollback.
 
 ### 1. Cloud and service prerequisites
@@ -615,7 +615,7 @@ Prepare the following before the first public deployment:
   only from nodes/operators, UDP 8472 only between nodes, and TCP 10250 only
   between nodes;
 - a DNS hostname for staging and another for production;
-- a valid PEM TLS certificate/private key for each hostname;
+- public DNS hostnames resolving to the Traefik ingress address;
 - MongoDB Atlas with backups and a least-privilege database user; allow the
   cluster's stable outbound IP in Atlas Network Access;
 - a production HTTPS n8n OTP webhook and a DeepSeek API key;
@@ -679,10 +679,19 @@ dig +short staging.example.com
 dig +short app.example.com
 ```
 
-Obtain certificates from a trusted certificate authority. Keep the full-chain
-certificate and private key in separate local PEM files. Ansible creates the
-`butler-tls` Kubernetes Secret at deployment time; the PEM files must never be
-committed.
+Install the pinned cert-manager release and the Let's Encrypt production
+ClusterIssuer after DNS resolves:
+
+```bash
+export K8S_AUTH_KUBECONFIG="$HOME/.kube/butler-k3s.yaml"
+ansible-playbook ansible/playbooks/install-cert-manager.yml
+kubectl get pods --namespace cert-manager
+kubectl get clusterissuer letsencrypt-production
+```
+
+The Butler Ingress requests its `butler-tls` Secret automatically. cert-manager
+renews the certificate before expiry; certificate private keys are never
+stored in GitHub or committed to the repository.
 
 If the cluster uses an Ingress controller other than the bundled K3s Traefik,
 change `ingressClassName`, its annotations, and the NetworkPolicy ingress
@@ -708,11 +717,11 @@ Create two GitHub Environments in **Settings → Environments**:
 - `staging`: automatic deployment from a successful `main` push;
 - `production`: add required reviewers so production waits for approval.
 
-At repository level, create the Actions variable
-`CLOUD_DEPLOY_ENABLED=true` only after both Environments and the cluster are
-ready. Until then, main still publishes a verified GHCR image while the two
-cluster deployment jobs stay safely skipped instead of failing on missing
-credentials.
+At repository level, create `STAGING_DEPLOY_ENABLED=true` only after the
+staging Environment, DNS, cert-manager, and cluster are ready. Create
+`PRODUCTION_DEPLOY_ENABLED=true` only after the protected production
+Environment is complete. Until enabled, main still publishes a verified GHCR
+image while the corresponding cluster deployment job stays safely skipped.
 
 Configure these variables in each Environment:
 
@@ -730,8 +739,6 @@ Configure these secrets independently in each Environment:
 | `DEEPSEEK_API_KEY` | Live Agent model credential |
 | `N8N_OTP_WEBHOOK_URL` | Production HTTPS OTP workflow |
 | `GHCR_READ_TOKEN` | Read-only `read:packages` credential for private GHCR |
-| `TLS_CERTIFICATE` | PEM full-chain certificate |
-| `TLS_PRIVATE_KEY` | PEM private key |
 
 Configure the non-secret Environment variables:
 
@@ -739,15 +746,11 @@ Configure the non-secret Environment variables:
 gh variable set APP_HOST --env staging --body "staging.example.com"
 gh variable set APP_URL --env staging --body "https://staging.example.com"
 gh variable set GHCR_USERNAME --env staging --body "YOUR_GITHUB_USER"
-
-gh secret set TLS_CERTIFICATE --env staging < staging-fullchain.pem
-gh secret set TLS_PRIVATE_KEY --env staging < staging-private-key.pem
 ```
 
-Repeat the variables and certificate commands for `production`. Set the other
-secrets interactively with `gh secret set NAME --env ENVIRONMENT` so their
-values do not appear in the command history. Do not print or echo secrets in a
-workflow.
+Repeat the variable commands for `production`. Set the secrets interactively
+with `gh secret set NAME --env ENVIRONMENT` so their values do not appear in
+the command history. Do not print or echo secrets in a workflow.
 
 The local K3s admin kubeconfig is sufficient for initial setup but broader than
 a mature CD identity should be. After the first deployment, replace it with a
@@ -755,9 +758,9 @@ namespace-scoped service account permitted to manage only Butler resources.
 
 ### 6. First automated deployment
 
-The deployment workflow must exist on `main`, and the repository variable
-`CLOUD_DEPLOY_ENABLED` must be `true`; a successful run on a feature branch
-does not publish or deploy. Merge through a protected pull request:
+The deployment workflow must exist on `main`, and the matching repository
+deployment variable must be `true`; a successful run on a feature branch does
+not publish or deploy. Merge through a protected pull request:
 
 ```bash
 git switch main
@@ -811,7 +814,7 @@ export IMAGE="ghcr.io/frankrainrp/c270_fa_deployment:sha-FULL_40_CHAR_COMMIT"
 export APP_HOST="app.example.com"
 export APP_URL="https://app.example.com"
 # Load MONGO_URI, DEEPSEEK_API_KEY, N8N_OTP_WEBHOOK_URL,
-# GHCR_USERNAME, GHCR_READ_TOKEN, TLS_CERTIFICATE, and TLS_PRIVATE_KEY
+# GHCR_USERNAME and GHCR_READ_TOKEN
 # from the approved secret manager without printing them.
 ansible-playbook ansible/playbooks/deploy.yml
 ```
@@ -831,7 +834,7 @@ procedures separately.
 
 ### 9. What is and is not automatic
 
-After the cluster, DNS, certificates, Atlas, GitHub Environments, and secrets
+After the cluster, DNS, cert-manager, Atlas, GitHub Environments, and secrets
 are configured, every successful `main` push completes build, test, image
 publication, staging deployment, production approval, production deployment,
 public verification, and failure rollback logic in the cloud.
