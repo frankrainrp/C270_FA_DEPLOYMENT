@@ -752,6 +752,13 @@ Repeat the variable commands for `production`. Set the secrets interactively
 with `gh secret set NAME --env ENVIRONMENT` so their values do not appear in
 the command history. Do not print or echo secrets in a workflow.
 
+Before either deployment changes the cluster, the workflow runs
+`scripts/verify-ghcr-read.sh`. The script uses the environment's
+`GHCR_USERNAME` and `GHCR_READ_TOKEN` to request the exact immutable SHA-tagged
+image manifest from GHCR. This catches missing, expired, or incorrectly scoped
+package credentials even when the K3s node already has a cached copy of the
+image.
+
 The local K3s admin kubeconfig is sufficient for initial setup but broader than
 a mature CD identity should be. After the first deployment, replace it with a
 namespace-scoped service account permitted to manage only Butler resources.
