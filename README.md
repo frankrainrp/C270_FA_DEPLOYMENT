@@ -690,6 +690,19 @@ selector in `k8s/base/` before deployment.
 
 ### 5. Configure GitHub Environments and secrets
 
+Register a dedicated Linux x64 self-hosted Actions runner on the K3s control
+node and assign the custom label `butler-k3s`. Install it as an unprivileged
+service account named `github-runner`. Copy the local K3s kubeconfig to
+`/home/github-runner/.kube/config`, set its server to
+`https://127.0.0.1:6443`, and restrict the file to that account with mode
+`0600`. Confirm that the account can run `kubectl get nodes` before enabling
+cloud deployment.
+
+Only the two deployment jobs use this runner. CI tests, container smoke tests,
+Trivy scans, and GHCR publishing remain on GitHub-hosted runners. This keeps
+the Kubernetes API private and avoids opening TCP `6443` to the Internet or
+storing an administrative kubeconfig in GitHub.
+
 Create two GitHub Environments in **Settings → Environments**:
 
 - `staging`: automatic deployment from a successful `main` push;
@@ -713,7 +726,6 @@ Configure these secrets independently in each Environment:
 
 | Secret | Purpose |
 |---|---|
-| `KUBE_CONFIG_B64` | Base64 kubeconfig with least-privilege cluster access |
 | `MONGO_URI` | Environment-specific Atlas connection string |
 | `DEEPSEEK_API_KEY` | Live Agent model credential |
 | `N8N_OTP_WEBHOOK_URL` | Production HTTPS OTP workflow |
@@ -721,13 +733,9 @@ Configure these secrets independently in each Environment:
 | `TLS_CERTIFICATE` | PEM full-chain certificate |
 | `TLS_PRIVATE_KEY` | PEM private key |
 
-Generate and upload the kubeconfig value from the control machine:
+Configure the non-secret Environment variables:
 
 ```bash
-KUBE_CONFIG_B64="$(base64 -w 0 "$HOME/.kube/butler-k3s.yaml")"
-gh secret set KUBE_CONFIG_B64 --env staging --body "$KUBE_CONFIG_B64"
-gh secret set KUBE_CONFIG_B64 --env production --body "$KUBE_CONFIG_B64"
-
 gh variable set APP_HOST --env staging --body "staging.example.com"
 gh variable set APP_URL --env staging --body "https://staging.example.com"
 gh variable set GHCR_USERNAME --env staging --body "YOUR_GITHUB_USER"
@@ -741,10 +749,9 @@ secrets interactively with `gh secret set NAME --env ENVIRONMENT` so their
 values do not appear in the command history. Do not print or echo secrets in a
 workflow.
 
-The exported K3s admin kubeconfig is sufficient for initial setup but broader
-than a mature CD identity should be. After the first deployment, replace it
-with a namespace-scoped service account or cloud workload identity permitted
-to manage only Butler resources.
+The local K3s admin kubeconfig is sufficient for initial setup but broader than
+a mature CD identity should be. After the first deployment, replace it with a
+namespace-scoped service account permitted to manage only Butler resources.
 
 ### 6. First automated deployment
 

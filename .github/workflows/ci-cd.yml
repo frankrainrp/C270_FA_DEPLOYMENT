@@ -217,7 +217,7 @@ jobs:
     name: Deploy staging with Ansible
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.CLOUD_DEPLOY_ENABLED == 'true'
     needs: publish
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, butler-k3s]
     timeout-minutes: 20
     concurrency:
       group: butler-staging-deployment
@@ -244,19 +244,10 @@ jobs:
           python -m pip install --requirement ansible/requirements.txt
           ansible-galaxy collection install --requirements-file ansible/requirements.yml
 
-      - name: Materialize the protected kubeconfig
-        shell: bash
-        env:
-          KUBE_CONFIG_B64: ${{ secrets.KUBE_CONFIG_B64 }}
-        run: |
-          test -n "$KUBE_CONFIG_B64"
-          printf '%s' "$KUBE_CONFIG_B64" | base64 --decode > "$RUNNER_TEMP/kubeconfig"
-          chmod 600 "$RUNNER_TEMP/kubeconfig"
-
       - name: Deploy and verify staging
         env:
           DEPLOY_ENV: staging
-          K8S_AUTH_KUBECONFIG: ${{ runner.temp }}/kubeconfig
+          K8S_AUTH_KUBECONFIG: /home/github-runner/.kube/config
           IMAGE: ${{ needs.publish.outputs.image }}
           APP_HOST: ${{ vars.APP_HOST }}
           APP_URL: ${{ vars.APP_URL }}
@@ -273,7 +264,7 @@ jobs:
     name: Approve and deploy production with Ansible
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.CLOUD_DEPLOY_ENABLED == 'true'
     needs: [publish, deploy-staging]
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, butler-k3s]
     timeout-minutes: 20
     concurrency:
       group: butler-production-deployment
@@ -300,19 +291,10 @@ jobs:
           python -m pip install --requirement ansible/requirements.txt
           ansible-galaxy collection install --requirements-file ansible/requirements.yml
 
-      - name: Materialize the protected kubeconfig
-        shell: bash
-        env:
-          KUBE_CONFIG_B64: ${{ secrets.KUBE_CONFIG_B64 }}
-        run: |
-          test -n "$KUBE_CONFIG_B64"
-          printf '%s' "$KUBE_CONFIG_B64" | base64 --decode > "$RUNNER_TEMP/kubeconfig"
-          chmod 600 "$RUNNER_TEMP/kubeconfig"
-
       - name: Deploy and verify production
         env:
           DEPLOY_ENV: production
-          K8S_AUTH_KUBECONFIG: ${{ runner.temp }}/kubeconfig
+          K8S_AUTH_KUBECONFIG: /home/github-runner/.kube/config
           IMAGE: ${{ needs.publish.outputs.image }}
           APP_HOST: ${{ vars.APP_HOST }}
           APP_URL: ${{ vars.APP_URL }}
