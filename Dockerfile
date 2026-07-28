@@ -2,10 +2,13 @@ FROM node:24-alpine
 
 WORKDIR /usr/src/app
 
-LABEL org.opencontainers.image.source="https://github.com/HeinThuNyiNyi/butler-devops-CA2"
+LABEL org.opencontainers.image.source="https://github.com/frankrainrp/C270_FA_DEPLOYMENT"
 
 COPY package*.json ./
-RUN npm ci --omit=dev && npm cache clean --force
+RUN npm ci --omit=dev \
+    && npm cache clean --force \
+    && rm -rf /usr/local/lib/node_modules/npm \
+    && rm -f /usr/local/bin/npm /usr/local/bin/npx
 
 COPY --chown=node:node src ./src
 COPY --chown=node:node scripts ./scripts

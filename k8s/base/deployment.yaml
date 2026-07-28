@@ -37,7 +37,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: butler
-          image: ghcr.io/heinthunyinyi/butler-devops-ca2:sha-REQUIRED
+          image: ghcr.io/frankrainrp/c270_fa_deployment:sha-REQUIRED
           imagePullPolicy: IfNotPresent
           ports:
             - name: http

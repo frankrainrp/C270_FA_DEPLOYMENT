@@ -1,6 +1,6 @@
 # Butler
 
-[![CI, Container Delivery, and Kubernetes Deployment](https://github.com/HeinThuNyiNyi/butler-devops-CA2/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/HeinThuNyiNyi/butler-devops-CA2/actions/workflows/ci-cd.yml)
+[![CI, Container Delivery, and Kubernetes Deployment](https://github.com/frankrainrp/C270_FA_DEPLOYMENT/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/frankrainrp/C270_FA_DEPLOYMENT/actions/workflows/ci-cd.yml)
 
 Butler is a single-process Node.js study workspace with server-rendered EJS
 pages, MongoDB persistence, and a streaming AI agent. The agent can read current
@@ -67,8 +67,8 @@ The complete local stack is the recommended way to run Butler for development
 or an on-device demonstration:
 
 ```powershell
-git clone https://github.com/HeinThuNyiNyi/butler-devops-CA2.git
-Set-Location butler-devops-CA2
+git clone https://github.com/frankrainrp/C270_FA_DEPLOYMENT.git
+Set-Location C270_FA_DEPLOYMENT
 Copy-Item .env.example .env
 docker compose up -d --build --wait
 docker compose ps
@@ -800,7 +800,7 @@ load the same values from a secret manager into environment variables and run:
 ```bash
 export DEPLOY_ENV=production
 export K8S_AUTH_KUBECONFIG="$HOME/.kube/butler-k3s.yaml"
-export IMAGE="ghcr.io/heinthunyinyi/butler-devops-ca2:sha-FULL_40_CHAR_COMMIT"
+export IMAGE="ghcr.io/frankrainrp/c270_fa_deployment:sha-FULL_40_CHAR_COMMIT"
 export APP_HOST="app.example.com"
 export APP_URL="https://app.example.com"
 # Load MONGO_URI, DEEPSEEK_API_KEY, N8N_OTP_WEBHOOK_URL,
