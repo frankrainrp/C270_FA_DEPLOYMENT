@@ -77,7 +77,7 @@ jobs:
           cache-dependency-path: ansible/requirements.txt
 
       - name: Set up kubectl
-        uses: azure/setup-kubectl@v4
+        uses: azure/setup-kubectl@v5
 
       - name: Install Ansible and Kubernetes dependencies
         run: |
@@ -238,7 +238,7 @@ jobs:
           cache-dependency-path: ansible/requirements.txt
 
       - name: Set up kubectl
-        uses: azure/setup-kubectl@v4
+        uses: azure/setup-kubectl@v5
 
       - name: Install Ansible and Kubernetes dependencies
         run: |
@@ -290,7 +290,7 @@ jobs:
           cache-dependency-path: ansible/requirements.txt
 
       - name: Set up kubectl
-        uses: azure/setup-kubectl@v4
+        uses: azure/setup-kubectl@v5
 
       - name: Install Ansible and Kubernetes dependencies
         run: |

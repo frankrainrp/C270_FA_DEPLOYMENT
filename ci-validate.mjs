@@ -65,6 +65,21 @@ requireFile('test/task-completion-analytics.test.js', 'task completion analytics
 requireFile('test/task-workspace.test.js', 'integrated task workspace tests');
 requireFile('test/profile-avatar.test.js', 'Kubernetes-safe avatar validation tests');
 
+// --- Regression guard: setup-kubectl v4 targets the deprecated Node.js 20
+// Actions runtime. Every kubectl installer in the pipeline must use a
+// Node.js 24-compatible major version. ---
+const ciWorkflowPath = '.github/workflows/ci-cd.yml';
+if (fs.existsSync(ciWorkflowPath)) {
+  const workflow = fs.readFileSync(ciWorkflowPath, 'utf8');
+  const kubectlVersions = [...workflow.matchAll(/uses:\s*azure\/setup-kubectl@v(\d+)\b/g)]
+    .map((match) => Number(match[1]));
+
+  if (kubectlVersions.length === 0 || kubectlVersions.some((major) => major < 5)) {
+    console.error('Validation Failed: every setup-kubectl step must use azure/setup-kubectl@v5 or newer.');
+    failed = true;
+  }
+}
+
 // --- Per-account data (tasks/notes/calendar/chat): required files ---
 requireFile('src/middleware/requireAuth.js', 'requireAuth middleware');
 requireFile('scripts/migrate-owner-email.js', 'ownerEmail migration script');
