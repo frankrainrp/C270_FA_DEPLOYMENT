@@ -1,9 +1,11 @@
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
 const path = require("node:path");
 const test = require("node:test");
 const ejs = require("ejs");
 
 const views = path.join(__dirname, "../src/views");
+const publicDir = path.join(__dirname, "../src/public");
 
 test("renders task filters in the contextual sidebar", async () => {
   const html = await ejs.renderFile(path.join(views, "partials/sidebar.ejs"), {
@@ -48,4 +50,14 @@ test("renders integrated calendar events without a task completion checkbox", as
   assert.match(eventCard, /Calendar event/);
   assert.doesNotMatch(eventCard, /data-task-toggle/);
   assert.match(html, /data-task-id="task-1"/);
+});
+
+test("task creation dialog has shared styles on the tasks page", () => {
+  const taskUi = fs.readFileSync(path.join(publicDir, "js/tasks-ui.js"), "utf8");
+  const styles = fs.readFileSync(path.join(publicDir, "css/style.css"), "utf8");
+
+  assert.match(taskUi, /data-action='new-task'[\s\S]*?openModal\(\)/);
+  assert.match(styles, /\.calendar-event-modal-overlay\s*\{/);
+  assert.match(styles, /\.calendar-event-modal-overlay\[hidden\]\s*\{[\s\S]*?display:\s*none/);
+  assert.match(styles, /\.calendar-event-modal\s*\{/);
 });

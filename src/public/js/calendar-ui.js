@@ -121,48 +121,47 @@
       '<div class="calendar-event-modal" role="dialog" aria-modal="true" aria-labelledby="calendar-event-title">',
       '  <div class="calendar-event-modal-header">',
       '    <div>',
-      '      <p class="hero-kicker" data-calendar-event-kicker>New Task</p>',
-      '      <h3 id="calendar-event-title">Create a study task</h3>',
+      '      <p class="hero-kicker" data-calendar-event-kicker>New Event</p>',
+      '      <h3 id="calendar-event-title">Create a calendar event</h3>',
       '    </div>',
       '    <button type="button" class="glass-btn" data-calendar-event-close>Close</button>',
       '  </div>',
       '  <div class="calendar-event-modal-body">',
       '    <label class="calendar-event-field">',
       '      <span>Title</span>',
-      '      <input type="text" maxlength="200" data-calendar-event-title placeholder="Task title" />',
+      '      <input type="text" maxlength="200" data-calendar-event-title placeholder="Event title" />',
       '    </label>',
       '    <label class="calendar-event-field">',
       '      <span>Description</span>',
-      '      <textarea rows="4" data-calendar-event-description placeholder="Task description"></textarea>',
+      '      <textarea rows="4" data-calendar-event-description placeholder="Event description"></textarea>',
       '    </label>',
       '    <div class="calendar-event-grid">',
       '      <label class="calendar-event-field">',
-      '        <span>Due Date</span>',
+      '        <span>Date</span>',
       '        <input type="date" data-calendar-event-date />',
       '      </label>',
       '      <label class="calendar-event-field">',
-      '        <span>Priority</span>',
-      '        <select data-calendar-event-priority>',
-      '          <option value="low">Low</option>',
-      '          <option value="medium" selected>Medium</option>',
-      '          <option value="high">High</option>',
+      '        <span>Color</span>',
+      '        <select data-calendar-event-color>',
+      '          <option value="blue" selected>Blue</option>',
+      '          <option value="green">Green</option>',
+      '          <option value="orange">Orange</option>',
+      '          <option value="red">Red</option>',
+      '          <option value="purple">Purple</option>',
+      '          <option value="gray">Gray</option>',
       '        </select>',
       '      </label>',
       '    </div>',
       '    <label class="calendar-event-field">',
-      '      <span>Status</span>',
-      '      <select data-calendar-event-status>',
-      '        <option value="active" selected>Active</option>',
-      '        <option value="in_progress">In Progress</option>',
-      '        <option value="completed">Completed</option>',
-      '      </select>',
+      '      <span>Calendar / tag</span>',
+      '      <input type="text" maxlength="80" data-calendar-event-tag placeholder="Default" />',
       '    </label>',
       '  </div>',
       '  <div class="calendar-event-modal-footer">',
-      '    <p class="task-create-note" style="font-size: 13px; color: var(--color-text-muted);">Tasks created here will appear on your calendar and your main task list.</p>',
+      '    <p class="task-create-note" style="font-size: 13px; color: var(--color-text-muted);">The event will appear on this calendar.</p>',
       '    <div class="calendar-event-actions">',
       '      <button type="button" class="glass-btn" data-calendar-event-cancel>Cancel</button>',
-      '      <button type="button" class="glass-btn" data-calendar-event-submit>Create task</button>',
+      '      <button type="button" class="glass-btn" data-calendar-event-submit>Create event</button>',
       '    </div>',
       '  </div>',
       '</div>'
@@ -182,8 +181,8 @@
     var titleInput = modal.querySelector("[data-calendar-event-title]");
     var dateInput = modal.querySelector("[data-calendar-event-date]");
     var descInput = modal.querySelector("[data-calendar-event-description]");
-    var priorityInput = modal.querySelector("[data-calendar-event-priority]");
-    var statusInput = modal.querySelector("[data-calendar-event-status]");
+    var colorInput = modal.querySelector("[data-calendar-event-color]");
+    var tagInput = modal.querySelector("[data-calendar-event-tag]");
     var submitBtn = modal.querySelector("[data-calendar-event-submit]");
     var cancelBtn = modal.querySelector("[data-calendar-event-cancel]");
     var closeBtn = modal.querySelector("[data-calendar-event-close]");
@@ -193,8 +192,8 @@
     titleInput.value = "";
     dateInput.value = toDateInputValue(new Date(cursor.year, cursor.month, calendarState.selectedDay || 1));
     descInput.value = "";
-    priorityInput.value = "medium";
-    statusInput.value = "active";
+    colorInput.value = "blue";
+    tagInput.value = "";
     
     function onBackdropClick(ev) {
       if (ev.target === modal) closeModal(modal, onBackdropClick, onKeydown);
@@ -219,12 +218,13 @@
       
       submitBtn.disabled = true;
       
-      ButlerApi.post("/tasks", {
+      ButlerApi.post("/calendar", {
         title: title,
-        dueDate: dateInput.value,
+        date: dateInput.value,
         description: descInput.value.trim(),
-        priority: priorityInput.value,
-        status: statusInput.value
+        color: colorInput.value,
+        tag: tagInput.value.trim(),
+        allDay: true
       }, { headers: { "Idempotency-Key": uniqueIdempotencyKey() } }).then(function () {
         closeModal(modal, onBackdropClick, onKeydown);
         loadMonth(parseCursor().year, parseCursor().month, true);
@@ -481,6 +481,7 @@
   document.addEventListener("click", function (ev) {
     var newEventBtn = ev.target.closest('[data-action="new-event"]');
     if (newEventBtn) {
+      ev.preventDefault();
       openEventModal();
     }
   });
@@ -488,4 +489,10 @@
   injectStyles();
   var initialCursor = parseCursor();
   loadMonth(initialCursor.year, initialCursor.month, true);
+  if (new URLSearchParams(window.location.search).get("create") === "event") {
+    openEventModal();
+    var cleanUrl = new URL(window.location.href);
+    cleanUrl.searchParams.delete("create");
+    window.history.replaceState({}, "", cleanUrl.pathname + "?" + cleanUrl.searchParams.toString());
+  }
 })();

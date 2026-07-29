@@ -2385,7 +2385,124 @@ html[data-theme="dark"] .sidebar-item:hover {
   gap: 8px;
 }
 
+/* Shared task/event editor. Both workspaces create this dialog from JS. */
+.calendar-event-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(20, 24, 28, 0.45);
+  backdrop-filter: blur(8px);
+}
+
+.calendar-event-modal-overlay[hidden] {
+  display: none;
+}
+
+.calendar-event-modal {
+  width: min(760px, calc(100vw - 32px));
+  max-height: min(90vh, 900px);
+  overflow: auto;
+  border: 1px solid var(--glass-border);
+  border-radius: 24px;
+  background: var(--color-surface);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.18);
+  color: var(--color-text);
+}
+
+.calendar-event-modal-header,
+.calendar-event-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px;
+}
+
+.calendar-event-modal-header {
+  border-bottom: 1px solid var(--color-border-soft);
+}
+
+.calendar-event-modal-footer {
+  align-items: flex-end;
+  border-top: 1px solid var(--color-border-soft);
+}
+
+.calendar-event-modal-body {
+  display: grid;
+  gap: 14px;
+  padding: 18px 20px 8px;
+}
+
+.calendar-event-field {
+  display: grid;
+  gap: 6px;
+}
+
+.calendar-event-field > span {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.calendar-event-field input,
+.calendar-event-field textarea,
+.calendar-event-field select {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border-soft);
+  border-radius: 14px;
+  outline: none;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font: inherit;
+}
+
+.calendar-event-field input:focus,
+.calendar-event-field textarea:focus,
+.calendar-event-field select:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 18%, transparent);
+}
+
+.calendar-event-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.calendar-event-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 @media (max-width: 720px) {
+  .calendar-event-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .calendar-event-modal-header,
+  .calendar-event-modal-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .calendar-event-actions {
+    justify-content: stretch;
+  }
+
+  .calendar-event-actions .glass-btn {
+    width: 100%;
+  }
+
   .calendar-toolbar {
     padding: 12px 12px 0;
   }

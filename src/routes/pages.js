@@ -421,6 +421,7 @@ router.get("/tasks/:id", requireAuthPage, async (req, res, _next) => {
 // -----------------------------------------------------------
 async function renderNotesPage(req, res, { onlyPinned = false, activeId = null } = {}) {
   const ownerEmail = req.sessionUser.email;
+  const noteView = onlyPinned ? "pinned" : "all";
   const allNotes = await NoteService.findAll("all", ownerEmail);
   const visibleNotes = onlyPinned ? allNotes.filter((note) => note.pinned) : allNotes;
   const plain = visibleNotes.map((note) => note.toObject());
@@ -428,7 +429,7 @@ async function renderNotesPage(req, res, { onlyPinned = false, activeId = null }
     ? plain.find((note) => String(note._id) === String(activeId)) || plain[0] || null
     : plain[0] || null;
   const [rail, authContext] = await Promise.all([
-    buildNotesRail(ownerEmail, allNotes),
+    buildNotesRail(ownerEmail, allNotes, noteView),
     loadAuthContext(req),
   ]);
 
@@ -437,7 +438,7 @@ async function renderNotesPage(req, res, { onlyPinned = false, activeId = null }
     activeNav: "notes",
     page: "note",
     rail,
-    pageLocals: { notes: plain, activeNote },
+    pageLocals: { notes: plain, activeNote, noteView },
     ...authContext,
   });
 }
@@ -468,6 +469,13 @@ router.get("/notes/:id", requireAuthPage, (req, res, next) => {
 // Calendar: load the CURRENT USER's real events + tasks with dueDate,
 // overlay both onto the month grid.
 // -----------------------------------------------------------
+router.get("/calendar/new", requireAuthPage, (_req, res) => {
+  const now = new Date();
+  res.redirect(
+    `/calendar?year=${now.getFullYear()}&month=${now.getMonth()}&create=event`
+  );
+});
+
 router.get("/calendar", requireAuthPage, async (req, res, next) => {
   const ownerEmail = req.sessionUser.email;
   try {

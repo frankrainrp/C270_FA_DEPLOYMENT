@@ -14,6 +14,7 @@
   const miniMonth = Array.isArray(railData.miniMonth) ? railData.miniMonth : [];
   const calendarTags = Array.isArray(railData.calendarTags) ? railData.calendarTags : [];
   const noteCounts = railData.noteCounts || {};
+  const noteView = railData.noteView === "pinned" ? "pinned" : "all";
   const pinnedNotes = Array.isArray(railData.pinnedNotes) ? railData.pinnedNotes : [];
   const customPanel = railData.customPanel || {};
 
@@ -267,13 +268,23 @@
     <section class="sidebar-section" aria-labelledby="sidebar-notes-title">
       <h2 id="sidebar-notes-title" class="sidebar-heading"><%= L("rail.notes.library", "Library") %></h2>
 
-      <a class="sidebar-item active" href="/notes">
+      <a
+        class="sidebar-item <%= noteView === "all" ? "active" : "" %>"
+        href="/notes"
+        data-note-view="all"
+        <% if (noteView === "all") { %>aria-current="page"<% } %>
+      >
         <span class="sidebar-item-icon note-icon" aria-hidden="true"></span>
         <span class="sidebar-item-label"><%= L("rail.notes.all", "All Notes") %></span>
         <% if (noteCount("all") > 0) { %><span class="sidebar-count"><%= noteCount("all") %></span><% } %>
       </a>
 
-      <a class="sidebar-item" href="/notes?pinned=1">
+      <a
+        class="sidebar-item <%= noteView === "pinned" ? "active" : "" %>"
+        href="/notes?pinned=1"
+        data-note-view="pinned"
+        <% if (noteView === "pinned") { %>aria-current="page"<% } %>
+      >
         <span class="sidebar-item-icon pin-icon" aria-hidden="true"></span>
         <span class="sidebar-item-label"><%= L("rail.notes.pinned", "Pinned") %></span>
         <% if (noteCount("pinned") > 0) { %><span class="sidebar-count"><%= noteCount("pinned") %></span><% } %>

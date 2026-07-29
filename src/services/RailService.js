@@ -27,10 +27,11 @@ async function buildTasksRail(taskView = "active", ownerEmail, existingStats) {
   };
 }
 
-async function buildNotesRail(ownerEmail, existingNotes) {
+async function buildNotesRail(ownerEmail, existingNotes, noteView = "all") {
   const all = existingNotes || await NoteService.findAll("all", ownerEmail);
   const pinned = all.filter((note) => note.pinned);
   return {
+    noteView: noteView === "pinned" ? "pinned" : "all",
     noteCounts: {
       all: all.length,
       pinned: pinned.length,
