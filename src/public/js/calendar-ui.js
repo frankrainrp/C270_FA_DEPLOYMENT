@@ -15,12 +15,16 @@
   var detailTitle = root.querySelector("[data-calendar-detail-title]");
   var detailText = root.querySelector("[data-calendar-detail-text]");
   var detailBadge = root.querySelector("[data-calendar-detail-badge]");
+  var initialSelectedDate = root.getAttribute("data-calendar-selected-date") || "";
+  var initialSelectedDay = Number(initialSelectedDate.split("-")[2]);
   
   var calendarState = {
     year: null,
     month: null,
     events: [],
-    selectedDay: new Date().getDate(),
+    selectedDay: Number.isInteger(initialSelectedDay) && initialSelectedDay > 0
+      ? initialSelectedDay
+      : new Date().getDate(),
   };
 
   function injectStyles() {
@@ -44,8 +48,6 @@
       ".calendar-month-chip:hover{border-color:var(--color-primary);color:var(--color-text);}",
       ".calendar-month-chip.is-empty{opacity:.7;cursor:default;}",
       ".calendar-month-chip.is-selected{border-color:var(--color-primary);color:var(--color-text);background:color-mix(in srgb, var(--color-primary) 10%, var(--color-surface));}",
-      ".calendar-day.is-selected{border-color:var(--color-primary);box-shadow:0 0 0 2px color-mix(in srgb, var(--color-primary) 16%, transparent);}",
-      ".calendar-day.today:not(.is-selected){border-color:var(--color-border-soft); box-shadow:none;}",
       ".event-pill.is-dragging{opacity: 0.4; transform: scale(0.95);}",
       ".calendar-day.drag-hover{background-color: color-mix(in srgb, var(--color-primary) 15%, transparent); border: 2px dashed var(--color-primary);}",
       "@media (max-width: 720px){.calendar-event-grid{grid-template-columns:1fr;}.calendar-event-modal-header,.calendar-event-modal-footer{flex-direction:column;align-items:stretch;}.calendar-event-actions{justify-content:stretch;}.calendar-event-actions .glass-btn{width:100%;}}"
@@ -54,14 +56,30 @@
   }
 
   function escapeHtml(value) { return String(value == null ? "" : value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\"/g, "&quot;").replace(/'/g, "&#39;"); }
+
+  function parseIsoDate(value) {
+    var match = String(value || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!match) return null;
+    var year = Number(match[1]);
+    var month = Number(match[2]) - 1;
+    var day = Number(match[3]);
+    var date = new Date(year, month, day);
+    if (date.getFullYear() !== year || date.getMonth() !== month || date.getDate() !== day) return null;
+    return { year: year, month: month, day: day };
+  }
   
   function parseCursor() {
     var params = new URLSearchParams(window.location.search);
     var now = new Date();
+    var selectedDate = parseIsoDate(params.get("date"));
     var year = Number(params.get("year"));
     var month = Number(params.get("month"));
-    if (!Number.isInteger(year) || year < 1900 || year > 3000) year = now.getFullYear();
-    if (!Number.isInteger(month) || month < 0 || month > 11) month = now.getMonth();
+    if (!Number.isInteger(year) || year < 1900 || year > 3000) {
+      year = selectedDate ? selectedDate.year : now.getFullYear();
+    }
+    if (!Number.isInteger(month) || month < 0 || month > 11) {
+      month = selectedDate ? selectedDate.month : now.getMonth();
+    }
     return { year: year, month: month };
   }
   
@@ -82,9 +100,54 @@
     var url = new URL(window.location.href);
     url.searchParams.set("year", String(year));
     url.searchParams.set("month", String(month));
+    url.searchParams.set("date", formatDateIso(year, month, calendarState.selectedDay));
     var nextHref = url.pathname + "?" + url.searchParams.toString();
     if (replace) window.history.replaceState({}, "", nextHref);
     else window.history.pushState({}, "", nextHref);
+  }
+
+  function syncMiniCalendar(isoDate) {
+    document.querySelectorAll(".mini-calendar-day.selected").forEach(function (day) {
+      day.classList.remove("selected");
+      day.removeAttribute("aria-current");
+    });
+    var selected = document.querySelector('.mini-calendar-day[data-date="' + isoDate + '"]');
+    if (selected) {
+      selected.classList.add("selected");
+      selected.setAttribute("aria-current", "date");
+    }
+  }
+
+  function renderMiniCalendar(year, month) {
+    var miniCalendar = document.querySelector(".mini-calendar");
+    if (!miniCalendar) return;
+    var today = new Date();
+    var daysInMonth = new Date(year, month + 1, 0).getDate();
+    var leading = (new Date(year, month, 1).getDay() + 6) % 7;
+    var selectedIso = formatDateIso(year, month, calendarState.selectedDay);
+    var eventDates = new Set(calendarState.events.map(function (event) {
+      return normalizeDateKey(event.date);
+    }).filter(Boolean));
+    var html = [];
+
+    for (var empty = 0; empty < leading; empty += 1) {
+      html.push('<span class="mini-calendar-day muted" aria-hidden="true"></span>');
+    }
+    for (var day = 1; day <= daysInMonth; day += 1) {
+      var isoDate = formatDateIso(year, month, day);
+      var isToday = year === today.getFullYear() && month === today.getMonth() && day === today.getDate();
+      var isSelected = isoDate === selectedIso;
+      html.push(
+        '<a class="mini-calendar-day'
+        + (isToday ? " today" : "")
+        + (isSelected ? " selected" : "")
+        + (eventDates.has(isoDate) ? " has-events" : "")
+        + '" href="/calendar?date=' + isoDate + '" data-date="' + isoDate + '"'
+        + (isSelected ? ' aria-current="date"' : "")
+        + "><span>" + day + "</span></a>"
+      );
+    }
+    miniCalendar.innerHTML = html.join("");
   }
   
   function syncNavButtons(year, month) {
@@ -277,14 +340,21 @@
   function selectDay(dayElement) {
     var prevs = grid.querySelectorAll(".calendar-day.is-selected");
     prevs.forEach(function (prev) {
-        prev.classList.remove("is-selected");
+      prev.classList.remove("is-selected");
+      prev.setAttribute("aria-pressed", "false");
     });
     
     dayElement.classList.add("is-selected");
+    dayElement.setAttribute("aria-pressed", "true");
     
     var day = dayElement.getAttribute("data-day");
     calendarState.selectedDay = Number(day);
     var isoDate = dayElement.getAttribute("data-iso");
+    root.setAttribute("data-calendar-selected-date", isoDate || "");
+    if (isoDate) {
+      syncMiniCalendar(isoDate);
+      updateUrl(calendarState.year, calendarState.month, true);
+    }
     
     if (detailTitle) detailTitle.textContent = "Day " + day;
     
@@ -436,6 +506,7 @@
         grid.innerHTML = html.join("");
         updateUrl(year, month, replace);
         syncNavButtons(year, month);
+        renderMiniCalendar(year, month);
         
         var activeBtn = grid.querySelector('.calendar-day[data-day="' + calendarState.selectedDay + '"]');
         if (activeBtn) selectDay(activeBtn);
@@ -479,6 +550,22 @@
 
   // Global listener for the Sidebar button
   document.addEventListener("click", function (ev) {
+    var miniDateLink = ev.target.closest(".mini-calendar-day[data-date]");
+    if (miniDateLink) {
+      var selectedDate = parseIsoDate(miniDateLink.getAttribute("data-date"));
+      if (selectedDate) {
+        ev.preventDefault();
+        calendarState.selectedDay = selectedDate.day;
+        if (calendarState.year === selectedDate.year && calendarState.month === selectedDate.month) {
+          var selectedButton = grid.querySelector('.calendar-day[data-iso="' + miniDateLink.getAttribute("data-date") + '"]');
+          if (selectedButton) selectDay(selectedButton);
+        } else {
+          loadMonth(selectedDate.year, selectedDate.month, false);
+        }
+        return;
+      }
+    }
+
     var newEventBtn = ev.target.closest('[data-action="new-event"]');
     if (newEventBtn) {
       ev.preventDefault();

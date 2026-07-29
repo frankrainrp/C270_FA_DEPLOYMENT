@@ -48,7 +48,10 @@
     const iso = year + "-" + String(month + 1).padStart(2, "0") + "-" + String(d).padStart(2, "0");
     cells.push({
       label: String(d),
-      isToday: d === today.getDate(),
+      isToday:
+        year === today.getFullYear() &&
+        month === today.getMonth() &&
+        d === today.getDate(),
       iso: iso,
       events: byDate[iso] || [],
     });
@@ -57,8 +60,19 @@
     cells.push({ label: "", muted: true, empty: true, events: [] });
   }
 
-  const firstEventCell = cells.find((cell) => Array.isArray(cell.events) && cell.events.length > 0);
-  const selectedDay = firstEventCell && firstEventCell.label ? Number(firstEventCell.label) : 1;
+  const selectedDateMatch = typeof locals.calendarSelectedDate === "string"
+    ? locals.calendarSelectedDate.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+    : null;
+  const selectedDayFromRoute = selectedDateMatch
+    && Number(selectedDateMatch[1]) === year
+    && Number(selectedDateMatch[2]) === month + 1
+    ? Number(selectedDateMatch[3])
+    : null;
+  const selectedDay = selectedDayFromRoute >= 1 && selectedDayFromRoute <= daysInMonth
+    ? selectedDayFromRoute
+    : year === today.getFullYear() && month === today.getMonth()
+      ? today.getDate()
+      : 1;
   const selectedIso = year + "-" + String(month + 1).padStart(2, "0") + "-" + String(selectedDay).padStart(2, "0");
   const selectedEvents = byDate[selectedIso] || [];
   const selectedDate = selectedEvents[0]
@@ -71,7 +85,13 @@
   const nextYear = month === 11 ? year + 1 : year;
 %>
 
-<section class="calendar-panel" data-calendar-root data-calendar-year="<%= year %>" data-calendar-month="<%= month %>">
+<section
+  class="calendar-panel"
+  data-calendar-root
+  data-calendar-year="<%= year %>"
+  data-calendar-month="<%= month %>"
+  data-calendar-selected-date="<%= selectedIso %>"
+>
   <header class="calendar-toolbar">
     <div class="calendar-toolbar-row calendar-toolbar-navigation">
       <span class="calendar-toolbar-label">Browse month</span>
@@ -145,11 +165,13 @@
         : (c.empty ? "" : "Open space for revision and reflection.");
     %>
       <button
-        class="calendar-day <%= c.isToday ? 'today' : '' %> <%= c.muted ? 'muted' : '' %>"
+        class="calendar-day <%= c.isToday ? 'today' : '' %> <%= c.iso === selectedIso ? 'is-selected' : '' %> <%= c.muted ? 'muted' : '' %>"
         type="button"
         data-day="<%= c.label %>"
+        data-iso="<%= c.iso || '' %>"
         data-title="<%= detailTitle %>"
         data-detail="<%= detailText %>"
+        aria-pressed="<%= c.iso === selectedIso ? 'true' : 'false' %>"
         <% if (c.empty) { %>disabled<% } %>
       >
         <span class="calendar-day-number"><%= c.label %></span>

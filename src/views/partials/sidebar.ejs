@@ -109,9 +109,10 @@
       <% if (miniMonth.length > 0) { %>
         <div class="mini-calendar" aria-label="<%= L("rail.calendar.month", "Month overview") %>">
           <% miniMonth.forEach((day) => { %>
-            <a class="mini-calendar-day <%= day.active ? "active" : "" %> <%= day.muted ? "muted" : "" %> <%= day.hasEvents ? "has-events" : "" %>"
+            <a class="mini-calendar-day <%= day.today ? "today" : "" %> <%= day.selected ? "selected" : "" %> <%= day.muted ? "muted" : "" %> <%= day.hasEvents ? "has-events" : "" %>"
                href="/calendar?date=<%= day.date || "" %>"
-               data-date="<%= day.date || "" %>">
+               data-date="<%= day.date || "" %>"
+               <% if (day.selected) { %>aria-current="date"<% } %>>
               <span><%= day.label %></span>
             </a>
           <% }) %>

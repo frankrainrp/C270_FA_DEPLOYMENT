@@ -482,11 +482,51 @@ router.get("/calendar", requireAuthPage, async (req, res, next) => {
     const now = new Date();
     const requestedYear = Number.parseInt(req.query.year, 10);
     const requestedMonth = Number.parseInt(req.query.month, 10);
-    const calendarYear = Number.isInteger(requestedYear) ? requestedYear : now.getFullYear();
-    const calendarMonth = Number.isInteger(requestedMonth) ? requestedMonth : now.getMonth();
+    const requestedDateMatch = typeof req.query.date === "string"
+      ? req.query.date.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+      : null;
+    const requestedDate = requestedDateMatch
+      ? new Date(
+          Number(requestedDateMatch[1]),
+          Number(requestedDateMatch[2]) - 1,
+          Number(requestedDateMatch[3])
+        )
+      : null;
+    const validRequestedDate = requestedDate
+      && requestedDate.getFullYear() === Number(requestedDateMatch[1])
+      && requestedDate.getMonth() === Number(requestedDateMatch[2]) - 1
+      && requestedDate.getDate() === Number(requestedDateMatch[3])
+      ? requestedDate
+      : null;
+    const validRequestedYear = Number.isInteger(requestedYear) && requestedYear >= 1900 && requestedYear <= 3000;
+    const validRequestedMonth = Number.isInteger(requestedMonth) && requestedMonth >= 0 && requestedMonth <= 11;
+    const calendarYear = validRequestedYear
+      ? requestedYear
+      : validRequestedDate
+        ? validRequestedDate.getFullYear()
+        : now.getFullYear();
+    const calendarMonth = validRequestedMonth
+      ? requestedMonth
+      : validRequestedDate
+        ? validRequestedDate.getMonth()
+        : now.getMonth();
+    const selectedDateObject = validRequestedDate
+      && validRequestedDate.getFullYear() === calendarYear
+      && validRequestedDate.getMonth() === calendarMonth
+      ? validRequestedDate
+      : calendarYear === now.getFullYear() && calendarMonth === now.getMonth()
+        ? now
+        : new Date(calendarYear, calendarMonth, 1);
+    const calendarSelectedDate = [
+      selectedDateObject.getFullYear(),
+      String(selectedDateObject.getMonth() + 1).padStart(2, "0"),
+      String(selectedDateObject.getDate()).padStart(2, "0"),
+    ].join("-");
 
-    if (!Number.isInteger(requestedYear) && !Number.isInteger(requestedMonth) && !req.query.date) {
-      return res.redirect(`/calendar?year=${calendarYear}&month=${calendarMonth}`);
+    if (!validRequestedYear && !validRequestedMonth && !validRequestedDate) {
+      return res.redirect(
+        `/calendar?year=${calendarYear}&month=${calendarMonth}&date=${calendarSelectedDate}`
+      );
     }
 
     const [events, tasks] = await Promise.all([
@@ -494,7 +534,7 @@ router.get("/calendar", requireAuthPage, async (req, res, next) => {
       TaskService.findAll("all", ownerEmail),
     ]);
     const [rail, authContext] = await Promise.all([
-      buildCalendarRail(ownerEmail, events, calendarYear, calendarMonth),
+      buildCalendarRail(ownerEmail, events, calendarYear, calendarMonth, calendarSelectedDate),
       loadAuthContext(req),
     ]);
 
@@ -528,6 +568,7 @@ router.get("/calendar", requireAuthPage, async (req, res, next) => {
         events: combined,
         calendarYear,
         calendarMonth,
+        calendarSelectedDate,
       },
       ...authContext,
     });

@@ -50,6 +50,41 @@ test("renders integrated calendar events without a task completion checkbox", as
   assert.match(eventCard, /Calendar event/);
   assert.doesNotMatch(eventCard, /data-task-toggle/);
   assert.match(html, /data-task-id="task-1"/);
+  assert.equal((html.match(/data-task-id="task-1"/g) || []).length, 1);
+  assert.equal((html.match(/data-task-id="event-1"/g) || []).length, 1);
+  assert.doesNotMatch(html, /data-task-group=/);
+});
+
+test("renders one empty state instead of repeated status groups", async () => {
+  const html = await ejs.renderFile(path.join(views, "pages/task.ejs"), {
+    tasks: [],
+    taskView: "all",
+    rail: { taskView: "all" },
+  });
+
+  assert.equal((html.match(/No tasks yet\./g) || []).length, 1);
+  assert.doesNotMatch(html, /No active tasks\./);
+  assert.doesNotMatch(html, /No tasks in progress\./);
+  assert.doesNotMatch(html, /No upcoming tasks\./);
+  assert.doesNotMatch(html, /No completed tasks yet\./);
+  assert.doesNotMatch(html, /data-task-group=/);
+});
+
+test("focused task views render a flat filtered list without duplicate headings", async () => {
+  const html = await ejs.renderFile(path.join(views, "pages/task.ejs"), {
+    tasks: [
+      { _id: "active-1", title: "Active", status: "active", priority: "medium" },
+      { _id: "progress-1", title: "Progress", status: "in_progress", priority: "medium" },
+      { _id: "done-1", title: "Done", status: "completed", completed: true, priority: "medium" },
+    ],
+    taskView: "completed",
+    rail: { taskView: "completed" },
+  });
+
+  assert.match(html, /data-task-id="done-1"/);
+  assert.doesNotMatch(html, /data-task-id="active-1"/);
+  assert.doesNotMatch(html, /data-task-id="progress-1"/);
+  assert.doesNotMatch(html, /task-group-title/);
 });
 
 test("task creation dialog has shared styles on the tasks page", () => {

@@ -7,6 +7,7 @@ const ejs = require("ejs");
 const root = path.join(__dirname, "..");
 const calendarView = path.join(root, "src/views/pages/calendar.ejs");
 const calendarUi = path.join(root, "src/public/js/calendar-ui.js");
+const calendarStyles = path.join(root, "src/public/css/style.css");
 const sidebarView = path.join(root, "src/views/partials/sidebar.ejs");
 const pagesRouter = path.join(root, "src/routes/pages.js");
 
@@ -26,6 +27,39 @@ test("separates calendar navigation from event actions and keeps selected day", 
   assert.match(html, /Refresh events/);
   assert.match(html, /Selected day/);
   assert.doesNotMatch(html, /Study rhythm/);
+});
+
+test("renders today and the selected calendar date as separate states", async () => {
+  const html = await ejs.renderFile(calendarView, {
+    events: [],
+    calendarYear: 2030,
+    calendarMonth: 0,
+    calendarSelectedDate: "2030-01-12",
+  });
+  const selectedCell = html.match(/<button(?=[^>]*data-day="12")[\s\S]*?>/)?.[0] || "";
+
+  assert.match(selectedCell, /class="[^"]*\bis-selected\b/);
+  assert.match(selectedCell, /data-iso="2030-01-12"/);
+  assert.match(selectedCell, /aria-pressed="true"/);
+  assert.doesNotMatch(selectedCell, /\btoday\b/);
+});
+
+test("calendar clicks move selection while today keeps a distinct colour", () => {
+  const source = fs.readFileSync(calendarUi, "utf8");
+  const styles = fs.readFileSync(calendarStyles, "utf8");
+  const sidebar = fs.readFileSync(sidebarView, "utf8");
+  const routes = fs.readFileSync(pagesRouter, "utf8");
+
+  assert.match(source, /prev\.classList\.remove\("is-selected"\)/);
+  assert.match(source, /dayElement\.classList\.add\("is-selected"\)/);
+  assert.match(source, /syncMiniCalendar\(isoDate\)/);
+  assert.match(source, /mini-calendar-day\[data-date\][\s\S]*?selectDay\(selectedButton\)/);
+  assert.match(styles, /\.calendar-day\.today\s*\{[\s\S]*?var\(--color-primary\)/);
+  assert.match(styles, /\.calendar-day\.is-selected\s*\{[\s\S]*?var\(--color-info\)/);
+  assert.match(styles, /\.mini-calendar-day\.today\s*\{[\s\S]*?var\(--color-primary\)/);
+  assert.match(styles, /\.mini-calendar-day\.selected\s*\{[\s\S]*?var\(--color-info\)/);
+  assert.match(sidebar, /day\.today[\s\S]*?day\.selected/);
+  assert.match(routes, /req\.query\.date\.match[\s\S]*?calendarSelectedDate/);
 });
 
 test("month navigation refreshes its visible label and event count", () => {

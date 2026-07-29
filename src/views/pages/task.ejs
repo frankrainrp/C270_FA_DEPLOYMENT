@@ -43,18 +43,19 @@
   );
   const allUpcomingTasks = list.filter(isUpcoming);
 
-  // "All" uses mutually exclusive groups. A focused rail view follows the
-  // view's full meaning, so Active includes future active tasks and Upcoming
-  // includes in-progress work that is due in the future.
-  const activeTasks = selectedView === "active"
-    ? allActiveTasks
-    : allActiveTasks.filter((t) => !isUpcoming(t));
-  const progressTasks = allProgressTasks;
-  const upcomingTasks = selectedView === "upcoming"
-    ? allUpcomingTasks
-    : allUpcomingTasks.filter((t) => t.status !== "in_progress");
+  const displayTasks = {
+    active: allActiveTasks,
+    in_progress: allProgressTasks,
+    upcoming: allUpcomingTasks,
+    completed: completedTasks
+  }[selectedView] || list;
 
-  const visibleGroup = (name) => selectedView === "all" || selectedView === name;
+  const emptyMessage = {
+    active: "No active tasks.",
+    in_progress: "No tasks in progress.",
+    upcoming: "No upcoming tasks.",
+    completed: "No completed tasks yet."
+  }[selectedView] || "No tasks yet.";
 %>
 <style>
   .tasks-workspace-layout {
@@ -120,7 +121,7 @@
           <span>Active</span>
         </div>
         <div class="hero-stat hero-stat--progress">
-          <strong><%= progressTasks.length %></strong>
+          <strong><%= allProgressTasks.length %></strong>
           <span>In Progress</span>
         </div>
         <div class="hero-stat hero-stat--upcoming">
@@ -142,73 +143,17 @@
   <div class="tasks-workspace-layout">
     <!-- Main Tasks List -->
     <div class="tasks-content" data-tasks-list>
-      
-      <% if (list.length === 0) { %>
+
+      <% if (displayTasks.length === 0) { %>
         <div style="padding: 40px; text-align: center; color: var(--color-text-muted);">
-          <p>No tasks yet.</p>
+          <p><%= emptyMessage %></p>
           <p>Click <strong>New Task</strong> to add one, or ask Butler in <a href="/chat">chat</a>.</p>
         </div>
+      <% } else { %>
+        <% displayTasks.forEach(function(t) { %>
+          <%- include("../partials/_task-card", { t, fmtDue, priorityColor }) %>
+        <% }) %>
       <% } %>
-
-      <!-- ACTIVE GROUP -->
-      <div class="task-group" data-task-group="active" <%= visibleGroup("active") ? "" : "hidden" %>>
-        <div class="task-group-title">
-          <span>Active</span>
-          <span><%= activeTasks.length %></span>
-        </div>
-        <% if (activeTasks.length === 0) { %>
-          <p style="color: var(--color-text-muted); font-size: 13px; padding: 10px;">No active tasks.</p>
-        <% } else { %>
-          <% activeTasks.forEach(function(t) { %>
-            <%- include("../partials/_task-card", { t, fmtDue, priorityColor }) %>
-          <% }) %>
-        <% } %>
-      </div>
-
-      <!-- IN PROGRESS GROUP -->
-      <div class="task-group" data-task-group="in_progress" <%= visibleGroup("in_progress") ? "" : "hidden" %>>
-        <div class="task-group-title">
-          <span>In Progress</span>
-          <span><%= progressTasks.length %></span>
-        </div>
-        <% if (progressTasks.length === 0) { %>
-          <p style="color: var(--color-text-muted); font-size: 13px; padding: 10px;">No tasks in progress.</p>
-        <% } else { %>
-          <% progressTasks.forEach(function(t) { %>
-            <%- include("../partials/_task-card", { t, fmtDue, priorityColor }) %>
-          <% }) %>
-        <% } %>
-      </div>
-
-      <!-- UPCOMING GROUP -->
-      <div class="task-group" data-task-group="upcoming" <%= visibleGroup("upcoming") ? "" : "hidden" %>>
-        <div class="task-group-title">
-          <span>Upcoming</span>
-          <span><%= upcomingTasks.length %></span>
-        </div>
-        <% if (upcomingTasks.length === 0) { %>
-          <p style="color: var(--color-text-muted); font-size: 13px; padding: 10px;">No upcoming tasks.</p>
-        <% } else { %>
-          <% upcomingTasks.forEach(function(t) { %>
-            <%- include("../partials/_task-card", { t, fmtDue, priorityColor }) %>
-          <% }) %>
-        <% } %>
-      </div>
-
-      <!-- COMPLETED GROUP -->
-      <div class="task-group" data-task-group="completed" <%= visibleGroup("completed") ? "" : "hidden" %>>
-        <div class="task-group-title">
-          <span>Completed</span>
-          <span><%= completedTasks.length %></span>
-        </div>
-        <% if (completedTasks.length === 0) { %>
-          <p style="color: var(--color-text-muted); font-size: 13px; padding: 10px;">No completed tasks yet.</p>
-        <% } else { %>
-          <% completedTasks.forEach(function(t) { %>
-            <%- include("../partials/_task-card", { t, fmtDue, priorityColor }) %>
-          <% }) %>
-        <% } %>
-      </div>
 
     </div>
   </div>

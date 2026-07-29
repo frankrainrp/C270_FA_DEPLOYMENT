@@ -44,7 +44,7 @@ async function buildNotesRail(ownerEmail, existingNotes, noteView = "all") {
   };
 }
 
-async function buildCalendarRail(ownerEmail, existingEvents, year, month) {
+async function buildCalendarRail(ownerEmail, existingEvents, year, month, selectedDate) {
   const today = new Date();
   const activeYear = Number.isInteger(year) ? year : today.getFullYear();
   const activeMonth = Number.isInteger(month) ? month : today.getMonth();
@@ -60,7 +60,8 @@ async function buildCalendarRail(ownerEmail, existingEvents, year, month) {
     return {
       label: cell.label,
       date,
-      active: cell.isToday,
+      today: cell.isToday,
+      selected: Boolean(date) && date === selectedDate,
       muted: cell.muted,
       hasEvents: cell.events.length > 0,
       key: `cell-${index}`,
