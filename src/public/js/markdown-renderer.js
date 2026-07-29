@@ -44,6 +44,55 @@
     });
   }
 
+  function splitTableRow(value) {
+    var source = String(value == null ? "" : value).trim();
+    if (source.charAt(0) === "|") source = source.slice(1);
+    if (source.charAt(source.length - 1) === "|") source = source.slice(0, -1);
+
+    var cells = [];
+    var cell = "";
+    var inCode = false;
+
+    for (var index = 0; index < source.length; index += 1) {
+      var character = source.charAt(index);
+      if (character === "\\" && source.charAt(index + 1) === "|") {
+        cell += "|";
+        index += 1;
+      } else if (character === "`") {
+        inCode = !inCode;
+        cell += character;
+      } else if (character === "|" && !inCode) {
+        cells.push(cell.trim());
+        cell = "";
+      } else {
+        cell += character;
+      }
+    }
+    cells.push(cell.trim());
+    return cells;
+  }
+
+  function tableAlignments(value) {
+    var cells = splitTableRow(value);
+    if (cells.length < 2 || cells.some(function (cell) {
+      return !/^:?-{3,}:?$/.test(cell);
+    })) {
+      return null;
+    }
+    return cells.map(function (cell) {
+      if (cell.charAt(0) === ":" && cell.charAt(cell.length - 1) === ":") return "center";
+      if (cell.charAt(cell.length - 1) === ":") return "right";
+      if (cell.charAt(0) === ":") return "left";
+      return "";
+    });
+  }
+
+  function tableCell(tag, value, alignment) {
+    return "<" + tag
+      + (alignment ? ' style="text-align:' + alignment + '"' : "")
+      + ">" + renderInline(value) + "</" + tag + ">";
+  }
+
   function render(markdown) {
     var lines = String(markdown == null ? "" : markdown)
       .replace(/\r\n?/g, "\n")
@@ -76,7 +125,8 @@
       output.push("<" + type + ">");
     }
 
-    lines.forEach(function (line) {
+    for (var lineIndex = 0; lineIndex < lines.length; lineIndex += 1) {
+      var line = lines[lineIndex];
       var fence = line.match(/^\s*```\s*([A-Za-z0-9_-]*)\s*$/);
       if (fence) {
         if (inCode) {
@@ -94,18 +144,48 @@
           inCode = true;
           codeLanguage = fence[1] || "";
         }
-        return;
+        continue;
       }
 
       if (inCode) {
         codeLines.push(line);
-        return;
+        continue;
       }
 
       if (!line.trim()) {
         flushParagraph();
         closeList();
-        return;
+        continue;
+      }
+
+      var alignments = lineIndex + 1 < lines.length
+        ? tableAlignments(lines[lineIndex + 1])
+        : null;
+      var headerCells = alignments ? splitTableRow(line) : [];
+      if (alignments && headerCells.length === alignments.length) {
+        flushParagraph();
+        closeList();
+        output.push('<div class="markdown-table-wrap"><table><thead><tr>');
+        headerCells.forEach(function (cell, cellIndex) {
+          output.push(tableCell("th", cell, alignments[cellIndex]));
+        });
+        output.push("</tr></thead><tbody>");
+        lineIndex += 2;
+        while (lineIndex < lines.length && lines[lineIndex].trim()) {
+          var rowCells = splitTableRow(lines[lineIndex]);
+          if (rowCells.length !== headerCells.length) {
+            lineIndex -= 1;
+            break;
+          }
+          output.push("<tr>");
+          rowCells.forEach(function (cell, cellIndex) {
+            output.push(tableCell("td", cell, alignments[cellIndex]));
+          });
+          output.push("</tr>");
+          lineIndex += 1;
+        }
+        output.push("</tbody></table></div>");
+        continue;
       }
 
       var heading = line.match(/^(#{1,6})\s+(.+)$/);
@@ -114,14 +194,14 @@
         closeList();
         var level = heading[1].length;
         output.push("<h" + level + ">" + renderInline(heading[2]) + "</h" + level + ">");
-        return;
+        continue;
       }
 
       if (/^\s*(?:---+|\*\*\*+|___+)\s*$/.test(line)) {
         flushParagraph();
         closeList();
         output.push("<hr>");
-        return;
+        continue;
       }
 
       var quote = line.match(/^\s*>\s?(.*)$/);
@@ -129,7 +209,7 @@
         flushParagraph();
         closeList();
         output.push("<blockquote><p>" + renderInline(quote[1]) + "</p></blockquote>");
-        return;
+        continue;
       }
 
       var unordered = line.match(/^\s*[-+*]\s+(.+)$/);
@@ -145,18 +225,18 @@
         } else {
           output.push("<li>" + renderInline(unordered[1]) + "</li>");
         }
-        return;
+        continue;
       }
 
       var ordered = line.match(/^\s*\d+[.)]\s+(.+)$/);
       if (ordered) {
         openList("ol");
         output.push("<li>" + renderInline(ordered[1]) + "</li>");
-        return;
+        continue;
       }
 
       paragraph.push(line.trim());
-    });
+    }
 
     if (inCode) {
       output.push(

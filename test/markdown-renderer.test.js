@@ -50,6 +50,27 @@ test("escapes raw HTML and only turns http(s) Markdown links into anchors", () =
   assert.doesNotMatch(html, /href="javascript:/);
 });
 
+test("renders agent-style Markdown tables with safe inline formatting", () => {
+  const html = renderer().render([
+    "Here's your current task snapshot:",
+    "",
+    "| Metric | Value |",
+    "|:---|---:|",
+    "| **Total tasks** | 3 |",
+    "| Unsafe | <img src=x onerror=alert(1)> |",
+    "",
+    "Top priorities: `Revision`",
+  ].join("\n"));
+
+  assert.match(html, /<div class="markdown-table-wrap"><table>/);
+  assert.match(html, /<th style="text-align:left">Metric<\/th>/);
+  assert.match(html, /<th style="text-align:right">Value<\/th>/);
+  assert.match(html, /<td style="text-align:left"><strong>Total tasks<\/strong><\/td>/);
+  assert.match(html, /&lt;img src=x onerror=alert\(1\)&gt;/);
+  assert.doesNotMatch(html, /<img/);
+  assert.match(html, /<code>Revision<\/code>/);
+});
+
 test("notes UI targets the editor preview instead of note-list search snippets", () => {
   const notesUi = fs.readFileSync(
     path.join(__dirname, "../src/public/js/notes-ui.js"),

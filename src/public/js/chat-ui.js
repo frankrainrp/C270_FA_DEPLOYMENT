@@ -99,6 +99,14 @@
 
   /** Renders a safe subset of block markdown into an assistant message bubble. */
   function renderMessageContent(bubble, text) {
+    if (window.ButlerMarkdown && typeof window.ButlerMarkdown.render === "function") {
+      // ButlerMarkdown escapes raw HTML and allow-lists link protocols before
+      // returning markup, so model output cannot inject executable elements.
+      bubble.innerHTML = window.ButlerMarkdown.render(text);
+      bubble.classList.add("chat-markdown");
+      return;
+    }
+
     var lines = String(text || "").replace(/\r\n/g, "\n").split("\n");
     var fragment = document.createDocumentFragment();
     var list = null;

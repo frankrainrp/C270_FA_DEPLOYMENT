@@ -36,6 +36,7 @@ test("chat CSS retains responsive, confirmation, focus, and reduced-motion rules
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)/);
   assert.match(css, /:focus-visible/);
   assert.match(css, /\[hidden\]\s*\{\s*display: none !important;/);
+  assert.match(css, /\.markdown-table-wrap\s*\{[\s\S]*overflow-x:\s*auto;/);
   assert.doesNotMatch(css, /\.bubble-wrap:hover \.msg-too\s*$/m);
   assert.equal((css.match(/\{/g) || []).length, (css.match(/\}/g) || []).length);
 });
@@ -47,6 +48,17 @@ test("chat bootstrap uses the server-generated safe state payload", () => {
   assert.match(template, /window\.__BUTLER_INIT__ = <%- initialChatStateJson %>/);
   assert.doesNotMatch(template, /<%- JSON\.stringify\(initialMessagesList\) %>/);
   assert.match(pages, /serializeForInlineScript/);
+});
+
+test("agent messages load and use the shared safe Markdown renderer", () => {
+  const template = read("src/views/pages/chat.ejs");
+  const chatUi = read("src/public/js/chat-ui.js");
+  const markdownIndex = template.indexOf('/js/markdown-renderer.js');
+  const chatUiIndex = template.indexOf('/js/chat-ui.js');
+
+  assert.ok(markdownIndex >= 0, "chat should load the Markdown renderer");
+  assert.ok(markdownIndex < chatUiIndex, "Markdown renderer should load before chat UI");
+  assert.match(chatUi, /window\.ButlerMarkdown\.render\(text\)/);
 });
 
 test("create tools carry idempotency keys into the API layer", () => {
