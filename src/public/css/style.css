@@ -201,6 +201,50 @@ html[data-theme="paper"] {
   --color-surface-strong: #f8fbfa;
 }
 
+/* Optional primary-action palette selected in Preferences.
+   These semantic overrides intentionally sit after the theme definitions so
+   every theme keeps its surfaces and typography while primary buttons,
+   selected controls, and focus rings adopt the user's chosen colour. */
+html[data-button-color="forest"] {
+  --color-primary: #2d4a3e;
+  --color-primary-hover: #3a5c4d;
+  --color-primary-soft: #dce6dd;
+}
+
+html[data-button-color="ocean"] {
+  --color-primary: #2f5e75;
+  --color-primary-hover: #3c718b;
+  --color-primary-soft: #dce9ef;
+}
+
+html[data-button-color="plum"] {
+  --color-primary: #60405f;
+  --color-primary-hover: #745474;
+  --color-primary-soft: #eadfea;
+}
+
+html[data-button-color="clay"] {
+  --color-primary: #834536;
+  --color-primary-hover: #985947;
+  --color-primary-soft: #f0ddd6;
+}
+
+html[data-theme="dark"][data-button-color="forest"] {
+  --color-primary-soft: #172b22;
+}
+
+html[data-theme="dark"][data-button-color="ocean"] {
+  --color-primary-soft: #152b36;
+}
+
+html[data-theme="dark"][data-button-color="plum"] {
+  --color-primary-soft: #2d1c2d;
+}
+
+html[data-theme="dark"][data-button-color="clay"] {
+  --color-primary-soft: #351d18;
+}
+
 /* ============================================================
    2. Reset & base typography
    ============================================================ */

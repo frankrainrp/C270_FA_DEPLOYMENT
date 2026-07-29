@@ -14,8 +14,9 @@
 //      not re-execute, so the inline script never runs again.
 //   2. The user switches the theme in another tab — the current tab
 //      would otherwise keep the old theme until reload.
-(function initThemeSync() {
+(function initAppearanceSync() {
   var VALID = { paper: true, retro: true, dark: true };
+  var VALID_BUTTON_COLORS = { forest: true, ocean: true, plum: true, clay: true };
   // Keeps the mobile browser chrome (address bar tint) in sync
   // with the current theme.  Values match the theme bg colours.
   var META_COLORS = { retro: "#f3eee0", paper: "#eff6f5", dark: "#0a0a0b" };
@@ -33,12 +34,29 @@
     } catch (_) { /* ignore */ }
   }
 
+  function applySavedButtonColor() {
+    try {
+      var saved = localStorage.getItem("butler-button-color");
+      if (saved && VALID_BUTTON_COLORS[saved]) {
+        document.documentElement.setAttribute("data-button-color", saved);
+      } else {
+        document.documentElement.removeAttribute("data-button-color");
+      }
+    } catch (_) { /* ignore */ }
+  }
+
+  function applySavedAppearance() {
+    applySavedTheme();
+    applySavedButtonColor();
+  }
+
   // Fires on fresh load AND when the page is restored from bfcache.
-  window.addEventListener("pageshow", applySavedTheme);
+  window.addEventListener("pageshow", applySavedAppearance);
 
   // Fires when any other tab writes to localStorage.
   window.addEventListener("storage", function (event) {
     if (event.key === "butler-theme") applySavedTheme();
+    if (event.key === "butler-button-color") applySavedButtonColor();
   });
 })();
 

@@ -1,9 +1,8 @@
 <%
   /*
     preferences.ejs
-    Standalone settings page.  For now the only user preference is
-    the visual theme.  Selection is persisted to localStorage under
-    the key "butler-theme" so the choice sticks across reloads.
+    Standalone settings page for visual theme and primary button colour.
+    Selections are persisted to localStorage so they stick across reloads.
 
     Themes exposed here (CSS names on the left, human labels on the right):
       - retro : Paper  (default, cream parchment)
@@ -32,6 +31,7 @@
         } catch (_) { /* ignore */ }
       })();
     </script>
+    <script src="/js/appearance-preload.js"></script>
     <link rel="stylesheet" href="/css/style.css" />
     <style>
       /* Local layout for the preferences page only. */
@@ -145,6 +145,127 @@
         color: var(--color-text-muted);
         font-size: 13px;
       }
+      .pref-color-section {
+        margin-top: 24px;
+        padding-top: 20px;
+        border-top: 1px solid var(--color-border-soft);
+      }
+      .pref-section-heading {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 12px;
+      }
+      .pref-section-heading .pref-section-title {
+        margin: 0;
+      }
+      .pref-section-help {
+        margin: 0;
+        color: var(--color-text-muted);
+        font-size: 12px;
+      }
+      .pref-color-grid {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 10px;
+      }
+      .pref-color-option {
+        min-height: 54px;
+        display: grid;
+        grid-template-columns: 20px minmax(0, 1fr);
+        align-items: center;
+        gap: 9px;
+        padding: 9px 10px;
+        border: 2px solid var(--color-border-soft);
+        border-radius: 12px;
+        background: var(--color-surface);
+        color: var(--color-text);
+        cursor: pointer;
+        text-align: left;
+        transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
+      }
+      .pref-color-option:hover {
+        border-color: color-mix(in srgb, var(--color-primary) 54%, var(--color-border-soft));
+      }
+      .pref-color-option.selected {
+        border-color: var(--color-primary);
+        background: color-mix(in srgb, var(--color-primary-soft) 58%, var(--color-surface));
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 15%, transparent);
+      }
+      .pref-color-option-copy {
+        min-width: 0;
+        display: grid;
+        gap: 2px;
+      }
+      .pref-color-option strong {
+        font-size: 13px;
+        line-height: 1.1;
+      }
+      .pref-color-status {
+        color: var(--color-primary);
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.35px;
+        text-transform: uppercase;
+      }
+      .pref-color-swatch {
+        width: 20px;
+        height: 20px;
+        border: 2px solid color-mix(in srgb, white 68%, transparent);
+        border-radius: 50%;
+        box-shadow: 0 0 0 1px var(--color-border);
+      }
+      [data-button-color-value="default"] .pref-color-swatch {
+        background: linear-gradient(135deg, var(--color-primary) 0 50%, var(--color-accent) 50%);
+      }
+      [data-button-color-value="forest"] .pref-color-swatch { background: #2d4a3e; }
+      [data-button-color-value="ocean"] .pref-color-swatch { background: #2f5e75; }
+      [data-button-color-value="plum"] .pref-color-swatch { background: #60405f; }
+      [data-button-color-value="clay"] .pref-color-swatch { background: #834536; }
+      .pref-button-demo {
+        min-height: 58px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        margin-top: 12px;
+        padding: 10px 12px 10px 14px;
+        border: 1px solid var(--color-border-soft);
+        border-radius: 12px;
+        background: color-mix(in srgb, var(--color-surface) 78%, transparent);
+      }
+      .pref-button-demo-copy {
+        display: grid;
+        gap: 2px;
+      }
+      .pref-button-demo-copy strong {
+        color: var(--color-text);
+        font-size: 13px;
+      }
+      .pref-button-demo-copy span {
+        color: var(--color-text-muted);
+        font-size: 11px;
+      }
+      .pref-demo-button {
+        min-width: 104px;
+        min-height: 38px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0 16px;
+        border-radius: 10px;
+        background: var(--color-primary);
+        box-shadow: 0 7px 16px color-mix(in srgb, var(--color-primary) 22%, transparent);
+        color: #fff;
+        font-size: 13px;
+        font-weight: 800;
+      }
+      .pref-theme-card:focus-visible,
+      .pref-color-option:focus-visible {
+        outline: 3px solid color-mix(in srgb, var(--color-primary) 58%, white);
+        outline-offset: 2px;
+      }
 
       /* Static preview colours per theme card, independent of the
          currently applied theme, so the user can compare them
@@ -169,6 +290,28 @@
       .pref-preview-dark .pref-swatch.primary { background: #7cc4e0; }
       .pref-preview-dark .pref-swatch.accent  { background: #4fd3c5; }
       .pref-preview-dark .pref-swatch.muted   { background: #3a4342; }
+
+      @media (max-width: 760px) {
+        .pref-shell {
+          place-items: start center;
+          overflow-y: auto;
+        }
+        .pref-card {
+          padding: 20px;
+        }
+        .pref-header {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+        .pref-color-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .pref-section-heading {
+          align-items: flex-start;
+          flex-direction: column;
+          gap: 4px;
+        }
+      }
     </style>
   </head>
   <body>
@@ -178,7 +321,7 @@
           <h1>Preferences</h1>
           <a href="/chat">← Back to Butler</a>
         </header>
-        <p class="pref-sub">Choose the visual theme that fits the mood you are working in. Your choice is saved on this device only.</p>
+        <p class="pref-sub">Choose a visual theme and button colour that fit your workspace. Your choices are saved on this device only.</p>
 
         <h2 class="pref-section-title">Theme</h2>
 
@@ -255,6 +398,45 @@
           </button>
 
         </div>
+
+        <section class="pref-color-section" aria-labelledby="pref-button-color-title">
+          <div class="pref-section-heading">
+            <h2 class="pref-section-title" id="pref-button-color-title">Button color</h2>
+            <p class="pref-section-help">Changes primary actions and selected controls across Butler.</p>
+          </div>
+
+          <div class="pref-color-grid" data-button-color-grid>
+            <% [
+              { value: "default", label: "Theme default" },
+              { value: "forest", label: "Forest" },
+              { value: "ocean", label: "Ocean" },
+              { value: "plum", label: "Plum" },
+              { value: "clay", label: "Clay" },
+            ].forEach(function(option) { %>
+              <button
+                type="button"
+                class="pref-color-option"
+                data-button-color-value="<%= option.value %>"
+                aria-pressed="false"
+                aria-label="<%= option.label %>"
+              >
+                <span class="pref-color-swatch" aria-hidden="true"></span>
+                <span class="pref-color-option-copy">
+                  <strong><%= option.label %></strong>
+                  <span class="pref-color-status" data-button-color-status hidden>Selected</span>
+                </span>
+              </button>
+            <% }) %>
+          </div>
+
+          <div class="pref-button-demo" aria-live="polite">
+            <span class="pref-button-demo-copy">
+              <strong>Live preview</strong>
+              <span>Your primary buttons update immediately.</span>
+            </span>
+            <span class="pref-demo-button">New task</span>
+          </div>
+        </section>
       </section>
     </main>
 
