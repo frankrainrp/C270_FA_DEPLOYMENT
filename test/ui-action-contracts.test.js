@@ -147,11 +147,13 @@ test("button effects point to registered and mounted API routes", () => {
     assert.ok(calendarRoutes.has(contract), `missing calendar API route: ${contract}`);
   });
 
-  assert.match(tasksUi, /ButlerApi\.post\("\/tasks"/);
+  assert.match(tasksUi, /ButlerApi\.createOperation\("task"\)/);
+  assert.match(tasksUi, /createTask\("\/tasks"/);
   assert.match(tasksUi, /ButlerApi\.put\("\/tasks\/" \+ idInput\.value/);
   assert.match(tasksUi, /ButlerApi\.patch\("\/tasks\/" \+ id \+ "\/toggle"/);
   assert.match(tasksUi, /ButlerApi\.del\("\/tasks\/" \+ delId/);
-  assert.match(calendarUi, /ButlerApi\.post\("\/calendar"/);
+  assert.match(calendarUi, /ButlerApi\.createOperation\("event"\)/);
+  assert.match(calendarUi, /createEvent\("\/calendar"/);
   assert.match(calendarUi, /ButlerApi\.get\("\/calendar\/month\/" \+ year \+ "\/" \+ month/);
 
   const mounts = [];

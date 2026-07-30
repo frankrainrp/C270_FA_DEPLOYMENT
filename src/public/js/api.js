@@ -8,6 +8,13 @@
 (function initApi() {
   var API_BASE = "/api";
 
+  function uniqueIdempotencyKey(scope) {
+    if (window.crypto && window.crypto.randomUUID) {
+      return window.crypto.randomUUID();
+    }
+    return String(scope || "create") + "-" + Date.now() + "-" + Math.random().toString(16).slice(2);
+  }
+
   async function request(method, path, body, options) {
     var extraHeaders = options && options.headers ? options.headers : {};
     var res = await fetch(API_BASE + path, {
@@ -31,9 +38,23 @@
     return payload.data;
   }
 
+  /**
+   * Creates a retry-safe POST operation. Reusing the returned function reuses
+   * the same idempotency key; creating a new operation produces a new key.
+   */
+  function createOperation(scope) {
+    var idempotencyKey = uniqueIdempotencyKey(scope);
+    return function create(path, body) {
+      return request("POST", path, body, {
+        headers: { "Idempotency-Key": idempotencyKey },
+      });
+    };
+  }
+
   window.ButlerApi = {
     get:    function (path)       { return request("GET",    path); },
     post:   function (path, body, options) { return request("POST", path, body, options); },
+    createOperation: createOperation,
     put:    function (path, body) { return request("PUT",    path, body); },
     patch:  function (path, body) { return request("PATCH",  path, body); },
     del:    function (path)       { return request("DELETE", path); },

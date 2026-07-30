@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const { generateIdempotencyKey } = require("../lib/idempotencyKey");
 
 const NoteSchema = new mongoose.Schema(
   {
@@ -11,7 +12,7 @@ const NoteSchema = new mongoose.Schema(
       lowercase: true,
       index: true,
     },
-    idempotencyKey: { type: String, trim: true, default: undefined },
+    idempotencyKey: { type: String, trim: true, default: generateIdempotencyKey },
     title: {
       type: String,
       required: [true, "Note title is required"],

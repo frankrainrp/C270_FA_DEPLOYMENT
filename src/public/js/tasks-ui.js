@@ -73,6 +73,7 @@
   // 2. Open Modal Logic
   function openModal(taskData) {
     var modal = ensureModal();
+    var createTask = ButlerApi.createOperation("task");
     var idInput = modal.querySelector("[data-task-id-input]");
     var titleInput = modal.querySelector("[data-task-title-input]");
     var descInput = modal.querySelector("[data-task-desc-input]");
@@ -141,7 +142,7 @@
       if (idInput.value) {
         req = ButlerApi.put("/tasks/" + idInput.value, payload);
       } else {
-        req = ButlerApi.post("/tasks", payload);
+        req = createTask("/tasks", payload);
       }
 
       req.then(function() {

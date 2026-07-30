@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const { generateIdempotencyKey } = require("../lib/idempotencyKey");
 
 const TaskSchema = new mongoose.Schema(
   {
@@ -9,7 +10,12 @@ const TaskSchema = new mongoose.Schema(
       lowercase: true,
       index: true,
     },
-    idempotencyKey: { type: String, trim: true, default: undefined },
+    // ownerEmail is always present, so MongoDB's compound sparse index also
+    // indexes documents whose idempotencyKey would otherwise be missing as
+    // null. Give ordinary UI creates a unique key to prevent the second
+    // document for an owner from colliding, while preserving caller-provided
+    // keys for retry deduplication.
+    idempotencyKey: { type: String, trim: true, default: generateIdempotencyKey },
     title: {
       type: String,
       required: [true, "Task title is required"],

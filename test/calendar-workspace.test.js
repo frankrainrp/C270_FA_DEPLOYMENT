@@ -85,7 +85,8 @@ test("new-event dialog creates a calendar event rather than a task", () => {
   const client = fs.readFileSync(calendarUi, "utf8");
 
   assert.match(client, /Create a calendar event/);
-  assert.match(client, /ButlerApi\.post\("\/calendar",\s*\{/);
+  assert.match(client, /ButlerApi\.createOperation\("event"\)/);
+  assert.match(client, /createEvent\("\/calendar",\s*\{/);
   assert.match(client, /date:\s*dateInput\.value/);
-  assert.doesNotMatch(client, /ButlerApi\.post\("\/tasks"/);
+  assert.doesNotMatch(client, /createTask\("\/tasks"/);
 });

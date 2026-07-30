@@ -160,11 +160,6 @@
     next.setAttribute("data-calendar-target-month", String(month === 11 ? 0 : month + 1));
   }
 
-  function uniqueIdempotencyKey() {
-    if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID();
-    return "event-" + Date.now() + "-" + Math.random().toString(16).slice(2);
-  }
-  
   function toDateInputValue(date) {
     var year = date.getFullYear();
     var month = String(date.getMonth() + 1).padStart(2, "0");
@@ -241,6 +236,7 @@
 
   function openEventModal() {
     var modal = ensureModal();
+    var createEvent = ButlerApi.createOperation("event");
     var titleInput = modal.querySelector("[data-calendar-event-title]");
     var dateInput = modal.querySelector("[data-calendar-event-date]");
     var descInput = modal.querySelector("[data-calendar-event-description]");
@@ -281,14 +277,14 @@
       
       submitBtn.disabled = true;
       
-      ButlerApi.post("/calendar", {
+      createEvent("/calendar", {
         title: title,
         date: dateInput.value,
         description: descInput.value.trim(),
         color: colorInput.value,
         tag: tagInput.value.trim(),
         allDay: true
-      }, { headers: { "Idempotency-Key": uniqueIdempotencyKey() } }).then(function () {
+      }).then(function () {
         closeModal(modal, onBackdropClick, onKeydown);
         loadMonth(parseCursor().year, parseCursor().month, true);
       }).catch(function (err) {
