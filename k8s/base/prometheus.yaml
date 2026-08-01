@@ -6,24 +6,37 @@ metadata:
     app.kubernetes.io/name: butler
     app.kubernetes.io/component: web
 spec:
+  serviceAccountName: butler-prometheus
   serviceMonitorSelector:
     matchLabels:
       app.kubernetes.io/name: butler
       app.kubernetes.io/component: web
-  serviceMonitorNamespaceSelector: {}
   ruleSelector:
     matchLabels:
       app.kubernetes.io/name: butler
       app.kubernetes.io/component: web
   remoteWrite:
-    - url: https://prometheus-prod-37-prod-ap-southeast-1.grafana.net/api/prom/push
+    - url: https://prometheus.example.invalid/api/prom/push
       basicAuth:
         username:
-          name: butler-runtime
-          key: PROMETHEUS_USERNAME
+          name: butler-prometheus-remote-write
+          key: username
         password:
-          name: butler-runtime
-          key: PROMETHEUS_API_KEY
+          name: butler-prometheus-remote-write
+          key: api-key
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 2000
+    fsGroup: 2000
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: prometheus
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop: ["ALL"]
   resources:
     requests:
       cpu: 100m

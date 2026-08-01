@@ -5,10 +5,6 @@ metadata:
   labels:
     app.kubernetes.io/name: butler
     app.kubernetes.io/component: web
-  annotations:
-    prometheus.io/scrape: "true"
-    prometheus.io/port: "9090"
-    prometheus.io/path: "/metrics"
 spec:
   type: ClusterIP
   selector:
@@ -21,7 +17,7 @@ spec:
       protocol: TCP
     - name: metrics
       port: 9090
-      targetPort: http
+      targetPort: metrics
       protocol: TCP
     - name: mongodb-metrics
       port: 9216

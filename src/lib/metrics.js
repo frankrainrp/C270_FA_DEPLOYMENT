@@ -1,4 +1,5 @@
 const client = require("prom-client");
+const mongoose = require("mongoose");
 
 client.collectDefaultMetrics({ prefix: "butler_" });
 
@@ -18,6 +19,9 @@ const httpRequestDurationSeconds = new client.Histogram({
 const dbConnected = new client.Gauge({
   name: "butler_db_connected",
   help: "1 when the application is connected to MongoDB, otherwise 0.",
+  collect() {
+    this.set(mongoose.connection.readyState === 1 ? 1 : 0);
+  },
 });
 
 const appUptimeSeconds = new client.Gauge({
@@ -27,18 +31,23 @@ const appUptimeSeconds = new client.Gauge({
 
 const metricsRegistry = client.register;
 
+function getRouteLabel(req) {
+  if (!req || !req.route || !req.route.path) return "unmatched";
+
+  const baseUrl = String(req.baseUrl || "").replace(/\/$/, "");
+  const routePath = String(req.route.path);
+  const separator = routePath.startsWith("/") ? "" : "/";
+  return `${baseUrl}${separator}${routePath}` || "/";
+}
+
 function observeHttpRequest(req, res, startTimeNs) {
   const durationSeconds = Number(process.hrtime.bigint() - startTimeNs) / 1e9;
-  const route = req.route && req.route.path ? String(req.route.path) : req.path || "unknown";
+  const route = getRouteLabel(req);
   const method = req.method || "GET";
   const status = String(res.statusCode || 0);
 
   httpRequestsTotal.inc({ method, route, status });
   httpRequestDurationSeconds.observe({ method, route, status }, durationSeconds);
-}
-
-function setDbConnectedState(connected) {
-  dbConnected.set(connected ? 1 : 0);
 }
 
 function refreshUptime() {
@@ -51,5 +60,5 @@ setInterval(refreshUptime, 10_000).unref();
 module.exports = {
   metricsRegistry,
   observeHttpRequest,
-  setDbConnectedState,
+  getRouteLabel,
 };

@@ -10,16 +10,18 @@
     app_host: "{{ lookup('ansible.builtin.env', 'APP_HOST') }}"
     app_url: "{{ lookup('ansible.builtin.env', 'APP_URL') | regex_replace('/$', '') }}"
     mongo_uri: "{{ lookup('ansible.builtin.env', 'MONGO_URI') }}"
+    mongodb_exporter_uri: "{{ lookup('ansible.builtin.env', 'MONGODB_EXPORTER_URI') }}"
     deepseek_api_key: "{{ lookup('ansible.builtin.env', 'DEEPSEEK_API_KEY') }}"
     n8n_otp_webhook_url: "{{ lookup('ansible.builtin.env', 'N8N_OTP_WEBHOOK_URL') }}"
+    prometheus_remote_write_url: "{{ lookup('ansible.builtin.env', 'PROMETHEUS_REMOTE_WRITE_URL') | regex_replace('/$', '') }}"
+    prometheus_username: "{{ lookup('ansible.builtin.env', 'PROMETHEUS_USERNAME') }}"
+    prometheus_api_key: "{{ lookup('ansible.builtin.env', 'PROMETHEUS_API_KEY') }}"
     ghcr_username: "{{ lookup('ansible.builtin.env', 'GHCR_USERNAME') }}"
     ghcr_token: "{{ lookup('ansible.builtin.env', 'GHCR_READ_TOKEN') }}"
     namespace_by_environment:
       staging: butler-staging
       production: butler-production
     target_namespace: "{{ namespace_by_environment[deploy_environment] | default('') }}"
-    prometheus_operator_namespace: monitoring
-    prometheus_operator_bundle_url: https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/main/bundle.yaml
     repository_root: "{{ playbook_dir }}/../.."
     overlay_path: "{{ repository_root }}/k8s/overlays/{{ deploy_environment }}"
 
@@ -33,8 +35,12 @@
           - app_host | length > 0
           - app_url is match('^https://')
           - mongo_uri | length > 0
+          - mongodb_exporter_uri is match('^mongodb(\+srv)?://')
           - deepseek_api_key | length > 0
           - n8n_otp_webhook_url is match('^https://')
+          - prometheus_remote_write_url is match('^https://')
+          - prometheus_username | length > 0
+          - prometheus_api_key | length > 0
           - ghcr_username | length > 0
           - ghcr_token | length > 0
         fail_msg: Configure every required GitHub Environment secret/variable before deploying.
@@ -46,6 +52,23 @@
         api_version: v1
         kind: Namespace
       register: cluster_access
+
+    - name: Verify that the Prometheus Operator CRDs are installed
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - --kubeconfig
+          - "{{ kubeconfig_path }}"
+          - api-resources
+          - --api-group=monitoring.coreos.com
+          - --output=name
+      register: prometheus_operator_resources
+      changed_when: false
+      failed_when: >-
+        prometheus_operator_resources.rc != 0 or
+        'prometheuses.monitoring.coreos.com' not in prometheus_operator_resources.stdout_lines or
+        'servicemonitors.monitoring.coreos.com' not in prometheus_operator_resources.stdout_lines or
+        'prometheusrules.monitoring.coreos.com' not in prometheus_operator_resources.stdout_lines
 
   tasks:
     - name: Deploy and verify the immutable image
@@ -66,46 +89,6 @@
                   pod-security.kubernetes.io/enforce: restricted
                   pod-security.kubernetes.io/audit: restricted
                   pod-security.kubernetes.io/warn: restricted
-      
-        - name: Ensure the Prometheus Operator namespace exists
-          kubernetes.core.k8s:
-            kubeconfig: "{{ kubeconfig_path }}"
-            state: present
-            apply: true
-            definition:
-              apiVersion: v1
-              kind: Namespace
-              metadata:
-                name: "{{ prometheus_operator_namespace }}"
-
-        - name: Install Prometheus Operator with kubectl
-          ansible.builtin.command:
-            argv:
-              - kubectl
-              - --kubeconfig
-              - "{{ kubeconfig_path }}"
-              - --namespace
-              - "{{ prometheus_operator_namespace }}"
-              - apply
-              - -f
-              - "{{ prometheus_operator_bundle_url }}"
-          register: prometheus_operator_install
-          changed_when: false
-
-        - name: Wait for Prometheus Operator CRDs to become established
-          ansible.builtin.command:
-            argv:
-              - kubectl
-              - --kubeconfig
-              - "{{ kubeconfig_path }}"
-              - wait
-              - --for=condition=Established
-              - crd/servicemonitors.monitoring.coreos.com
-              - crd/prometheuses.monitoring.coreos.com
-              - --timeout=120s
-          register: prometheus_operator_crds
-          changed_when: false
-
         - name: Create or update application runtime secrets
           kubernetes.core.k8s:
             kubeconfig: "{{ kubeconfig_path }}"
@@ -122,6 +105,39 @@
                 MONGO_URI: "{{ mongo_uri }}"
                 DEEPSEEK_API_KEY: "{{ deepseek_api_key }}"
                 N8N_OTP_WEBHOOK_URL: "{{ n8n_otp_webhook_url }}"
+          no_log: true
+
+        - name: Create or update the MongoDB exporter secret
+          kubernetes.core.k8s:
+            kubeconfig: "{{ kubeconfig_path }}"
+            state: present
+            apply: true
+            definition:
+              apiVersion: v1
+              kind: Secret
+              metadata:
+                name: butler-mongodb-exporter
+                namespace: "{{ target_namespace }}"
+              type: Opaque
+              stringData:
+                MONGODB_EXPORTER_URI: "{{ mongodb_exporter_uri }}"
+          no_log: true
+
+        - name: Create or update the Prometheus remote-write secret
+          kubernetes.core.k8s:
+            kubeconfig: "{{ kubeconfig_path }}"
+            state: present
+            apply: true
+            definition:
+              apiVersion: v1
+              kind: Secret
+              metadata:
+                name: butler-prometheus-remote-write
+                namespace: "{{ target_namespace }}"
+              type: Opaque
+              stringData:
+                username: "{{ prometheus_username }}"
+                api-key: "{{ prometheus_api_key }}"
           no_log: true
 
         - name: Build the private GHCR pull configuration
@@ -181,6 +197,29 @@
                       - name: butler
                         image: "{{ image_ref }}"
 
+        - name: Configure the environment's Grafana Cloud remote-write endpoint
+          kubernetes.core.k8s:
+            kubeconfig: "{{ kubeconfig_path }}"
+            state: present
+            merge_type: merge
+            definition:
+              apiVersion: monitoring.coreos.com/v1
+              kind: Prometheus
+              metadata:
+                name: butler
+                namespace: "{{ target_namespace }}"
+              spec:
+                remoteWrite:
+                  - url: "{{ prometheus_remote_write_url }}"
+                    basicAuth:
+                      username:
+                        name: butler-prometheus-remote-write
+                        key: username
+                      password:
+                        name: butler-prometheus-remote-write
+                        key: api-key
+          no_log: true
+
         - name: Set the environment's real HTTPS hostname
           kubernetes.core.k8s:
             kubeconfig: "{{ kubeconfig_path }}"
@@ -223,6 +262,24 @@
               - deployment/butler
               - --timeout=5m
           register: rollout_result
+          changed_when: false
+
+        - name: Wait for Prometheus to become ready
+          ansible.builtin.command:
+            argv:
+              - kubectl
+              - --kubeconfig
+              - "{{ kubeconfig_path }}"
+              - --namespace
+              - "{{ target_namespace }}"
+              - rollout
+              - status
+              - statefulset/prometheus-butler
+              - --timeout=20s
+          register: prometheus_rollout
+          retries: 12
+          delay: 10
+          until: prometheus_rollout.rc == 0
           changed_when: false
 
         - name: Verify the public readiness endpoint

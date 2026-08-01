@@ -43,6 +43,9 @@ spec:
             - name: http
               containerPort: 3000
               protocol: TCP
+            - name: metrics
+              containerPort: 9090
+              protocol: TCP
           envFrom:
             - configMapRef:
                 name: butler-config
@@ -98,13 +101,14 @@ spec:
             - name: mongodb-metrics
               containerPort: 9216
               protocol: TCP
-          envFrom:
-            - configMapRef:
-                name: butler-config
-            - secretRef:
-                name: butler-runtime
+          env:
+            - name: MONGODB_EXPORTER_URI
+              valueFrom:
+                secretKeyRef:
+                  name: butler-mongodb-exporter
+                  key: MONGODB_EXPORTER_URI
           args:
-            - --mongodb.uri=$(MONGO_URI)
+            - --mongodb.uri=$(MONGODB_EXPORTER_URI)
             - --web.listen-address=:9216
           readinessProbe:
             httpGet:

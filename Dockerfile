@@ -13,8 +13,9 @@ RUN npm ci --omit=dev \
 COPY --chown=node:node src ./src
 COPY --chown=node:node scripts ./scripts
 
-EXPOSE 3000
+EXPOSE 3000 9090
 ENV PORT=3000
+ENV METRICS_PORT=9090
 ENV NODE_ENV=production
 
 USER node

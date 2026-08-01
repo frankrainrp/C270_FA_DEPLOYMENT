@@ -260,8 +260,12 @@ jobs:
           APP_HOST: ${{ vars.APP_HOST }}
           APP_URL: ${{ vars.APP_URL }}
           MONGO_URI: ${{ secrets.MONGO_URI }}
+          MONGODB_EXPORTER_URI: ${{ secrets.MONGODB_EXPORTER_URI }}
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           N8N_OTP_WEBHOOK_URL: ${{ secrets.N8N_OTP_WEBHOOK_URL }}
+          PROMETHEUS_REMOTE_WRITE_URL: ${{ vars.PROMETHEUS_REMOTE_WRITE_URL }}
+          PROMETHEUS_USERNAME: ${{ secrets.PROMETHEUS_USERNAME }}
+          PROMETHEUS_API_KEY: ${{ secrets.PROMETHEUS_API_KEY }}
           GHCR_USERNAME: ${{ vars.GHCR_USERNAME }}
           GHCR_READ_TOKEN: ${{ secrets.GHCR_READ_TOKEN }}
         run: ansible-playbook ansible/playbooks/deploy.yml
@@ -312,8 +316,12 @@ jobs:
           APP_HOST: ${{ vars.APP_HOST }}
           APP_URL: ${{ vars.APP_URL }}
           MONGO_URI: ${{ secrets.MONGO_URI }}
+          MONGODB_EXPORTER_URI: ${{ secrets.MONGODB_EXPORTER_URI }}
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           N8N_OTP_WEBHOOK_URL: ${{ secrets.N8N_OTP_WEBHOOK_URL }}
+          PROMETHEUS_REMOTE_WRITE_URL: ${{ vars.PROMETHEUS_REMOTE_WRITE_URL }}
+          PROMETHEUS_USERNAME: ${{ secrets.PROMETHEUS_USERNAME }}
+          PROMETHEUS_API_KEY: ${{ secrets.PROMETHEUS_API_KEY }}
           GHCR_USERNAME: ${{ vars.GHCR_USERNAME }}
           GHCR_READ_TOKEN: ${{ secrets.GHCR_READ_TOKEN }}
         run: ansible-playbook ansible/playbooks/deploy.yml

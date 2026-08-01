@@ -59,11 +59,11 @@ test("active auth service exposes MongoDB session operations instead of JWT oper
   assert.equal(AuthService.issueSessionToken, undefined);
 });
 
-test("global auth guard keeps login, probe, and Prometheus scrape endpoints public", () => {
+test("global auth guard keeps only login and probe endpoints public", () => {
   assert.equal(isPublicPath("/auth/login"), true);
   assert.equal(isPublicPath("/api/live"), true);
   assert.equal(isPublicPath("/api/health"), true);
-  assert.equal(isPublicPath("/metrics"), true);
+  assert.equal(isPublicPath("/metrics"), false);
   assert.equal(isPublicPath("/api/auth/request-otp"), true);
   assert.equal(isPublicPath("/api/tasks"), false);
 });

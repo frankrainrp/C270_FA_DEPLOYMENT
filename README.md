@@ -730,15 +730,19 @@ Configure these variables in each Environment:
 | `APP_HOST` | `staging.example.com` or `app.example.com` |
 | `APP_URL` | `https://staging.example.com` or `https://app.example.com` |
 | `GHCR_USERNAME` | GitHub account allowed to read the package |
+| `PROMETHEUS_REMOTE_WRITE_URL` | Environment-specific Grafana Cloud Prometheus remote-write URL |
 
 Configure these secrets independently in each Environment:
 
 | Secret | Purpose |
 |---|---|
 | `MONGO_URI` | Environment-specific Atlas connection string |
+| `MONGODB_EXPORTER_URI` | Dedicated least-privilege MongoDB monitoring connection string |
 | `DEEPSEEK_API_KEY` | Live Agent model credential |
 | `N8N_OTP_WEBHOOK_URL` | Production HTTPS OTP workflow |
 | `GHCR_READ_TOKEN` | Read-only `read:packages` credential for private GHCR |
+| `PROMETHEUS_USERNAME` | Grafana Cloud Prometheus tenant/user ID |
+| `PROMETHEUS_API_KEY` | Grafana Cloud access-policy token with metrics write permission |
 
 Configure the non-secret Environment variables:
 
@@ -746,6 +750,7 @@ Configure the non-secret Environment variables:
 gh variable set APP_HOST --env staging --body "staging.example.com"
 gh variable set APP_URL --env staging --body "https://staging.example.com"
 gh variable set GHCR_USERNAME --env staging --body "YOUR_GITHUB_USER"
+gh variable set PROMETHEUS_REMOTE_WRITE_URL --env staging --body "https://YOUR_GRAFANA_PROMETHEUS_HOST/api/prom/push"
 ```
 
 Repeat the variable commands for `production`. Set the secrets interactively
@@ -759,6 +764,12 @@ image manifest from GHCR. This catches missing, expired, or incorrectly scoped
 package credentials even when the K3s node already has a cached copy of the
 image.
 
+Create `MONGODB_EXPORTER_URI` with a dedicated MongoDB account that has only
+the monitoring permissions required by Percona MongoDB Exporter. Do not reuse
+an administrative database account. The Grafana Cloud token should likewise
+have metrics-write permission only; it does not need organization or dashboard
+administration permissions.
+
 To verify one Environment without deploying or changing Kubernetes resources,
 run the **Verify GHCR Environment Credential** workflow manually and select
 `staging` or `production`. The production Environment's normal reviewer
@@ -769,7 +780,22 @@ The local K3s admin kubeconfig is sufficient for initial setup but broader than
 a mature CD identity should be. After the first deployment, replace it with a
 namespace-scoped service account permitted to manage only Butler resources.
 
-### 6. First automated deployment
+### 6. Install the Prometheus Operator prerequisite
+
+The Prometheus Operator owns cluster-scoped CRDs and RBAC, so install it once
+with a cluster-admin kubeconfig instead of granting cluster-admin to the normal
+deployment workflow. The playbook pins the operator to a reviewed release:
+
+```bash
+export K8S_AUTH_KUBECONFIG="$HOME/.kube/butler-k3s.yaml"
+ansible-playbook ansible/playbooks/install-prometheus-operator.yml
+```
+
+Re-run this explicit bootstrap playbook only when intentionally upgrading the
+pinned operator version. Normal Butler deployments verify that the CRDs exist
+but do not modify cluster-wide monitoring infrastructure.
+
+### 7. First automated deployment
 
 The deployment workflow must exist on `main`, and the matching repository
 deployment variable must be `true`; a successful run on a feature branch does
@@ -798,24 +824,51 @@ The deployment jobs use `ansible/playbooks/deploy.yml`. They do not rebuild the
 image. Staging and production both receive the exact
 `ghcr.io/...:sha-${GITHUB_SHA}` image that passed CI.
 
-### 7. Verify the cloud deployment
+### 8. Verify the cloud deployment
 
 ```bash
 export KUBECONFIG="$HOME/.kube/butler-k3s.yaml"
 kubectl -n butler-staging get deployment,pods,service,ingress,hpa,pdb
 kubectl -n butler-production get deployment,pods,service,ingress,hpa,pdb
+kubectl -n butler-staging get prometheus,servicemonitor,prometheusrule
+kubectl -n butler-staging get pods -l prometheus=butler
 kubectl -n butler-production rollout history deployment/butler
 
 curl --fail --show-error https://app.example.com/api/live
 curl --fail --show-error https://app.example.com/api/health
 ```
 
+For an administrator-only local view of the staging Prometheus UI, keep the
+service private and use a port-forward:
+
+```bash
+kubectl -n butler-staging port-forward service/butler-prometheus 9090:9090
+```
+
+Then open `http://127.0.0.1:9090/targets` and confirm that both Butler and the
+MongoDB exporter are `UP`. Long-term dashboards are viewed in Grafana Cloud;
+Grafana itself is not deployed into the K3s cluster.
+
+The application metrics listener is deliberately excluded from the public
+Ingress. To inspect the raw staging metrics, use a separate local port:
+
+```bash
+kubectl -n butler-staging port-forward service/butler 9091:9090
+```
+
+Then open `http://127.0.0.1:9091/metrics`.
+
+The checked-in `PrometheusRule` resources are evaluated by the in-cluster
+Prometheus instance. Remote write sends metric samples, not alert
+notifications. Configure Grafana Cloud managed alerts and contact points
+separately if email, Slack, or other notifications are required.
+
 `/api/live` should return `status: alive`. `/api/health` should return
 `status: ready` and `database: connected`. Complete a real OTP login and one
 read-only Agent request, then approve one write request and verify the saved
 record.
 
-### 8. Manual deployment and rollback
+### 9. Manual deployment and rollback
 
 Normal releases use GitHub Actions. For an authorized operator deployment,
 load the same values from a secret manager into environment variables and run:
@@ -826,8 +879,9 @@ export K8S_AUTH_KUBECONFIG="$HOME/.kube/butler-k3s.yaml"
 export IMAGE="ghcr.io/frankrainrp/c270_fa_deployment:sha-FULL_40_CHAR_COMMIT"
 export APP_HOST="app.example.com"
 export APP_URL="https://app.example.com"
-# Load MONGO_URI, DEEPSEEK_API_KEY, N8N_OTP_WEBHOOK_URL,
-# GHCR_USERNAME and GHCR_READ_TOKEN
+# Load MONGO_URI, MONGODB_EXPORTER_URI, DEEPSEEK_API_KEY,
+# N8N_OTP_WEBHOOK_URL, PROMETHEUS_REMOTE_WRITE_URL,
+# PROMETHEUS_USERNAME, PROMETHEUS_API_KEY, GHCR_USERNAME and GHCR_READ_TOKEN
 # from the approved secret manager without printing them.
 ansible-playbook ansible/playbooks/deploy.yml
 ```
@@ -845,7 +899,7 @@ Application rollback does not reverse destructive database migrations. Use
 backward-compatible expand/contract migrations and test Atlas restore
 procedures separately.
 
-### 9. What is and is not automatic
+### 10. What is and is not automatic
 
 After the cluster, DNS, cert-manager, Atlas, GitHub Environments, and secrets
 are configured, every successful `main` push completes build, test, image
