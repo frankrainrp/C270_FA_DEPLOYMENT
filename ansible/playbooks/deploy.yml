@@ -195,6 +195,17 @@
           register: rendered_manifests
           changed_when: false
 
+        - name: Inject immutable environment values before applying resources
+          ansible.builtin.set_fact:
+            deployment_manifests: >-
+              {{
+                rendered_manifests.stdout
+                | replace('ghcr.io/frankrainrp/c270_fa_deployment:sha-REQUIRED', image_ref)
+                | replace('https://prometheus.example.invalid/api/prom/push', prometheus_remote_write_url)
+                | replace(deploy_environment + '.butler.invalid', app_host)
+              }}
+          no_log: true
+
         - name: Apply the rendered resources in one throttled kubectl process
           ansible.builtin.command:
             argv:
@@ -204,93 +215,12 @@
               - --request-timeout=30s
               - apply
               - --server-side
+              - --force-conflicts
               - --field-manager=butler-cd
               - --filename=-
-            stdin: "{{ rendered_manifests.stdout }}"
+            stdin: "{{ deployment_manifests }}"
           register: manifest_apply
           until: manifest_apply.rc == 0
-          retries: 5
-          delay: 20
-
-        - name: Pin the Deployment to the verified GHCR SHA image
-          kubernetes.core.k8s:
-            kubeconfig: "{{ kubeconfig_path }}"
-            state: present
-            merge_type: strategic-merge
-            definition:
-              apiVersion: apps/v1
-              kind: Deployment
-              metadata:
-                name: butler
-                namespace: "{{ target_namespace }}"
-              spec:
-                template:
-                  spec:
-                    containers:
-                      - name: butler
-                        image: "{{ image_ref }}"
-          register: image_patch
-          until: image_patch is succeeded
-          retries: 5
-          delay: 20
-
-        - name: Configure the environment's Grafana Cloud remote-write endpoint
-          kubernetes.core.k8s:
-            kubeconfig: "{{ kubeconfig_path }}"
-            state: present
-            merge_type: merge
-            definition:
-              apiVersion: monitoring.coreos.com/v1
-              kind: Prometheus
-              metadata:
-                name: butler
-                namespace: "{{ target_namespace }}"
-              spec:
-                remoteWrite:
-                  - url: "{{ prometheus_remote_write_url }}"
-                    basicAuth:
-                      username:
-                        name: butler-prometheus-remote-write
-                        key: username
-                      password:
-                        name: butler-prometheus-remote-write
-                        key: api-key
-          register: remote_write_patch
-          until: remote_write_patch is succeeded
-          retries: 5
-          delay: 20
-          no_log: true
-
-        - name: Set the environment's real HTTPS hostname
-          kubernetes.core.k8s:
-            kubeconfig: "{{ kubeconfig_path }}"
-            state: present
-            merge_type: strategic-merge
-            definition:
-              apiVersion: networking.k8s.io/v1
-              kind: Ingress
-              metadata:
-                name: butler
-                namespace: "{{ target_namespace }}"
-                annotations:
-                  cert-manager.io/cluster-issuer: letsencrypt-production
-              spec:
-                tls:
-                  - hosts: ["{{ app_host }}"]
-                    secretName: butler-tls
-                rules:
-                  - host: "{{ app_host }}"
-                    http:
-                      paths:
-                        - path: /
-                          pathType: Prefix
-                          backend:
-                            service:
-                              name: butler
-                              port:
-                                number: 80
-          register: ingress_patch
-          until: ingress_patch is succeeded
           retries: 5
           delay: 20
 
