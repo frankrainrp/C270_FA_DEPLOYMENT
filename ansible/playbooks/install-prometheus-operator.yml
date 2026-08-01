@@ -1,0 +1,76 @@
+---
+- name: Install the cluster-wide Prometheus Operator prerequisite
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    kubeconfig_path: "{{ lookup('ansible.builtin.env', 'K8S_AUTH_KUBECONFIG') }}"
+    prometheus_operator_namespace: default
+    prometheus_operator_version: v0.93.0
+    prometheus_operator_bundle_url: "https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/{{ prometheus_operator_version }}/bundle.yaml"
+
+  pre_tasks:
+    - name: Validate the administrator kubeconfig
+      ansible.builtin.assert:
+        that:
+          - kubeconfig_path | length > 0
+        fail_msg: Set K8S_AUTH_KUBECONFIG to a cluster-admin kubeconfig before installing the operator.
+
+    - name: Verify cluster-admin access
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - --kubeconfig
+          - "{{ kubeconfig_path }}"
+          - auth
+          - can-i
+          - create
+          - customresourcedefinitions.apiextensions.k8s.io
+      register: cluster_admin_check
+      changed_when: false
+      failed_when: cluster_admin_check.stdout | trim != 'yes'
+
+  tasks:
+    - name: Install the pinned Prometheus Operator bundle
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - --kubeconfig
+          - "{{ kubeconfig_path }}"
+          - --namespace
+          - "{{ prometheus_operator_namespace }}"
+          - apply
+          - --server-side
+          - --field-manager=butler-platform-bootstrap
+          - -f
+          - "{{ prometheus_operator_bundle_url }}"
+      register: prometheus_operator_install
+      changed_when: "'configured' in prometheus_operator_install.stdout or 'created' in prometheus_operator_install.stdout"
+
+    - name: Wait for the required CRDs to become established
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - --kubeconfig
+          - "{{ kubeconfig_path }}"
+          - wait
+          - --for=condition=Established
+          - crd/servicemonitors.monitoring.coreos.com
+          - crd/prometheuses.monitoring.coreos.com
+          - crd/prometheusrules.monitoring.coreos.com
+          - --timeout=180s
+      changed_when: false
+
+    - name: Wait for the Prometheus Operator to become available
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - --kubeconfig
+          - "{{ kubeconfig_path }}"
+          - --namespace
+          - "{{ prometheus_operator_namespace }}"
+          - wait
+          - --for=condition=Available
+          - deployment/prometheus-operator
+          - --timeout=180s
+      changed_when: false

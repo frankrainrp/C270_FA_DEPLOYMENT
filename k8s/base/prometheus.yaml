@@ -1,0 +1,48 @@
+apiVersion: monitoring.coreos.com/v1
+kind: Prometheus
+metadata:
+  name: butler
+  labels:
+    app.kubernetes.io/name: butler
+    app.kubernetes.io/component: web
+spec:
+  serviceAccountName: butler-prometheus
+  serviceMonitorSelector:
+    matchLabels:
+      app.kubernetes.io/name: butler
+      app.kubernetes.io/component: web
+  ruleSelector:
+    matchLabels:
+      app.kubernetes.io/name: butler
+      app.kubernetes.io/component: web
+  remoteWrite:
+    - url: https://prometheus.example.invalid/api/prom/push
+      basicAuth:
+        username:
+          name: butler-prometheus-remote-write
+          key: username
+        password:
+          name: butler-prometheus-remote-write
+          key: api-key
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 2000
+    fsGroup: 2000
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: prometheus
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop: ["ALL"]
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 250m
+      memory: 512Mi
+  retention: 24h

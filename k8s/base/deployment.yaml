@@ -43,6 +43,9 @@ spec:
             - name: http
               containerPort: 3000
               protocol: TCP
+            - name: metrics
+              containerPort: 9090
+              protocol: TCP
           envFrom:
             - configMapRef:
                 name: butler-config
@@ -91,6 +94,48 @@ spec:
           volumeMounts:
             - name: temporary-files
               mountPath: /tmp
+        - name: mongodb-exporter
+          image: percona/mongodb_exporter:0.44.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: mongodb-metrics
+              containerPort: 9216
+              protocol: TCP
+          env:
+            - name: MONGODB_EXPORTER_URI
+              valueFrom:
+                secretKeyRef:
+                  name: butler-mongodb-exporter
+                  key: MONGODB_EXPORTER_URI
+          args:
+            - --mongodb.uri=$(MONGODB_EXPORTER_URI)
+            - --web.listen-address=:9216
+          readinessProbe:
+            httpGet:
+              path: /metrics
+              port: mongodb-metrics
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /metrics
+              port: mongodb-metrics
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 20m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
       volumes:
         - name: temporary-files
           emptyDir:

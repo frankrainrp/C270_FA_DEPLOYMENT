@@ -23,6 +23,15 @@ spec:
       ports:
         - protocol: TCP
           port: 3000
+    - from:
+        - podSelector:
+            matchLabels:
+              prometheus: butler
+      ports:
+        - protocol: TCP
+          port: 9090
+        - protocol: TCP
+          port: 9216
   egress:
     - to:
         - namespaceSelector:

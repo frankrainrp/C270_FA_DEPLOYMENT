@@ -5,6 +5,15 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      operation:
+        description: Workflow operation to run
+        required: true
+        default: validate
+        type: choice
+        options:
+          - validate
+          - bootstrap-prometheus-operator
 
 permissions:
   contents: read
@@ -96,8 +105,43 @@ jobs:
           ansible-playbook --syntax-check --inventory ansible/inventory.example.yml ansible/playbooks/bootstrap-k3s.yml
           ansible-playbook --syntax-check --inventory ansible/inventory.example.yml ansible/playbooks/export-kubeconfig.yml
           ansible-playbook --syntax-check --inventory localhost, ansible/playbooks/install-cert-manager.yml
+          ansible-playbook --syntax-check --inventory localhost, ansible/playbooks/install-prometheus-operator.yml
           ansible-playbook --syntax-check --inventory localhost, ansible/playbooks/deploy.yml
           ansible-playbook --syntax-check --inventory localhost, ansible/playbooks/rollback.yml
+
+  bootstrap-prometheus-operator:
+    name: Bootstrap Prometheus Operator
+    if: github.event_name == 'workflow_dispatch' && inputs.operation == 'bootstrap-prometheus-operator'
+    runs-on: [self-hosted, Linux, X64, butler-k3s]
+    timeout-minutes: 10
+    concurrency:
+      group: butler-cluster-bootstrap
+      cancel-in-progress: false
+    environment:
+      name: production
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: ansible/requirements.txt
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v5
+
+      - name: Install Ansible and Kubernetes dependencies
+        run: |
+          python -m pip install --requirement ansible/requirements.txt
+          ansible-galaxy collection install --requirements-file ansible/requirements.yml
+
+      - name: Install and verify the pinned Prometheus Operator
+        env:
+          K8S_AUTH_KUBECONFIG: /home/github-runner/.kube/config
+        run: ansible-playbook ansible/playbooks/install-prometheus-operator.yml
 
   docker-smoke:
     name: Build and smoke-test containers
@@ -260,8 +304,12 @@ jobs:
           APP_HOST: ${{ vars.APP_HOST }}
           APP_URL: ${{ vars.APP_URL }}
           MONGO_URI: ${{ secrets.MONGO_URI }}
+          MONGODB_EXPORTER_URI: ${{ secrets.MONGODB_EXPORTER_URI }}
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           N8N_OTP_WEBHOOK_URL: ${{ secrets.N8N_OTP_WEBHOOK_URL }}
+          PROMETHEUS_REMOTE_WRITE_URL: ${{ vars.PROMETHEUS_REMOTE_WRITE_URL }}
+          PROMETHEUS_USERNAME: ${{ secrets.PROMETHEUS_USERNAME }}
+          PROMETHEUS_API_KEY: ${{ secrets.PROMETHEUS_API_KEY }}
           GHCR_USERNAME: ${{ vars.GHCR_USERNAME }}
           GHCR_READ_TOKEN: ${{ secrets.GHCR_READ_TOKEN }}
         run: ansible-playbook ansible/playbooks/deploy.yml
@@ -312,8 +360,12 @@ jobs:
           APP_HOST: ${{ vars.APP_HOST }}
           APP_URL: ${{ vars.APP_URL }}
           MONGO_URI: ${{ secrets.MONGO_URI }}
+          MONGODB_EXPORTER_URI: ${{ secrets.MONGODB_EXPORTER_URI }}
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           N8N_OTP_WEBHOOK_URL: ${{ secrets.N8N_OTP_WEBHOOK_URL }}
+          PROMETHEUS_REMOTE_WRITE_URL: ${{ vars.PROMETHEUS_REMOTE_WRITE_URL }}
+          PROMETHEUS_USERNAME: ${{ secrets.PROMETHEUS_USERNAME }}
+          PROMETHEUS_API_KEY: ${{ secrets.PROMETHEUS_API_KEY }}
           GHCR_USERNAME: ${{ vars.GHCR_USERNAME }}
           GHCR_READ_TOKEN: ${{ secrets.GHCR_READ_TOKEN }}
         run: ansible-playbook ansible/playbooks/deploy.yml

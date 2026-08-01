@@ -8,6 +8,7 @@ metadata:
 data:
   NODE_ENV: production
   PORT: "3000"
+  METRICS_PORT: "9090"
   AUTH_REQUIRED: "true"
   LOCAL_DEMO_MODE: "false"
   CHAT_MOCK_MODE: "false"

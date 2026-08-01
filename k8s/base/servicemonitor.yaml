@@ -1,0 +1,35 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: butler
+  labels:
+    app.kubernetes.io/name: butler
+    app.kubernetes.io/component: web
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: butler
+      app.kubernetes.io/component: web
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: butler-mongodb
+  labels:
+    app.kubernetes.io/name: butler
+    app.kubernetes.io/component: web
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: butler
+      app.kubernetes.io/component: web
+  endpoints:
+    - port: mongodb-metrics
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s

@@ -28,20 +28,33 @@ try {
 const mountRoutes = require("./routes");
 const { makeFail } = require("./lib/apiResponse");
 const { connectDb } = require("./lib/db");
+const { metricsRegistry, observeHttpRequest } = require("./lib/metrics");
 const AuthService = require("./services/AuthService");
 
 AuthService.assertProductionConfig();
 
 const app = express();
+const metricsApp = express();
 
 // ------------------------------------------------------------------
 // Global middleware
 // ------------------------------------------------------------------
+app.use((req, res, next) => {
+  const startTimeNs = process.hrtime.bigint();
+  res.on("finish", () => observeHttpRequest(req, res, startTimeNs));
+  next();
+});
 app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 app.use(express.json({ limit: "5mb" }));
 // Static assets served from src/public.
 // Requests like /css/style.css or /js/shell.js resolve to files here.
 app.use(express.static(path.join(__dirname, "public")));
+
+metricsApp.disable("x-powered-by");
+metricsApp.get("/metrics", async (_req, res) => {
+  res.set("Content-Type", metricsRegistry.contentType);
+  res.end(await metricsRegistry.metrics());
+});
 
 // ------------------------------------------------------------------
 // EJS view engine
@@ -82,7 +95,9 @@ app.use((err, req, res, _next) => {
 // Server bootstrap
 // ------------------------------------------------------------------
 const PORT = process.env.PORT || 3000;
+const METRICS_PORT = process.env.METRICS_PORT || 9090;
 let server = null;
+let metricsServer = null;
 let shuttingDown = false;
 
 /** Starts listening only after MongoDB is ready, so Docker health is truthful. */
@@ -90,6 +105,9 @@ async function start() {
   await connectDb();
   server = app.listen(PORT, () => {
     console.log(`Butler is running at http://localhost:${PORT}`);
+  });
+  metricsServer = metricsApp.listen(METRICS_PORT, () => {
+    console.log(`[metrics] Prometheus endpoint listening on port ${METRICS_PORT}`);
   });
 }
 
@@ -99,9 +117,10 @@ async function shutdown(signal) {
   shuttingDown = true;
   console.log(`[app] ${signal} received; shutting down.`);
 
-  if (server) {
-    await new Promise((resolve) => server.close(resolve));
-  }
+  const activeServers = [server, metricsServer].filter(Boolean);
+  await Promise.all(activeServers.map((activeServer) => (
+    new Promise((resolve) => activeServer.close(resolve))
+  )));
   await mongoose.disconnect();
 }
 

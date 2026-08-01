@@ -1,0 +1,27 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: butler-alerts
+  labels:
+    app.kubernetes.io/name: butler
+    app.kubernetes.io/component: web
+spec:
+  groups:
+    - name: butler.alerts
+      rules:
+        - alert: ButlerAppDatabaseDisconnected
+          expr: butler_db_connected == 0
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: Butler database is disconnected
+            description: The Butler app is reporting that MongoDB is not connected.
+        - alert: ButlerAppUnavailable
+          expr: absent(up{job="butler"}) == 1
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: Butler metrics are not being scraped
+            description: Prometheus is not receiving Butler metrics from the service monitor.
