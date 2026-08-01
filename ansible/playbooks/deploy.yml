@@ -177,7 +177,12 @@
             kubeconfig: "{{ kubeconfig_path }}"
             state: present
             apply: true
-            definition: "{{ rendered_manifests.stdout | from_yaml_all | list }}"
+            definition: "{{ manifest }}"
+          loop: "{{ rendered_manifests.stdout | from_yaml_all | list }}"
+          loop_control:
+            loop_var: manifest
+            label: "{{ manifest.kind }}/{{ manifest.metadata.name }}"
+            pause: 2
           register: manifest_apply
           until: manifest_apply is succeeded
           retries: 5
@@ -200,6 +205,10 @@
                     containers:
                       - name: butler
                         image: "{{ image_ref }}"
+          register: image_patch
+          until: image_patch is succeeded
+          retries: 5
+          delay: 20
 
         - name: Configure the environment's Grafana Cloud remote-write endpoint
           kubernetes.core.k8s:
@@ -222,6 +231,10 @@
                       password:
                         name: butler-prometheus-remote-write
                         key: api-key
+          register: remote_write_patch
+          until: remote_write_patch is succeeded
+          retries: 5
+          delay: 20
           no_log: true
 
         - name: Set the environment's real HTTPS hostname
@@ -252,6 +265,10 @@
                               name: butler
                               port:
                                 number: 80
+          register: ingress_patch
+          until: ingress_patch is succeeded
+          retries: 5
+          delay: 20
 
         - name: Wait for the rolling deployment to finish
           ansible.builtin.command:
