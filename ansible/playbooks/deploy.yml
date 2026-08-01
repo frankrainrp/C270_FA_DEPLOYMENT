@@ -52,6 +52,9 @@
         api_version: v1
         kind: Namespace
       register: cluster_access
+      until: cluster_access is succeeded
+      retries: 5
+      delay: 20
 
     - name: Verify that the Prometheus Operator CRDs are installed
       ansible.builtin.command:
@@ -89,6 +92,10 @@
                   pod-security.kubernetes.io/enforce: restricted
                   pod-security.kubernetes.io/audit: restricted
                   pod-security.kubernetes.io/warn: restricted
+          register: namespace_apply
+          until: namespace_apply is succeeded
+          retries: 5
+          delay: 20
         - name: Create or update application runtime secrets
           kubernetes.core.k8s:
             kubeconfig: "{{ kubeconfig_path }}"
@@ -105,6 +112,10 @@
                 MONGO_URI: "{{ mongo_uri }}"
                 DEEPSEEK_API_KEY: "{{ deepseek_api_key }}"
                 N8N_OTP_WEBHOOK_URL: "{{ n8n_otp_webhook_url }}"
+          register: runtime_secret_apply
+          until: runtime_secret_apply is succeeded
+          retries: 5
+          delay: 20
           no_log: true
 
         - name: Create or update the MongoDB exporter secret
@@ -121,6 +132,10 @@
               type: Opaque
               stringData:
                 MONGODB_EXPORTER_URI: "{{ mongodb_exporter_uri }}"
+          register: exporter_secret_apply
+          until: exporter_secret_apply is succeeded
+          retries: 5
+          delay: 20
           no_log: true
 
         - name: Create or update the Prometheus remote-write secret
@@ -138,6 +153,10 @@
               stringData:
                 username: "{{ prometheus_username }}"
                 api-key: "{{ prometheus_api_key }}"
+          register: remote_write_secret_apply
+          until: remote_write_secret_apply is succeeded
+          retries: 5
+          delay: 20
           no_log: true
 
         - name: Build the private GHCR pull configuration
@@ -164,6 +183,10 @@
               type: kubernetes.io/dockerconfigjson
               stringData:
                 .dockerconfigjson: "{{ ghcr_docker_config | to_json }}"
+          register: pull_secret_apply
+          until: pull_secret_apply is succeeded
+          retries: 5
+          delay: 20
           no_log: true
 
         - name: Build the selected Kustomize overlay
@@ -172,19 +195,20 @@
           register: rendered_manifests
           changed_when: false
 
-        - name: Apply Kubernetes resources with server-side ownership
-          kubernetes.core.k8s:
-            kubeconfig: "{{ kubeconfig_path }}"
-            state: present
-            apply: true
-            definition: "{{ manifest }}"
-          loop: "{{ rendered_manifests.stdout | from_yaml_all | list }}"
-          loop_control:
-            loop_var: manifest
-            label: "{{ manifest.kind }}/{{ manifest.metadata.name }}"
-            pause: 2
+        - name: Apply the rendered resources in one throttled kubectl process
+          ansible.builtin.command:
+            argv:
+              - kubectl
+              - --kubeconfig
+              - "{{ kubeconfig_path }}"
+              - --request-timeout=30s
+              - apply
+              - --server-side
+              - --field-manager=butler-cd
+              - --filename=-
+            stdin: "{{ rendered_manifests.stdout }}"
           register: manifest_apply
-          until: manifest_apply is succeeded
+          until: manifest_apply.rc == 0
           retries: 5
           delay: 20
 
