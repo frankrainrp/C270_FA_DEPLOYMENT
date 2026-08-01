@@ -15,6 +15,15 @@ spec:
     matchLabels:
       app.kubernetes.io/name: butler
       app.kubernetes.io/component: web
+  remoteWrite:
+    - url: https://prometheus-prod-37-prod-ap-southeast-1.grafana.net/api/prom/push
+      basicAuth:
+        username:
+          name: butler-runtime
+          key: PROMETHEUS_USERNAME
+        password:
+          name: butler-runtime
+          key: PROMETHEUS_API_KEY
   resources:
     requests:
       cpu: 100m
