@@ -45,6 +45,9 @@
           - -f
           - "{{ prometheus_operator_bundle_url }}"
       register: prometheus_operator_install
+      until: prometheus_operator_install is succeeded
+      retries: 5
+      delay: 20
       changed_when: "'configured' in prometheus_operator_install.stdout or 'created' in prometheus_operator_install.stdout"
 
     - name: Wait for the required CRDs to become established

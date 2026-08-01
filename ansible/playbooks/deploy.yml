@@ -178,6 +178,10 @@
             state: present
             apply: true
             definition: "{{ rendered_manifests.stdout | from_yaml_all | list }}"
+          register: manifest_apply
+          until: manifest_apply is succeeded
+          retries: 5
+          delay: 20
 
         - name: Pin the Deployment to the verified GHCR SHA image
           kubernetes.core.k8s:
