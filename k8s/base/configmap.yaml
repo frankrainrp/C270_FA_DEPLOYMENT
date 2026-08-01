@@ -19,3 +19,23 @@ data:
   OTP_MAX_ATTEMPTS: "5"
   SESSION_TTL_DAYS: "30"
   SESSION_COOKIE_NAME: butler_session
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: butler-prometheus-config
+  labels:
+    app.kubernetes.io/name: butler
+    app.kubernetes.io/component: web
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 60s
+    remote_write:
+      - url: https://prometheus-prod-37-prod-ap-southeast-1.grafana.net/api/prom/push
+        basic_auth:
+          username: {{PROMETHEUS_USERNAME}}
+          password: {{PROMETHEUS_API_KEY}}
+      - job_name: node
+        static_configs:
+          - targets: ["localhost:9090", "localhost:9216"]
