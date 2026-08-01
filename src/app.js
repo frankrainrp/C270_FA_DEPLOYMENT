@@ -28,6 +28,7 @@ try {
 const mountRoutes = require("./routes");
 const { makeFail } = require("./lib/apiResponse");
 const { connectDb } = require("./lib/db");
+const { metricsRegistry, observeHttpRequest, setDbConnectedState } = require("./lib/metrics");
 const AuthService = require("./services/AuthService");
 
 AuthService.assertProductionConfig();
@@ -37,11 +38,21 @@ const app = express();
 // ------------------------------------------------------------------
 // Global middleware
 // ------------------------------------------------------------------
+app.use((req, res, next) => {
+  const startTimeNs = process.hrtime.bigint();
+  res.on("finish", () => observeHttpRequest(req, res, startTimeNs));
+  next();
+});
 app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 app.use(express.json({ limit: "5mb" }));
 // Static assets served from src/public.
 // Requests like /css/style.css or /js/shell.js resolve to files here.
 app.use(express.static(path.join(__dirname, "public")));
+
+app.get("/metrics", async (_req, res) => {
+  res.set("Content-Type", metricsRegistry.contentType);
+  res.end(await metricsRegistry.metrics());
+});
 
 // ------------------------------------------------------------------
 // EJS view engine
@@ -88,6 +99,7 @@ let shuttingDown = false;
 /** Starts listening only after MongoDB is ready, so Docker health is truthful. */
 async function start() {
   await connectDb();
+  setDbConnectedState(true);
   server = app.listen(PORT, () => {
     console.log(`Butler is running at http://localhost:${PORT}`);
   });
@@ -102,6 +114,7 @@ async function shutdown(signal) {
   if (server) {
     await new Promise((resolve) => server.close(resolve));
   }
+  setDbConnectedState(false);
   await mongoose.disconnect();
 }
 

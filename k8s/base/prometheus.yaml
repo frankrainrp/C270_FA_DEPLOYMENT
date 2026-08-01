@@ -1,0 +1,25 @@
+apiVersion: monitoring.coreos.com/v1
+kind: Prometheus
+metadata:
+  name: butler
+  labels:
+    app.kubernetes.io/name: butler
+    app.kubernetes.io/component: web
+spec:
+  serviceMonitorSelector:
+    matchLabels:
+      app.kubernetes.io/name: butler
+      app.kubernetes.io/component: web
+  serviceMonitorNamespaceSelector: {}
+  ruleSelector:
+    matchLabels:
+      app.kubernetes.io/name: butler
+      app.kubernetes.io/component: web
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 250m
+      memory: 512Mi
+  retention: 24h

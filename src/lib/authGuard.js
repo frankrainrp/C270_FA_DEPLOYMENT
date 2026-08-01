@@ -10,7 +10,7 @@ const { readSessionCookie } = require("./cookies");
 const { makeFail } = require("./apiResponse");
 
 const AUTH_REQUIRED = process.env.AUTH_REQUIRED !== "false";
-const PUBLIC_EXACT_PATHS = new Set(["/auth/login", "/api/live", "/api/health"]);
+const PUBLIC_EXACT_PATHS = new Set(["/auth/login", "/api/live", "/api/health", "/metrics"]);
 
 /** Returns true when a request may be served without a login session. */
 function isPublicPath(path) {

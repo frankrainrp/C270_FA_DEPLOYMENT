@@ -18,6 +18,8 @@
       staging: butler-staging
       production: butler-production
     target_namespace: "{{ namespace_by_environment[deploy_environment] | default('') }}"
+    prometheus_operator_namespace: monitoring
+    prometheus_operator_bundle_url: https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/main/bundle.yaml
     repository_root: "{{ playbook_dir }}/../.."
     overlay_path: "{{ repository_root }}/k8s/overlays/{{ deploy_environment }}"
 
@@ -64,6 +66,45 @@
                   pod-security.kubernetes.io/enforce: restricted
                   pod-security.kubernetes.io/audit: restricted
                   pod-security.kubernetes.io/warn: restricted
+      
+        - name: Ensure the Prometheus Operator namespace exists
+          kubernetes.core.k8s:
+            kubeconfig: "{{ kubeconfig_path }}"
+            state: present
+            apply: true
+            definition:
+              apiVersion: v1
+              kind: Namespace
+              metadata:
+                name: "{{ prometheus_operator_namespace }}"
+
+        - name: Install Prometheus Operator with kubectl
+          ansible.builtin.command:
+            argv:
+              - kubectl
+              - --kubeconfig
+              - "{{ kubeconfig_path }}"
+              - --namespace
+              - "{{ prometheus_operator_namespace }}"
+              - apply
+              - -f
+              - "{{ prometheus_operator_bundle_url }}"
+          register: prometheus_operator_install
+          changed_when: false
+
+        - name: Wait for Prometheus Operator CRDs to become established
+          ansible.builtin.command:
+            argv:
+              - kubectl
+              - --kubeconfig
+              - "{{ kubeconfig_path }}"
+              - wait
+              - --for=condition=Established
+              - crd/servicemonitors.monitoring.coreos.com
+              - crd/prometheuses.monitoring.coreos.com
+              - --timeout=120s
+          register: prometheus_operator_crds
+          changed_when: false
 
         - name: Create or update application runtime secrets
           kubernetes.core.k8s:

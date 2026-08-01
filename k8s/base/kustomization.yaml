@@ -4,6 +4,9 @@ resources:
   - configmap.yaml
   - deployment.yaml
   - service.yaml
+  - servicemonitor.yaml
+  - prometheus.yaml
+  - prometheusrule.yaml
   - ingress.yaml
   - hpa.yaml
   - pdb.yaml
