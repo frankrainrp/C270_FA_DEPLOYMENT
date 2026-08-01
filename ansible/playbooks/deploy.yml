@@ -21,6 +21,9 @@
     namespace_by_environment:
       staging: butler-staging
       production: butler-production
+    app_host_placeholder_by_environment:
+      staging: staging.butler.invalid
+      production: butler.invalid
     target_namespace: "{{ namespace_by_environment[deploy_environment] | default('') }}"
     repository_root: "{{ playbook_dir }}/../.."
     overlay_path: "{{ repository_root }}/k8s/overlays/{{ deploy_environment }}"
@@ -202,7 +205,7 @@
                 rendered_manifests.stdout
                 | replace('ghcr.io/frankrainrp/c270_fa_deployment:sha-REQUIRED', image_ref)
                 | replace('https://prometheus.example.invalid/api/prom/push', prometheus_remote_write_url)
-                | replace(deploy_environment + '.butler.invalid', app_host)
+                | replace(app_host_placeholder_by_environment[deploy_environment], app_host)
               }}
           no_log: true
 
