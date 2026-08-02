@@ -31,3 +31,6 @@ build/
 /output/
 /tmp/
 /$out/
+
+# Local presentation notes
+/DEVOPS_TEAM_LEARNING_GUIDE.md
