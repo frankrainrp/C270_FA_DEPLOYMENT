@@ -1,3 +1,4 @@
+// Owner: Chong Khen - Trivy Security and Quality Testing
 const assert = require("node:assert/strict");
 const test = require("node:test");
 

@@ -1,3 +1,4 @@
+// Owner: Chong Khen - Trivy Security and Quality Testing
 // CI/CD Submission Validation Script
 import fs from 'fs';
 

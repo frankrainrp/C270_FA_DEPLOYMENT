@@ -1,3 +1,4 @@
+# Owner: Chong Khen - Trivy Security and Quality Testing
 # Dependencies
 node_modules/
 
@@ -30,3 +31,6 @@ build/
 /output/
 /tmp/
 /$out/
+
+# Local presentation notes
+/DEVOPS_TEAM_LEARNING_GUIDE.md

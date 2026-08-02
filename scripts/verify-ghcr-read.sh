@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Owner: Kaiduo - DevOps Architecture and CI/CD Integration
 set -euo pipefail
 
 : "${GHCR_USERNAME:?GHCR_USERNAME is required}"
