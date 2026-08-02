@@ -1,3 +1,5 @@
+# Primary owner: Kaiduo - DevOps Architecture and CI/CD Integration
+# Shared sections identify their responsible owner inline.
 name: CI, Container Delivery, and Kubernetes Deployment
 
 on:
@@ -28,6 +30,7 @@ env:
   IMAGE_NAME: ghcr.io/${{ github.repository }}
 
 jobs:
+  # Owner: Kaiduo - CI/CD workflow integration and quality orchestration
   quality:
     name: Test and security gate
     runs-on: ubuntu-latest
@@ -36,6 +39,7 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v6
 
+      # Owner: Chong Khen - CI security and quality gate
       - name: Lint GitHub Actions workflow
         run: docker run --rm --volume "$PWD:/repo" --workdir /repo rhysd/actionlint:1.7.12 -color
 
@@ -51,9 +55,11 @@ jobs:
       - name: Run validation and automated tests
         run: npm run test:ci
 
+      # Owner: Chong Khen - CI security and quality gate
       - name: Block high-severity dependency vulnerabilities
         run: npm run audit:ci
 
+      # Owner: Chong Khen - Trivy filesystem, secret, and misconfiguration scan
       - name: Scan source, secrets, and deployment configuration
         uses: aquasecurity/trivy-action@v0.36.0
         with:
@@ -70,6 +76,7 @@ jobs:
           docker compose config -q
           docker compose -f docker-compose.db.yml config -q
 
+  # Owner: Kaiduo - CI/CD deployment configuration integration
   deployment-validation:
     name: Validate Kubernetes and Ansible
     runs-on: ubuntu-latest
@@ -109,6 +116,7 @@ jobs:
           ansible-playbook --syntax-check --inventory localhost, ansible/playbooks/deploy.yml
           ansible-playbook --syntax-check --inventory localhost, ansible/playbooks/rollback.yml
 
+  # Owner: Yu Fei - K3s and Monitoring
   bootstrap-prometheus-operator:
     name: Bootstrap Prometheus Operator
     if: github.event_name == 'workflow_dispatch' && inputs.operation == 'bootstrap-prometheus-operator'
@@ -143,6 +151,7 @@ jobs:
           K8S_AUTH_KUBECONFIG: /home/github-runner/.kube/config
         run: ansible-playbook ansible/playbooks/install-prometheus-operator.yml
 
+  # Owner: Kaiduo - container build and smoke-test integration
   docker-smoke:
     name: Build and smoke-test containers
     needs: quality
@@ -192,6 +201,7 @@ jobs:
         if: always()
         run: docker compose down -v --remove-orphans
 
+  # Owner: Kaiduo - Docker image delivery and GHCR publishing
   publish:
     name: Publish verified image to GHCR
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -220,6 +230,7 @@ jobs:
       - name: Build local candidate image for security scan
         run: docker build --pull --tag "${{ steps.image.outputs.ref }}" .
 
+      # Owner: Chong Khen - Trivy container image scan
       - name: Block high-severity candidate image vulnerabilities
         uses: aquasecurity/trivy-action@v0.36.0
         with:
@@ -258,6 +269,7 @@ jobs:
           provenance: mode=max
           sbom: true
 
+  # Owner: Ei Htet Htet Tun - server deployment and presentation
   deploy-staging:
     name: Deploy staging with Ansible
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.STAGING_DEPLOY_ENABLED == 'true'
@@ -314,6 +326,7 @@ jobs:
           GHCR_READ_TOKEN: ${{ secrets.GHCR_READ_TOKEN }}
         run: ansible-playbook ansible/playbooks/deploy.yml
 
+  # Owner: Ei Htet Htet Tun - server deployment and presentation
   deploy-production:
     name: Approve and deploy production with Ansible
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.PRODUCTION_DEPLOY_ENABLED == 'true'

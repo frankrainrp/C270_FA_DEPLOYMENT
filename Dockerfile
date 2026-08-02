@@ -1,3 +1,4 @@
+# Owner: Kaiduo - DevOps Architecture and CI/CD Integration
 FROM node:24-alpine
 
 WORKDIR /usr/src/app
