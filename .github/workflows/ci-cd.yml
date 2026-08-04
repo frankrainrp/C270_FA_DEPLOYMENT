@@ -15,6 +15,7 @@ on:
         type: choice
         options:
           - validate
+          - deploy-staging
           - bootstrap-prometheus-operator
 
 permissions:
@@ -204,7 +205,10 @@ jobs:
   # Owner: Kaiduo - Docker image delivery and GHCR publishing
   publish:
     name: Publish verified image to GHCR
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' && inputs.operation == 'deploy-staging'))
     needs: [quality, deployment-validation, docker-smoke]
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -272,7 +276,11 @@ jobs:
   # Owner: Ei Htet Htet Tun - server deployment and presentation
   deploy-staging:
     name: Deploy staging with Ansible
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.STAGING_DEPLOY_ENABLED == 'true'
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      vars.STAGING_DEPLOY_ENABLED == 'true' &&
+      (github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' && inputs.operation == 'deploy-staging'))
     needs: publish
     runs-on: [self-hosted, Linux, X64, butler-k3s]
     timeout-minutes: 20
