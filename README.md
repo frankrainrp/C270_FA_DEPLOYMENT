@@ -1,4 +1,4 @@
-<p align="center"><img src="docs/assets/butler-logo.png" alt="Study Butler logo" width="100"></p>
+<p align="center"><img src="docs/assets/butler-mark.svg" alt="Study Butler logo" width="100"></p>
 
 # Study Butler — AI Study Workspace
 
