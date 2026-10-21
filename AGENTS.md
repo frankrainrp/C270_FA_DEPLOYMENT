@@ -8,5 +8,6 @@ This repository is the Express/EJS/MongoDB Study Butler application referenced b
 - `ChatService.js` maps compatibility IDs to `deepseek-chat` and `deepseek-reasoner`; inspect that map before describing model capabilities.
 - Keep OTP/provider credentials server-side. Use deployment-specific environment values and synthetic test accounts.
 - Preserve `test/`, lockfiles, Compose, Kubernetes, Ansible and CI configuration.
+- Mammoth's CLI parser is pinned through npm overrides to dependency-free `argparse@2.0.1`. Preserve the DOCX and upstream CLI compatibility checks when changing this override.
 - Run `npm run test:ci` for application changes. Use container smoke verification for runtime/deployment changes.
 - Write English technical documentation using actual model names, endpoints, data stores and operation types.
